@@ -950,7 +950,7 @@ class UniversalDragAndDrop {
     }
 }
 
-class Snapdrop {
+class LinkApp {
     constructor() {
         const server = new ServerConnection();
         const peers = new PeersManager(server);
@@ -973,7 +973,7 @@ class Snapdrop {
     }
 }
 
-const snapdrop = new Snapdrop();
+const linkApp = new LinkApp();
 
 
 

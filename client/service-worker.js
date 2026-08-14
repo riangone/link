@@ -1,4 +1,4 @@
-var CACHE_NAME = 'snapdrop-cache-v5';
+var CACHE_NAME = 'link-cache-v6';
 var urlsToCache = [
   'index.html',
   './',

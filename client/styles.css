@@ -264,42 +264,53 @@ x-no-peers h2 {
     max-width: 280px;
 }
 
-x-no-peers::before, x-no-peers::after {
+x-no-peers::before {
     content: '';
     position: absolute;
     top: 40px;
     left: calc(50% - 40px);
     width: 80px;
     height: 80px;
-    border: 1px solid var(--primary-color);
+    border: 1.5px dashed var(--primary-color);
     border-radius: 50%;
-    opacity: 0;
-    animation: radar-pulse 4s cubic-bezier(0.215, 0.610, 0.355, 1) infinite;
+    opacity: 0.5;
+    animation: rotate-slow 15s linear infinite;
     pointer-events: none;
     z-index: 1;
 }
 
 x-no-peers::after {
-    animation-delay: 2s;
+    content: '';
+    position: absolute;
+    top: 40px;
+    left: calc(50% - 40px);
+    width: 80px;
+    height: 80px;
+    background-image: radial-gradient(circle, var(--primary-color) 0%, transparent 65%);
+    border-radius: 50%;
+    opacity: 0.25;
+    animation: breathing 3s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
 }
 
-x-no-peers::before {
-    /* Centered starting point indicator */
-    background-image: radial-gradient(circle, var(--primary-color) 0%, transparent 60%);
-    border-width: 2px;
-}
-
-@keyframes radar-pulse {
+@keyframes rotate-slow {
     0% {
-        transform: scale(0.6);
-        opacity: 0;
-    }
-    10% {
-        opacity: 0.6;
+        transform: rotate(0deg);
     }
     100% {
-        transform: scale(3.5);
-        opacity: 0;
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes breathing {
+    0%, 100% {
+        transform: scale(0.92);
+        opacity: 0.15;
+    }
+    50% {
+        transform: scale(1.08);
+        opacity: 0.35;
     }
 }
 
