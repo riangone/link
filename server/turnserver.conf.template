@@ -1,0 +1,11 @@
+# coturn configuration for Snapdrop
+listening-port=3478
+fingerprint
+use-auth-secret
+static-auth-secret=snapdrop-static-auth-secret-12345
+realm=link.0101.click
+total-quota=0
+bps-capacity=0
+stale-nonce=600
+log-file=/var/log/turnserver/turnserver.log
+simple-log

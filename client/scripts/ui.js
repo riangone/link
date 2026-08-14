@@ -525,6 +525,55 @@ class WebShareTargetUI {
     }
 }
 
+class RoomStatusUI {
+    constructor() {
+        this.$roomStatus = $('roomStatus');
+        this.$btnCopyRoom = $('btnCopyRoom');
+        this.$btnCreateRoom = $('btnCreateRoom');
+        this.$btnLeaveRoom = $('btnLeaveRoom');
+
+        if (this.$btnCopyRoom) this.$btnCopyRoom.addEventListener('click', () => this._onCopyRoom());
+        if (this.$btnCreateRoom) this.$btnCreateRoom.addEventListener('click', () => this._onCreateRoom());
+        if (this.$btnLeaveRoom) this.$btnLeaveRoom.addEventListener('click', () => this._onLeaveRoom());
+
+        Events.on('room-changed', () => this._updateRoomUI());
+        // Handle direct load with hash
+        this._updateRoomUI();
+    }
+
+    _updateRoomUI() {
+        if (!this.$roomStatus) return;
+        const hash = window.location.hash;
+        if (hash && hash.length > 1) {
+            const roomName = decodeURIComponent(hash.substring(1));
+            this.$roomStatus.textContent = `Room: ${roomName}`;
+            if (this.$btnCopyRoom) this.$btnCopyRoom.style.display = 'inline-block';
+            if (this.$btnLeaveRoom) this.$btnLeaveRoom.style.display = 'inline-block';
+            if (this.$btnCreateRoom) this.$btnCreateRoom.style.display = 'none';
+        } else {
+            this.$roomStatus.textContent = 'You can be discovered by everyone on this network';
+            if (this.$btnCopyRoom) this.$btnCopyRoom.style.display = 'none';
+            if (this.$btnLeaveRoom) this.$btnLeaveRoom.style.display = 'none';
+            if (this.$btnCreateRoom) this.$btnCreateRoom.style.display = 'inline-block';
+        }
+    }
+
+    _onCopyRoom() {
+        navigator.clipboard.writeText(window.location.href)
+            .then(() => Events.fire('notify-user', 'Room link copied to clipboard'))
+            .catch(() => Events.fire('notify-user', 'Failed to copy link'));
+    }
+
+    _onCreateRoom() {
+        const randomRoom = Math.random().toString(36).substring(2, 8);
+        window.location.hash = randomRoom;
+    }
+
+    _onLeaveRoom() {
+        window.location.hash = '';
+    }
+}
+
 
 class Snapdrop {
     constructor() {
@@ -539,6 +588,7 @@ class Snapdrop {
             const notifications = new Notifications();
             const networkStatusUI = new NetworkStatusUI();
             const webShareTargetUI = new WebShareTargetUI();
+            const roomStatusUI = new RoomStatusUI();
         });
     }
 }

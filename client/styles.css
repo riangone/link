@@ -318,6 +318,32 @@ footer .font-body2 {
     color: var(--primary-color);
 }
 
+footer .room-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 10px;
+    justify-content: center;
+}
+
+footer button.button-link {
+    background: transparent;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+footer button.button-link:hover {
+    background: var(--primary-color);
+    color: #fff;
+    opacity: 0.9;
+}
+
 @media (min-height: 800px) {
     footer {
         margin-bottom: 16px;

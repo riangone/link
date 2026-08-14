@@ -66,7 +66,14 @@
             <use xlink:href="#wifi-tethering" />
         </svg>
         <div id="displayName" placeholder="The easiest way to transfer data across devices"></div>
-        <div class="font-body2">You can be discovered by everyone on this network</div>
+        <div id="roomContainer" class="column center">
+            <div id="roomStatus" class="font-body2">You can be discovered by everyone on this network</div>
+            <div class="room-actions">
+                <button id="btnCopyRoom" class="button-link" title="Copy Room Link" style="display:none;">Copy Room Link</button>
+                <button id="btnCreateRoom" class="button-link" title="Create Private Room">Create Private Room</button>
+                <button id="btnLeaveRoom" class="button-link" title="Leave Private Room" style="display:none;">Leave Room</button>
+            </div>
+        </div>
     </footer>
     <!-- Receive Dialog -->
     <x-dialog id="receiveDialog">

@@ -13,6 +13,26 @@ process.on('SIGTERM', () => {
 
 const parser = require('ua-parser-js');
 const { uniqueNamesGenerator, animals, colors } = require('unique-names-generator');
+const url = require('url');
+const crypto = require('crypto');
+
+const TURN_SECRET = process.env.TURN_SECRET || 'snapdrop-static-auth-secret-12345';
+const TURN_URLS = [
+    'turn:link.0101.click:3478?transport=udp',
+    'turn:link.0101.click:3478?transport=tcp'
+];
+
+function getTurnCredentials(username) {
+    const unixTimestamp = parseInt(Date.now() / 1000) + 24 * 3600; // 24 hours validity
+    const turnUsername = [unixTimestamp, username].join(':');
+    const hmac = crypto.createHmac('sha1', TURN_SECRET);
+    hmac.update(turnUsername);
+    const password = hmac.digest('base64');
+    return {
+        username: turnUsername,
+        password: password
+    };
+}
 
 class SnapdropServer {
 
@@ -40,6 +60,20 @@ class SnapdropServer {
                 displayName: peer.name.displayName,
                 deviceName: peer.name.deviceName
             }
+        });
+
+        // send turn-config with dynamically generated credentials
+        const creds = getTurnCredentials(peer.id);
+        this._send(peer, {
+            type: 'turn-config',
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                {
+                    urls: TURN_URLS,
+                    username: creds.username,
+                    credential: creds.password
+                }
+            ]
         });
     }
 
@@ -182,14 +216,22 @@ class Peer {
     }
 
     _setIP(request) {
+        let ip;
         if (request.headers['x-forwarded-for']) {
-            this.ip = request.headers['x-forwarded-for'].split(/\s*,\s*/)[0];
+            ip = request.headers['x-forwarded-for'].split(/\s*,\s*/)[0];
         } else {
-            this.ip = request.connection.remoteAddress;
+            ip = request.connection.remoteAddress;
         }
-        // IPv4 and IPv6 use different values to refer to localhost
-        if (this.ip == '::1' || this.ip == '::ffff:127.0.0.1') {
-            this.ip = '127.0.0.1';
+        if (ip === '::1' || ip === '::ffff:127.0.0.1') {
+            ip = '127.0.0.1';
+        }
+
+        const parsedUrl = url.parse(request.url, true);
+        const room = parsedUrl.query && parsedUrl.query.room;
+        if (room) {
+            this.ip = 'room-' + room;
+        } else {
+            this.ip = ip;
         }
     }
 

@@ -8,6 +8,17 @@ class ServerConnection {
         Events.on('beforeunload', e => this._disconnect());
         Events.on('pagehide', e => this._disconnect());
         document.addEventListener('visibilitychange', e => this._onVisibilityChange());
+        window.addEventListener('hashchange', e => this._onHashChange());
+    }
+
+    _onHashChange() {
+        console.log('WS: Hash changed, reconnecting to new room...');
+        if (this._socket) {
+            this._socket.onclose = null;
+            this._socket.close();
+        }
+        this._connect();
+        Events.fire('room-changed');
     }
 
     _connect() {
@@ -44,6 +55,12 @@ class ServerConnection {
             case 'display-name':
                 Events.fire('display-name', msg);
                 break;
+            case 'turn-config':
+                Events.fire('turn-config', msg);
+                break;
+            case 'peer-message':
+                Events.fire('peer-message', msg);
+                break;
             default:
                 console.error('WS: unkown message type', msg);
         }
@@ -58,7 +75,12 @@ class ServerConnection {
         // hack to detect if deployment or development environment
         const protocol = location.protocol.startsWith('https') ? 'wss' : 'ws';
         const webrtc = window.isRtcSupported ? '/webrtc' : '/fallback';
-        const url = protocol + '://' + location.host + location.pathname + 'server' + webrtc;
+        let roomId = '';
+        if (location.hash && location.hash.length > 1) {
+            roomId = encodeURIComponent(location.hash.substring(1));
+        }
+        const query = roomId ? `?room=${roomId}` : '';
+        const url = protocol + '://' + location.host + location.pathname + 'server' + webrtc + query;
         return url;
     }
 
@@ -307,6 +329,7 @@ class RTCPeer extends Peer {
     }
 
     _onConnectionStateChange(e) {
+        if (!this._conn) return;
         console.log('RTC: state changed:', this._conn.connectionState);
         switch (this._conn.connectionState) {
             case 'disconnected':
@@ -315,18 +338,25 @@ class RTCPeer extends Peer {
             case 'failed':
                 this._conn = null;
                 this._onChannelClosed();
+                this._fallbackToWSPeer();
                 break;
         }
     }
 
     _onIceConnectionStateChange() {
+        if (!this._conn) return;
         switch (this._conn.iceConnectionState) {
             case 'failed':
                 console.error('ICE Gathering failed');
+                this._fallbackToWSPeer();
                 break;
             default:
                 console.log('ICE Gathering', this._conn.iceConnectionState);
         }
+    }
+
+    _fallbackToWSPeer() {
+        Events.fire('peer-fallback', this._peerId);
     }
 
     _onError(error) {
@@ -365,10 +395,18 @@ class PeersManager {
         this.peers = {};
         this._server = serverConnection;
         Events.on('signal', e => this._onMessage(e.detail));
+        Events.on('peer-message', e => this._onPeerMessage(e.detail));
+        Events.on('peer-fallback', e => this._onPeerFallback(e.detail));
         Events.on('peers', e => this._onPeers(e.detail));
         Events.on('files-selected', e => this._onFilesSelected(e.detail));
         Events.on('send-text', e => this._onSendText(e.detail));
         Events.on('peer-left', e => this._onPeerLeft(e.detail));
+        Events.on('turn-config', e => this._onTurnConfig(e.detail));
+    }
+
+    _onTurnConfig(config) {
+        console.log('WS: Setting ICE Servers config', config.iceServers);
+        RTCPeer.config.iceServers = config.iceServers;
     }
 
     _onMessage(message) {
@@ -376,6 +414,37 @@ class PeersManager {
             this.peers[message.sender] = new RTCPeer(this._server);
         }
         this.peers[message.sender].onServerMessage(message);
+    }
+
+    _onPeerMessage(message) {
+        const senderId = message.sender;
+        if (!this.peers[senderId]) {
+            this.peers[senderId] = new WSPeer(this._server, senderId);
+        }
+        const peer = this.peers[senderId];
+        if (peer instanceof WSPeer) {
+            peer.onServerMessage(message);
+        }
+    }
+
+    _onPeerFallback(peerId) {
+        const oldPeer = this.peers[peerId];
+        if (oldPeer && oldPeer instanceof RTCPeer) {
+            try {
+                if (oldPeer._channel) oldPeer._channel.close();
+                if (oldPeer._conn) oldPeer._conn.close();
+            } catch (e) {}
+
+            const filesQueue = oldPeer._filesQueue || [];
+            const wsPeer = new WSPeer(this._server, peerId);
+            wsPeer._filesQueue = filesQueue;
+            this.peers[peerId] = wsPeer;
+
+            if (filesQueue.length > 0) {
+                wsPeer._dequeueFile();
+            }
+            console.log(`Successfully fell back to WSPeer for peer ${peerId}`);
+        }
     }
 
     _onPeers(peers) {
@@ -407,16 +476,103 @@ class PeersManager {
     _onPeerLeft(peerId) {
         const peer = this.peers[peerId];
         delete this.peers[peerId];
-        if (!peer || !peer._peer) return;
-        peer._peer.close();
+        if (!peer) return;
+        if (peer._channel) {
+            try { peer._channel.close(); } catch (e) {}
+        }
+        if (peer._conn) {
+            try { peer._conn.close(); } catch (e) {}
+        }
     }
 
 }
 
-class WSPeer {
+class WSPeer extends Peer {
+    constructor(serverConnection, peerId) {
+        super(serverConnection, peerId);
+    }
+
+    sendFiles(files) {
+        const LIMIT = 10 * 1024 * 1024;
+        const largeFiles = [];
+        const okFiles = [];
+        for (let i = 0; i < files.length; i++) {
+            if (files[i].size > LIMIT) {
+                largeFiles.push(files[i]);
+            } else {
+                okFiles.push(files[i]);
+            }
+        }
+        
+        if (largeFiles.length > 0) {
+            Events.fire('notify-user', `Files > 10MB cannot be sent via relay (WebRTC failed).`);
+        }
+        
+        if (okFiles.length > 0) {
+            super.sendFiles(okFiles);
+        }
+    }
+
     _send(message) {
-        message.to = this._peerId;
-        this._server.send(message);
+        if (typeof message === 'string') {
+            this._server.send({
+                type: 'peer-message',
+                to: this._peerId,
+                message: message
+            });
+        } else {
+            this._sendArrayBuffer(message);
+        }
+    }
+
+    _sendArrayBuffer(arrayBuffer) {
+        const base64 = this._arrayBufferToBase64(arrayBuffer);
+        this.sendJSON({
+            type: 'peer-message',
+            to: this._peerId,
+            message: base64,
+            isBinary: true
+        });
+    }
+
+    onServerMessage(message) {
+        if (message.isBinary) {
+            const arrayBuffer = this._base64ToArrayBuffer(message.message);
+            this._onMessage(arrayBuffer);
+        } else {
+            this._onMessage(message.message);
+        }
+    }
+
+    _arrayBufferToBase64(buffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
+    }
+
+    _base64ToArrayBuffer(base64) {
+        const binary_string = window.atob(base64);
+        const len = binary_string.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binary_string.charCodeAt(i);
+        }
+        return bytes.buffer;
+    }
+
+    refresh() {
+    }
+
+    _isConnected() {
+        return this._server._isConnected();
+    }
+
+    _isConnecting() {
+        return this._server._isConnecting();
     }
 }
 
