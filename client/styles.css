@@ -132,6 +132,56 @@ header a:hover {
     transform: scale(1.05);
 }
 
+/* Language Selection Styling */
+.language-select-wrapper {
+    display: flex;
+    align-items: center;
+    position: relative;
+    margin-left: 12px;
+    height: 36px;
+    padding: 0 10px;
+    border-radius: 18px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    transition: all var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.language-select-wrapper:hover {
+    background: var(--bg-color-secondary);
+    border-color: var(--primary-color);
+    box-shadow: var(--card-shadow);
+}
+
+.language-select-wrapper .icon {
+    width: 18px;
+    height: 18px;
+    margin-right: 4px;
+    color: var(--text-muted);
+    transition: color var(--transition-speed);
+}
+
+.language-select-wrapper:hover .icon {
+    color: var(--text-color);
+}
+
+.language-select-wrapper select {
+    background: transparent;
+    border: 0;
+    color: var(--text-color);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    padding-right: 2px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
 /* Typography */
 h1 {
     font-size: 32px;

@@ -41,37 +41,48 @@
 
 <body translate="no">
     <header class="row-reverse">
-        <a href="#about" class="icon-button" title="About Link">
+        <a href="#about" class="icon-button" title="About Link" data-translate-title="header_about_title">
             <svg class="icon">
                 <use xlink:href="#info-outline" />
             </svg>
         </a>
-        <a href="#" id="theme-toggle" class="icon-button" title="Toggle Theme">
+        <a href="#" id="theme-toggle" class="icon-button" title="Toggle Theme" data-translate-title="header_theme_title">
             <svg class="icon">
                 <use xlink:href="#theme-toggle-icon" />
             </svg>
         </a>
-        <a href="#" id="transfers-toggle" class="icon-button" title="Transfer Center" style="position: relative;">
+        <a href="#" id="transfers-toggle" class="icon-button" title="Transfer Center" data-translate-title="header_transfers_title" style="position: relative;">
             <svg class="icon">
                 <use xlink:href="#swap-vert" />
             </svg>
             <span id="transfers-badge" class="badge" hidden>0</span>
         </a>
-        <a href="#" id="notification" class="icon-button" title="Enable Notifications" hidden>
+        <a href="#" id="notification" class="icon-button" title="Enable Notifications" data-translate-title="header_notifications_title" hidden>
             <svg class="icon">
                 <use xlink:href="#notifications" />
             </svg>
         </a>
-        <a href="#" id="install" class="icon-button" title="Install Link" hidden>
+        <a href="#" id="install" class="icon-button" title="Install Link" data-translate-title="header_install_title" hidden>
             <svg class="icon">
                 <use xlink:href="#homescreen" />
             </svg>
         </a>
+        <div class="language-select-wrapper" title="Change Language">
+            <svg class="icon">
+                <use xlink:href="#language-icon" />
+            </svg>
+            <select id="language-select">
+                <option value="en">English</option>
+                <option value="zh">简体中文</option>
+                <option value="ja">日本語</option>
+                <option value="ko">한국어</option>
+            </select>
+        </div>
     </header>
     <!-- Peers -->
     <x-peers class="center"></x-peers>
     <x-no-peers>
-        <h2>Open Link on other devices to send files</h2>
+        <h2 data-translate="no_peers_msg">Open Link on other devices to send files</h2>
     </x-no-peers>
     <x-instructions desktop="Click to send files or right click to send a message" mobile="Tap to send files or long tap to send a message"></x-instructions>
     <!-- Footer -->
@@ -79,13 +90,13 @@
         <svg class="icon logo">
             <use xlink:href="#wifi-tethering" />
         </svg>
-        <div id="displayName" placeholder="The easiest way to transfer data across devices"></div>
+        <div id="displayName" data-translate-placeholder="display_name_default" placeholder="The easiest way to transfer data across devices"></div>
         <div id="roomContainer" class="column center">
-            <div id="roomStatus" class="font-body2">You can be discovered by everyone on this network</div>
+            <div id="roomStatus" class="font-body2" data-translate="room_status_public">You can be discovered by everyone on this network</div>
             <div class="room-actions">
-                <button id="btnCopyRoom" class="button-link" title="Copy Room Link" style="display:none;">Copy Room Link</button>
-                <button id="btnCreateRoom" class="button-link" title="Create Private Room">Create Private Room</button>
-                <button id="btnLeaveRoom" class="button-link" title="Leave Private Room" style="display:none;">Leave Room</button>
+                <button id="btnCopyRoom" class="button-link" title="Copy Room Link" data-translate-title="btn_copy_room" data-translate="btn_copy_room" style="display:none;">Copy Room Link</button>
+                <button id="btnCreateRoom" class="button-link" title="Create Private Room" data-translate-title="btn_create_room" data-translate="btn_create_room">Create Private Room</button>
+                <button id="btnLeaveRoom" class="button-link" title="Leave Private Room" data-translate-title="btn_leave_room" data-translate="btn_leave_room" style="display:none;">Leave Room</button>
             </div>
         </div>
     </footer>
@@ -93,19 +104,19 @@
     <x-dialog id="receiveDialog">
         <x-background class="full center">
             <x-paper shadow="2">
-                <h3>File Received</h3>
+                <h3 data-translate="dialog_receive_title">File Received</h3>
                 <div class="font-subheading" id="fileName">Filename</div>
                 <div class="font-body2" id="fileSize"></div>
                 <div class='preview' style="visibility: hidden;">
                     <img id='img-preview' src="">
                 </div>
                 <div class="row">
-                    <label for="autoDownload" class="grow">Ask to save each file before downloading</label>
+                    <label for="autoDownload" class="grow" data-translate="dialog_receive_auto">Ask to save each file before downloading</label>
                     <input type="checkbox" id="autoDownload" checked="">
                 </div>
                 <div class="row-reverse">
-                    <a class="button" close id="download" title="Download File" autofocus>Save</a>
-                    <button class="button" close>Ignore</button>
+                    <a class="button" close id="download" title="Download File" data-translate-title="click_to_download" data-translate="dialog_receive_save" autofocus>Save</a>
+                    <button class="button" close data-translate="dialog_receive_ignore">Ignore</button>
                 </div>
             </x-paper>
         </x-background>
@@ -115,11 +126,11 @@
         <form action="#">
             <x-background class="full center">
                 <x-paper shadow="2">
-                    <h3>Send a Message</h3>
-                    <div id="textInput" class="textarea" role="textbox" placeholder="Send a message" autocomplete="off" autofocus contenteditable></div>
+                    <h3 data-translate="dialog_send_text_title">Send a Message</h3>
+                    <div id="textInput" class="textarea" role="textbox" data-translate-placeholder="dialog_send_text_placeholder" placeholder="Send a message" autocomplete="off" autofocus contenteditable></div>
                     <div class="row-reverse">
-                        <button class="button" type="submit" close>Send</button>
-                        <a class="button" close>Cancel</a>
+                        <button class="button" type="submit" close data-translate="dialog_send_text_send">Send</button>
+                        <a class="button" close data-translate="dialog_send_text_cancel">Cancel</a>
                     </div>
                 </x-paper>
             </x-background>
@@ -129,11 +140,11 @@
     <x-dialog id="receiveTextDialog">
         <x-background class="full center">
             <x-paper shadow="2">
-                <h3>Message Received</h3>
+                <h3 data-translate="dialog_receive_text_title">Message Received</h3>
                 <div class="font-subheading" id="text"></div>
                 <div class="row-reverse">
-                    <button class="button" id="copy" close autofocus>Copy</button>
-                    <button class="button" close>Close</button>
+                    <button class="button" id="copy" close data-translate="dialog_receive_text_copy" autofocus>Copy</button>
+                    <button class="button" close data-translate="dialog_receive_text_close">Close</button>
                 </div>
             </x-paper>
         </x-background>
@@ -143,11 +154,11 @@
         <form action="#">
             <x-background class="full center">
                 <x-paper shadow="2">
-                    <h3>Edit Your Nickname</h3>
-                    <input type="text" id="nicknameInput" class="textarea" style="width: 100%; box-sizing: border-box;" maxlength="20" placeholder="Enter nickname" autocomplete="off" autofocus>
+                    <h3 data-translate="dialog_edit_nickname_title">Edit Your Nickname</h3>
+                    <input type="text" id="nicknameInput" class="textarea" style="width: 100%; box-sizing: border-box;" maxlength="20" data-translate-placeholder="dialog_edit_nickname_placeholder" placeholder="Enter nickname" autocomplete="off" autofocus>
                     <div class="row-reverse">
-                        <button class="button" type="submit" close>Save</button>
-                        <a class="button" close>Cancel</a>
+                        <button class="button" type="submit" close data-translate="dialog_edit_nickname_save">Save</button>
+                        <a class="button" close data-translate="dialog_edit_nickname_cancel">Cancel</a>
                     </div>
                 </x-paper>
             </x-background>
@@ -156,17 +167,17 @@
     <!-- Transfer Center Drawer -->
     <div id="transferCenter" class="drawer">
         <div class="drawer-header row">
-            <h3>Transfers</h3>
+            <h3 data-translate="drawer_transfers_title">Transfers</h3>
             <div class="row-reverse grow" style="align-items: center;">
-                <a href="#" class="close-drawer icon-button" id="btn-close-drawer" title="Close" style="color: inherit;">
+                <a href="#" class="close-drawer icon-button" id="btn-close-drawer" title="Close" data-translate-title="dialog_receive_text_close" style="color: inherit;">
                     <svg class="icon"><use xlink:href="#close" /></svg>
                 </a>
-                <button id="btn-clear-transfers" class="button-link" style="margin-right: 12px; font-size: 11px; padding: 4px 8px; border-radius: 12px; border: 1px solid var(--primary-color); background: transparent; color: var(--primary-color); cursor: pointer;">Clear All</button>
+                <button id="btn-clear-transfers" class="button-link" data-translate="drawer_transfers_clear" style="margin-right: 12px; font-size: 11px; padding: 4px 8px; border-radius: 12px; border: 1px solid var(--primary-color); background: transparent; color: var(--primary-color); cursor: pointer;">Clear All</button>
             </div>
         </div>
         <div class="drawer-body">
             <div id="transfer-list" class="column">
-                <div class="empty-state">No active or recent transfers</div>
+                <div class="empty-state" data-translate="drawer_transfers_empty">No active or recent transfers</div>
             </div>
         </div>
     </div>
@@ -176,13 +187,13 @@
             <svg class="icon logo" style="--icon-size: 80px; margin-bottom: 16px; color: var(--primary-color);">
                 <use xlink:href="#wifi-tethering" />
             </svg>
-            <h2>Drop anywhere to send files</h2>
-            <div class="drag-overlay-sub" style="opacity: 0.7; margin-top: 8px;">Drop files on a device to send</div>
+            <h2 data-translate="drag_overlay_title">Drop anywhere to send files</h2>
+            <div class="drag-overlay-sub" data-translate="drag_overlay_sub_default" style="opacity: 0.7; margin-top: 8px;">Drop files on a device to send</div>
         </div>
     </div>
     <!-- Toast -->
     <div class="toast-container full center">
-        <x-toast class="row" shadow="1" id="toast">File Transfer Completed</x-toast>
+        <x-toast class="row" shadow="1" id="toast" data-translate="toast_completed">File Transfer Completed</x-toast>
     </div>
     <!-- About Page -->
     <x-about id="about" class="full center column">
@@ -198,13 +209,13 @@
                 <use xlink:href="#wifi-tethering" />
             </svg>
             <h1 style="margin-bottom: 12px;">Link</h1>
-            <div class="font-subheading" style="font-weight: 600; color: var(--text-color); margin-bottom: 16px;">
+            <div class="font-subheading" data-translate="about_tagline" style="font-weight: 600; color: var(--text-color); margin-bottom: 16px;">
                 A clean, secure, and modern local file sharing system.
             </div>
-            <div class="font-body1" style="color: var(--text-muted); line-height: 1.6; margin-bottom: 24px;">
+            <div class="font-body1" data-translate="about_description" style="color: var(--text-muted); line-height: 1.6; margin-bottom: 24px;">
                 Link allows you to instantly share files, photos, videos, and text across devices on the same local network or via secure private virtual rooms. Operating directly on WebRTC Peer-to-Peer technology, your data goes straight to the recipient without hitting intermediary servers, ensuring maximum privacy and transfer speeds.
             </div>
-            <div class="font-body2" style="border-top: 1px solid var(--border-color); padding-top: 16px; width: 100%;">
+            <div class="font-body2" data-translate="about_footer" style="border-top: 1px solid var(--border-color); padding-top: 16px; width: 100%;">
                 No installation or accounts required. Just open and share.
             </div>
         </section>
@@ -212,6 +223,9 @@
     </x-about>
     <!-- SVG Icon Library -->
     <svg style="display: none;">
+        <symbol id="language-icon" viewBox="0 0 24 24">
+            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95c-.32-1.25-.78-2.45-1.38-3.56 1.84.63 3.37 1.91 4.33 3.56zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.33-.14 2 0 .67.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56-1.84-.63-3.37-1.9-4.33-3.56zm2.95-8H5.08c.96-1.66 2.49-2.93 4.33-3.56-.6 1.11-1.06 2.31-1.38 3.56zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.34-.16-2 0-.66.07-1.34.16-2h4.68c.09.66.16 1.34.16 2 0 .66-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95c-.96 1.66-2.49 2.93-4.33 3.56zM16.36 14c.08-.66.14-1.33.14-2 0-.67-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/>
+        </symbol>
         <symbol id="theme-toggle-icon" viewBox="0 0 24 24">
             <path d="M12 22c5.52 0 10-4.48 10-10S17.52 2 12 2 2 6.48 2 12s4.48 10 10 10zm1-17.93c3.95.49 7 3.85 7 7.93s-3.05 7.44-7 7.93V4.07z"/>
         </symbol>
@@ -259,6 +273,7 @@
         </symbol>
     </svg>
     <!-- Scripts -->
+    <script src="scripts/i18n.js"></script>
     <script src="scripts/network.js"></script>
     <script src="scripts/ui.js"></script>
     <script src="scripts/clipboard.js" async></script>
@@ -270,8 +285,8 @@
     <!-- no script -->
     <noscript>
         <x-noscript class="full center column">
-            <h1>Enable JavaScript</h1>
-            <h3>Link works only with JavaScript</h3>
+            <h1 data-translate="noscript_title">Enable JavaScript</h1>
+            <h3 data-translate="noscript_desc">Link works only with JavaScript</h3>
         </x-noscript>
         <style>
         x-noscript {

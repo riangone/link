@@ -102,7 +102,7 @@ class ServerConnection {
 
     _onDisconnect() {
         console.log('WS: server disconnected');
-        Events.fire('notify-user', 'Connection lost. Retry in 5 seconds...');
+        Events.fire('notify-user', window.I18n.t('net_connection_lost'));
         clearTimeout(this._reconnectTimer);
         this._reconnectTimer = setTimeout(_ => this._connect(), 5000);
     }
@@ -283,7 +283,7 @@ class Peer {
         this._busy = false;
         this._activeTransferId = null;
         this._dequeueFile();
-        Events.fire('notify-user', 'File transfer completed.');
+        Events.fire('notify-user', window.I18n.t('net_transfer_completed'));
     }
 
     cancelTransfer(transferId) {
@@ -305,7 +305,7 @@ class Peer {
     _onCancelTransferReceived(message) {
         if (this._activeTransferId === message.transferId) {
             this._cleanActiveTransfer('remote-cancelled');
-            Events.fire('notify-user', 'File transfer was cancelled by the other device.');
+            Events.fire('notify-user', window.I18n.t('net_transfer_cancelled_peer'));
         }
     }
 
@@ -587,7 +587,7 @@ class WSPeer extends Peer {
         }
         
         if (largeFiles.length > 0) {
-            Events.fire('notify-user', `Files > 10MB cannot be sent via relay (WebRTC failed).`);
+            Events.fire('notify-user', window.I18n.t('net_relay_limit'));
         }
         
         if (okFiles.length > 0) {

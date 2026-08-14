@@ -1,8 +1,9 @@
-var CACHE_NAME = 'link-cache-v7';
+var CACHE_NAME = 'link-cache-v8';
 var urlsToCache = [
   'index.html',
   './',
   'styles.css',
+  'scripts/i18n.js',
   'scripts/network.js',
   'scripts/ui.js',
   'scripts/clipboard.js',

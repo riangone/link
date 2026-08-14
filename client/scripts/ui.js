@@ -10,8 +10,17 @@ Events.on('display-name', e => {
     const me = e.detail.message;
     const $displayName = $('displayName');
     const savedNick = localStorage.getItem('custom-nickname');
-    $displayName.textContent = 'You are known as ' + (savedNick || me.displayName);
+    window.myDisplayName = savedNick || me.displayName;
+    window.myDeviceName = me.deviceName;
+    $displayName.textContent = window.I18n.t('known_as', { name: window.myDisplayName });
     $displayName.title = me.deviceName;
+});
+
+Events.on('language-changed', () => {
+    const $displayName = $('displayName');
+    if ($displayName && window.myDisplayName) {
+        $displayName.textContent = window.I18n.t('known_as', { name: window.myDisplayName });
+    }
 });
 
 class PeersUI {
@@ -24,6 +33,21 @@ class PeersUI {
         Events.on('paste', e => this._onPaste(e));
         Events.on('peer-nickname-changed', e => this._onPeerNicknameChanged(e.detail));
         Events.on('peer-fallback', e => this._onPeerFallback(e.detail));
+        Events.on('language-changed', () => this._onLanguageChanged());
+    }
+
+    _onLanguageChanged() {
+        document.querySelectorAll('x-peer').forEach($peer => {
+            if ($peer.ui) {
+                const label = $peer.querySelector('label');
+                if (label) label.setAttribute('title', window.I18n.t('peer_title'));
+                const $connType = $peer.querySelector('.connection-type');
+                if ($connType) {
+                    const isRelay = $connType.classList.contains('relay');
+                    $connType.textContent = window.I18n.t(isRelay ? 'relay' : 'p2p');
+                }
+            }
+        });
     }
 
     _onPeerJoined(peer) {
@@ -86,8 +110,9 @@ class PeersUI {
 class PeerUI {
 
     html() {
+        const titleText = window.I18n.t('peer_title');
         return `
-            <label class="column center" title="Click to send files or right click to send a text">
+            <label class="column center" title="${titleText}">
                 <input type="file" multiple>
                 <x-icon shadow="1">
                     <svg class="icon"><use xlink:href="#"/></svg>
@@ -192,7 +217,7 @@ class PeerUI {
     setConnectionType(type) {
         const $connType = this.$el.querySelector('.connection-type');
         if ($connType) {
-            $connType.textContent = type;
+            $connType.textContent = window.I18n.t(type.toLowerCase());
             $connType.className = `connection-type font-body2 ${type.toLowerCase()}`;
         }
     }
@@ -405,7 +430,7 @@ class ReceiveTextDialog extends Dialog {
 
     async _onCopy() {
         await navigator.clipboard.writeText(this.$text.textContent);
-        Events.fire('notify-user', 'Copied to clipboard');
+        Events.fire('notify-user', window.I18n.t('copied_clipboard'));
     }
 }
 
@@ -445,7 +470,7 @@ class Notifications {
                 Events.fire('notify-user', Notifications.PERMISSION_ERROR || 'Error');
                 return;
             }
-            this._notify('Even more snappy sharing!');
+            this._notify(window.I18n.t('snappy_sharing'));
             this.$button.setAttribute('hidden', 1);
         });
     }
@@ -479,10 +504,10 @@ class Notifications {
     _messageNotification(message) {
         if (document.visibilityState !== 'visible') {
             if (isURL(message)) {
-                const notification = this._notify(message, 'Click to open link');
+                const notification = this._notify(message, window.I18n.t('click_to_open'));
                 this._bind(notification, e => window.open(message, '_blank', null, true));
             } else {
-                const notification = this._notify(message, 'Click to copy text');
+                const notification = this._notify(message, window.I18n.t('click_to_copy'));
                 this._bind(notification, e => this._copyText(message, notification));
             }
         }
@@ -490,7 +515,7 @@ class Notifications {
 
     _downloadNotification(message) {
         if (document.visibilityState !== 'visible') {
-            const notification = this._notify(message, 'Click to download');
+            const notification = this._notify(message, window.I18n.t('click_to_download'));
             if (!window.isDownloadSupported) return;
             this._bind(notification, e => this._download(notification));
         }
@@ -504,7 +529,7 @@ class Notifications {
     _copyText(message, notification) {
         notification.close();
         if (!navigator.clipboard.writeText(message)) return;
-        this._notify('Copied text to clipboard');
+        this._notify(window.I18n.t('copied_text'));
     }
 
     _bind(notification, handler) {
@@ -528,11 +553,11 @@ class NetworkStatusUI {
     }
 
     _showOfflineMessage() {
-        Events.fire('notify-user', 'You are offline');
+        Events.fire('notify-user', window.I18n.t('offline'));
     }
 
     _showOnlineMessage() {
-        Events.fire('notify-user', 'You are back online');
+        Events.fire('notify-user', window.I18n.t('online'));
     }
 }
 
@@ -567,6 +592,7 @@ class RoomStatusUI {
         if (this.$btnLeaveRoom) this.$btnLeaveRoom.addEventListener('click', () => this._onLeaveRoom());
 
         Events.on('room-changed', () => this._updateRoomUI());
+        Events.on('language-changed', () => this._updateRoomUI());
         // Handle direct load with hash
         this._updateRoomUI();
     }
@@ -576,12 +602,12 @@ class RoomStatusUI {
         const hash = window.location.hash;
         if (hash && hash.length > 1) {
             const roomName = decodeURIComponent(hash.substring(1));
-            this.$roomStatus.textContent = `Room: ${roomName}`;
+            this.$roomStatus.textContent = window.I18n.t('room_status_private', { roomName: roomName });
             if (this.$btnCopyRoom) this.$btnCopyRoom.style.display = 'inline-block';
             if (this.$btnLeaveRoom) this.$btnLeaveRoom.style.display = 'inline-block';
             if (this.$btnCreateRoom) this.$btnCreateRoom.style.display = 'none';
         } else {
-            this.$roomStatus.textContent = 'You can be discovered by everyone on this network';
+            this.$roomStatus.textContent = window.I18n.t('room_status_public');
             if (this.$btnCopyRoom) this.$btnCopyRoom.style.display = 'none';
             if (this.$btnLeaveRoom) this.$btnLeaveRoom.style.display = 'none';
             if (this.$btnCreateRoom) this.$btnCreateRoom.style.display = 'inline-block';
@@ -590,8 +616,8 @@ class RoomStatusUI {
 
     _onCopyRoom() {
         navigator.clipboard.writeText(window.location.href)
-            .then(() => Events.fire('notify-user', 'Room link copied to clipboard'))
-            .catch(() => Events.fire('notify-user', 'Failed to copy link'));
+            .then(() => Events.fire('notify-user', window.I18n.t('room_copied')))
+            .catch(() => Events.fire('notify-user', window.I18n.t('room_copy_failed')));
     }
 
     _onCreateRoom() {
@@ -641,8 +667,10 @@ class EditNicknameDialog extends Dialog {
         const $displayName = $('displayName');
         if ($displayName) {
             $displayName.addEventListener('click', () => {
-                const currentName = $displayName.textContent.replace('You are known as ', '').trim();
-                this.$input.value = currentName;
+                const savedNick = localStorage.getItem('custom-nickname');
+                const prefix = window.I18n.t('known_as', { name: '' });
+                const fallbackName = $displayName.textContent.replace(prefix, '').trim();
+                this.$input.value = window.myDisplayName || savedNick || fallbackName;
                 this.show();
             });
         }
@@ -652,8 +680,9 @@ class EditNicknameDialog extends Dialog {
         const val = this.$input.value.trim();
         if (!val) return;
         localStorage.setItem('custom-nickname', val);
+        window.myDisplayName = val;
         Events.fire('change-nickname-request', val);
-        $('displayName').textContent = 'You are known as ' + val;
+        $('displayName').textContent = window.I18n.t('known_as', { name: val });
         this.hide();
     }
 }
@@ -679,6 +708,42 @@ class TransferCenterUI {
         Events.on('file-progress', e => this._onProgress(e.detail));
         Events.on('transfer-completed', e => this._onCompleted(e.detail));
         Events.on('transfer-cancelled', e => this._onCancelled(e.detail));
+        Events.on('language-changed', () => this._onLanguageChanged());
+    }
+
+    _onLanguageChanged() {
+        for (const tid in this.transfers) {
+            const t = this.transfers[tid];
+            const detail = t.detail;
+            if (!detail) continue;
+            
+            const peerName = this._getPeerName(detail.peerId);
+            const directionLabel = detail.direction === 'incoming' ? window.I18n.t('direction_from', { peerName: peerName }) : window.I18n.t('direction_to', { peerName: peerName });
+            
+            const metaSpan = t.el.querySelector('.transfer-meta span:first-child');
+            if (metaSpan) metaSpan.textContent = directionLabel;
+
+            const badge = t.el.querySelector('.status-badge');
+            if (badge) {
+                if (t.status === 'queued') {
+                    badge.textContent = window.I18n.t('status_queued');
+                } else if (t.status === 'transferring') {
+                    if (!badge.textContent.includes('MB/s') && !badge.textContent.includes('KB/s') && !badge.textContent.includes('B/s')) {
+                        badge.textContent = window.I18n.t('status_transferring');
+                    }
+                } else if (t.status === 'completed') {
+                    badge.textContent = window.I18n.t('status_done');
+                } else if (t.status === 'cancelled') {
+                    badge.textContent = t.wasRemoteCancelled ? window.I18n.t('status_cancelled_peer') : window.I18n.t('status_cancelled');
+                }
+            }
+
+            const cancelBtn = t.el.querySelector('.cancel-btn');
+            if (cancelBtn) {
+                cancelBtn.textContent = window.I18n.t('dialog_send_text_cancel');
+            }
+        }
+        this._checkEmptyState();
     }
 
     toggle() {
@@ -711,7 +776,7 @@ class TransferCenterUI {
 
     _getPeerName(peerId) {
         const $peer = $(peerId);
-        return $peer && $peer.ui ? $peer.ui._displayName() : 'Unknown Device';
+        return $peer && $peer.ui ? $peer.ui._displayName() : window.I18n.t('unknown_device');
     }
 
     _onQueued(detail) {
@@ -724,12 +789,12 @@ class TransferCenterUI {
         card.innerHTML = `
             <div class="file-info" title="${detail.name}">${detail.name}</div>
             <div class="transfer-meta">
-                <span>To: ${peerName}</span>
-                <span class="status-badge queued">Queued</span>
+                <span>${window.I18n.t('direction_to', { peerName: peerName })}</span>
+                <span class="status-badge queued">${window.I18n.t('status_queued')}</span>
             </div>
             <div class="progress-container">
                 <progress value="0" max="1"></progress>
-                <button class="cancel-btn">Cancel</button>
+                <button class="cancel-btn">${window.I18n.t('dialog_send_text_cancel')}</button>
             </div>
         `;
         
@@ -741,7 +806,8 @@ class TransferCenterUI {
         this.transfers[detail.id] = {
             el: card,
             size: detail.size,
-            status: 'queued'
+            status: 'queued',
+            detail: detail
         };
         this._updateBadge();
     }
@@ -750,13 +816,13 @@ class TransferCenterUI {
         this._removeEmptyState();
         const existing = this.transfers[detail.id];
         const peerName = this._getPeerName(detail.peerId);
-        const directionLabel = detail.direction === 'incoming' ? `From: ${peerName}` : `To: ${peerName}`;
+        const directionLabel = detail.direction === 'incoming' ? window.I18n.t('direction_from', { peerName: peerName }) : window.I18n.t('direction_to', { peerName: peerName });
 
         if (existing) {
             existing.status = 'transferring';
             existing.startTime = Date.now();
             existing.el.querySelector('.status-badge').className = 'status-badge transferring';
-            existing.el.querySelector('.status-badge').textContent = 'Transferring';
+            existing.el.querySelector('.status-badge').textContent = window.I18n.t('status_transferring');
         } else {
             const card = document.createElement('div');
             card.className = 'transfer-item';
@@ -765,11 +831,11 @@ class TransferCenterUI {
                 <div class="file-info" title="${detail.name}">${detail.name}</div>
                 <div class="transfer-meta">
                     <span>${directionLabel}</span>
-                    <span class="status-badge transferring">Transferring</span>
+                    <span class="status-badge transferring">${window.I18n.t('status_transferring')}</span>
                 </div>
                 <div class="progress-container">
                     <progress value="0" max="1"></progress>
-                    <button class="cancel-btn">Cancel</button>
+                    <button class="cancel-btn">${window.I18n.t('dialog_send_text_cancel')}</button>
                 </div>
             `;
             card.querySelector('.cancel-btn').addEventListener('click', e => {
@@ -780,7 +846,8 @@ class TransferCenterUI {
                 el: card,
                 size: detail.size,
                 status: 'transferring',
-                startTime: Date.now()
+                startTime: Date.now(),
+                detail: detail
             };
         }
         this._updateBadge();
@@ -793,7 +860,7 @@ class TransferCenterUI {
             existing.startTime = Date.now();
             const badge = existing.el.querySelector('.status-badge');
             badge.className = 'status-badge transferring';
-            badge.textContent = 'Transferring';
+            badge.textContent = window.I18n.t('status_transferring');
         }
         this._updateBadge();
     }
@@ -827,7 +894,7 @@ class TransferCenterUI {
         const badge = transfer.el.querySelector('.status-badge');
         if (badge) {
             badge.className = 'status-badge completed';
-            badge.textContent = 'Done';
+            badge.textContent = window.I18n.t('status_done');
         }
         const cancelBtn = transfer.el.querySelector('.cancel-btn');
         if (cancelBtn) cancelBtn.style.display = 'none';
@@ -838,10 +905,11 @@ class TransferCenterUI {
         const transfer = this.transfers[detail.id];
         if (!transfer) return;
         transfer.status = 'cancelled';
+        transfer.wasRemoteCancelled = (detail.status === 'remote-cancelled');
         const badge = transfer.el.querySelector('.status-badge');
         if (badge) {
             badge.className = 'status-badge cancelled';
-            badge.textContent = detail.status === 'remote-cancelled' ? 'Cancelled by peer' : 'Cancelled';
+            badge.textContent = transfer.wasRemoteCancelled ? window.I18n.t('status_cancelled_peer') : window.I18n.t('status_cancelled');
         }
         const cancelBtn = transfer.el.querySelector('.cancel-btn');
         if (cancelBtn) cancelBtn.style.display = 'none';
@@ -866,7 +934,7 @@ class TransferCenterUI {
 
     _checkEmptyState() {
         if (this.$list.children.length === 0) {
-            this.$list.innerHTML = '<div class="empty-state">No active or recent transfers</div>';
+            this.$list.innerHTML = `<div class="empty-state">${window.I18n.t('drawer_transfers_empty')}</div>`;
         }
     }
 
@@ -905,10 +973,10 @@ class UniversalDragAndDrop {
             const sub = this.$overlay.querySelector('.drag-overlay-sub');
             if (peers.length === 1) {
                 const peerName = peers[0].ui ? peers[0].ui._displayName() : 'device';
-                sub.textContent = `Drop anywhere to send to ${peerName}`;
+                sub.textContent = window.I18n.t('drag_overlay_sub_one', { peerName: peerName });
                 this.$overlay.style.pointerEvents = 'auto';
             } else {
-                sub.textContent = 'Drop files directly on a device icon to send';
+                sub.textContent = window.I18n.t('drag_overlay_sub_many');
                 this.$overlay.style.pointerEvents = 'none';
             }
         }
@@ -969,6 +1037,18 @@ class LinkApp {
             const editNicknameDialog = new EditNicknameDialog();
             const transferCenterUI = new TransferCenterUI();
             const universalDragAndDrop = new UniversalDragAndDrop();
+
+            // Initialize page translation
+            window.I18n.translatePage();
+
+            // Bind language selector element events
+            const select = $('language-select');
+            if (select) {
+                select.value = window.I18n.currentLanguage;
+                select.addEventListener('change', event => {
+                    window.I18n.setLanguage(event.target.value);
+                });
+            }
         });
     }
 }
