@@ -98,6 +98,20 @@ class SnapdropServer {
             case 'pong':
                 sender.lastBeat = Date.now();
                 break;
+            case 'change-nickname':
+                sender.name.displayName = message.displayName;
+                if (this._rooms[sender.ip]) {
+                    for (const otherPeerId in this._rooms[sender.ip]) {
+                        if (otherPeerId === sender.id) continue;
+                        const otherPeer = this._rooms[sender.ip][otherPeerId];
+                        this._send(otherPeer, {
+                            type: 'peer-nickname-changed',
+                            peerId: sender.id,
+                            displayName: message.displayName
+                        });
+                    }
+                }
+                break;
         }
 
         // relay message to recipient

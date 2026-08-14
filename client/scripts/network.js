@@ -9,6 +9,9 @@ class ServerConnection {
         Events.on('pagehide', e => this._disconnect());
         document.addEventListener('visibilitychange', e => this._onVisibilityChange());
         window.addEventListener('hashchange', e => this._onHashChange());
+        Events.on('change-nickname-request', e => {
+            this.send({ type: 'change-nickname', displayName: e.detail });
+        });
     }
 
     _onHashChange() {
@@ -54,6 +57,13 @@ class ServerConnection {
                 break;
             case 'display-name':
                 Events.fire('display-name', msg);
+                const savedNick = localStorage.getItem('custom-nickname');
+                if (savedNick) {
+                    this.send({ type: 'change-nickname', displayName: savedNick });
+                }
+                break;
+            case 'peer-nickname-changed':
+                Events.fire('peer-nickname-changed', msg);
                 break;
             case 'turn-config':
                 Events.fire('turn-config', msg);
@@ -126,7 +136,18 @@ class Peer {
 
     sendFiles(files) {
         for (let i = 0; i < files.length; i++) {
-            this._filesQueue.push(files[i]);
+            const file = files[i];
+            const transferId = 'tx-' + Math.random().toString(36).substring(2, 9);
+            file.transferId = transferId;
+            this._filesQueue.push(file);
+            Events.fire('transfer-queued', {
+                id: transferId,
+                name: file.name,
+                size: file.size,
+                peerId: this._peerId,
+                direction: 'outgoing',
+                status: 'queued'
+            });
         }
         if (this._busy) return;
         this._dequeueFile();
@@ -136,15 +157,26 @@ class Peer {
         if (!this._filesQueue.length) return;
         this._busy = true;
         const file = this._filesQueue.shift();
+        Events.fire('transfer-active', { id: file.transferId });
         this._sendFile(file);
     }
 
     _sendFile(file) {
+        this._activeTransferId = file.transferId;
         this.sendJSON({
             type: 'header',
+            transferId: file.transferId,
             name: file.name,
             mime: file.type,
             size: file.size
+        });
+        Events.fire('transfer-started', {
+            id: file.transferId,
+            name: file.name,
+            size: file.size,
+            peerId: this._peerId,
+            direction: 'outgoing',
+            status: 'transferring'
         });
         this._chunker = new FileChunker(file,
             chunk => this._send(chunk),
@@ -192,6 +224,9 @@ class Peer {
             case 'transfer-complete':
                 this._onTransferCompleted();
                 break;
+            case 'cancel-transfer':
+                this._onCancelTransferReceived(message);
+                break;
             case 'text':
                 this._onTextReceived(message);
                 break;
@@ -200,11 +235,20 @@ class Peer {
 
     _onFileHeader(header) {
         this._lastProgress = 0;
+        this._activeTransferId = header.transferId;
         this._digester = new FileDigester({
             name: header.name,
             mime: header.mime,
             size: header.size
         }, file => this._onFileReceived(file));
+        Events.fire('transfer-started', {
+            id: header.transferId,
+            name: header.name,
+            size: header.size,
+            peerId: this._peerId,
+            direction: 'incoming',
+            status: 'transferring'
+        });
     }
 
     _onChunkReceived(chunk) {
@@ -221,20 +265,58 @@ class Peer {
     }
 
     _onDownloadProgress(progress) {
-        Events.fire('file-progress', { sender: this._peerId, progress: progress });
+        Events.fire('file-progress', { sender: this._peerId, progress: progress, transferId: this._activeTransferId });
     }
 
     _onFileReceived(proxyFile) {
+        Events.fire('transfer-completed', { id: this._activeTransferId });
         Events.fire('file-received', proxyFile);
         this.sendJSON({ type: 'transfer-complete' });
+        this._activeTransferId = null;
+        this._busy = false;
     }
 
     _onTransferCompleted() {
+        Events.fire('transfer-completed', { id: this._activeTransferId });
         this._onDownloadProgress(1);
         this._reader = null;
         this._busy = false;
+        this._activeTransferId = null;
         this._dequeueFile();
         Events.fire('notify-user', 'File transfer completed.');
+    }
+
+    cancelTransfer(transferId) {
+        if (this._activeTransferId === transferId) {
+            if (this._chunker) {
+                this._chunker.abort();
+            }
+            this.sendJSON({ type: 'cancel-transfer', transferId: transferId });
+            this._cleanActiveTransfer('cancelled');
+        } else {
+            const lenBefore = this._filesQueue.length;
+            this._filesQueue = this._filesQueue.filter(file => file.transferId !== transferId);
+            if (this._filesQueue.length < lenBefore) {
+                Events.fire('transfer-cancelled', { id: transferId, status: 'cancelled' });
+            }
+        }
+    }
+
+    _onCancelTransferReceived(message) {
+        if (this._activeTransferId === message.transferId) {
+            this._cleanActiveTransfer('remote-cancelled');
+            Events.fire('notify-user', 'File transfer was cancelled by the other device.');
+        }
+    }
+
+    _cleanActiveTransfer(status) {
+        const tid = this._activeTransferId;
+        this._activeTransferId = null;
+        this._chunker = null;
+        this._digester = null;
+        this._busy = false;
+        Events.fire('transfer-cancelled', { id: tid, status: status });
+        this._dequeueFile();
     }
 
     sendText(text) {
@@ -586,21 +668,29 @@ class FileChunker {
         this._file = file;
         this._onChunk = onChunk;
         this._onPartitionEnd = onPartitionEnd;
+        this._aborted = false;
         this._reader = new FileReader();
         this._reader.addEventListener('load', e => this._onChunkRead(e.target.result));
     }
 
+    abort() {
+        this._aborted = true;
+    }
+
     nextPartition() {
+        if (this._aborted) return;
         this._partitionSize = 0;
         this._readChunk();
     }
 
     _readChunk() {
+        if (this._aborted) return;
         const chunk = this._file.slice(this._offset, this._offset + this._chunkSize);
         this._reader.readAsArrayBuffer(chunk);
     }
 
     _onChunkRead(chunk) {
+        if (this._aborted) return;
         this._offset += chunk.byteLength;
         this._partitionSize += chunk.byteLength;
         this._onChunk(chunk);

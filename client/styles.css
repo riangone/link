@@ -7,6 +7,44 @@
     --text-color: #333;
     --bg-color: #fafafa;
     --bg-color-secondary: #f1f3f4;
+    --card-shadow: 0 4px 5px 0 rgba(0, 0, 0, 0.14),
+        0 1px 10px 0 rgba(0, 0, 0, 0.12),
+        0 2px 4px -1px rgba(0, 0, 0, 0.4);
+    --border-color: #e0e0e0;
+}
+
+/* System Preference */
+@media (prefers-color-scheme: dark) {
+    body:not(.theme-light) {
+        --text-color: #e8eaed;
+        --bg-color: #202124;
+        --bg-color-secondary: #292a2d;
+        --card-shadow: 0 4px 5px 0 rgba(0, 0, 0, 0.3),
+            0 1px 10px 0 rgba(0, 0, 0, 0.24),
+            0 2px 4px -1px rgba(0, 0, 0, 0.5);
+        --border-color: #3c4043;
+    }
+}
+
+/* Explicit Themes */
+body.theme-light {
+    --text-color: #333;
+    --bg-color: #fafafa;
+    --bg-color-secondary: #f1f3f4;
+    --border-color: #e0e0e0;
+    --card-shadow: 0 4px 5px 0 rgba(0, 0, 0, 0.14),
+        0 1px 10px 0 rgba(0, 0, 0, 0.12),
+        0 2px 4px -1px rgba(0, 0, 0, 0.4);
+}
+
+body.theme-dark {
+    --text-color: #e8eaed;
+    --bg-color: #202124;
+    --bg-color-secondary: #292a2d;
+    --card-shadow: 0 4px 5px 0 rgba(0, 0, 0, 0.3),
+        0 1px 10px 0 rgba(0, 0, 0, 0.24),
+        0 2px 4px -1px rgba(0, 0, 0, 0.5);
+    --border-color: #3c4043;
 }
 
 /* Layout */
@@ -155,9 +193,7 @@ a {
 }
 
 [shadow="2"] {
-    box-shadow: 0 4px 5px 0 rgba(0, 0, 0, 0.14),
-        0 1px 10px 0 rgba(0, 0, 0, 0.12),
-        0 2px 4px -1px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--card-shadow);
 }
 
 
@@ -716,12 +752,7 @@ screen and (min-width: 1100px) {
     Color Themes
 */
 
-/* Default colors */
-body {
-    --text-color: #333;
-    --bg-color: #fafafa;
-    --bg-color-secondary: #f1f3f4;
-}
+/* Default colors are handled by root variables and theme overrides */
 
 /* Colored Elements */
 body {
@@ -755,5 +786,260 @@ x-dialog x-paper {
     body {
         overflow: hidden;
     }
+}
+
+/* --- Added Architect UX Improvements --- */
+
+/* Drawer for Transfer Center */
+.drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 340px;
+    max-width: 100%;
+    height: 100%;
+    background-color: var(--bg-color);
+    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.2);
+    z-index: 100;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    border-left: 1px solid var(--border-color);
+}
+
+.drawer.show {
+    transform: translateX(0);
+}
+
+.drawer-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+    align-items: center;
+    background-color: var(--bg-color-secondary);
+    display: flex;
+    justify-content: space-between;
+}
+
+.drawer-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.drawer-body {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-color);
+}
+
+/* Badge count for active transfers */
+.badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background-color: #ff5722;
+    color: white;
+    border-radius: 50%;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: bold;
+    line-height: 1;
+    min-width: 10px;
+    text-align: center;
+}
+
+/* Transfer items in list */
+.transfer-item {
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    background-color: var(--bg-color-secondary);
+    border: 1px solid var(--border-color);
+    font-size: 13px;
+    position: relative;
+    overflow: hidden;
+    color: var(--text-color);
+}
+
+.transfer-item .file-info {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 4px;
+}
+
+.transfer-item .transfer-meta {
+    font-size: 11px;
+    opacity: 0.7;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.transfer-item .progress-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.transfer-item progress {
+    flex-grow: 1;
+    height: 8px;
+    border-radius: 4px;
+    border: none;
+    background-color: var(--bg-color);
+}
+
+.transfer-item progress::-webkit-progress-bar {
+    background-color: var(--bg-color);
+    border-radius: 4px;
+}
+
+.transfer-item progress::-webkit-progress-value {
+    background-color: var(--primary-color);
+    border-radius: 4px;
+}
+
+.transfer-item progress::-moz-progress-bar {
+    background-color: var(--primary-color);
+    border-radius: 4px;
+}
+
+.transfer-item .cancel-btn {
+    background: transparent;
+    border: 1px solid #ff5722;
+    color: #ff5722;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+    outline: none;
+}
+
+.transfer-item .cancel-btn:hover {
+    background-color: #ff5722;
+    color: white;
+}
+
+.transfer-item .status-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.transfer-item .status-badge.completed {
+    background-color: rgba(76, 175, 80, 0.15);
+    color: #4caf50;
+}
+
+.transfer-item .status-badge.cancelled {
+    background-color: rgba(244, 67, 54, 0.15);
+    color: #f44336;
+}
+
+.transfer-item .status-badge.transferring {
+    background-color: rgba(33, 150, 243, 0.15);
+    color: #2196f3;
+}
+
+.transfer-item .status-badge.queued {
+    background-color: rgba(255, 152, 0, 0.15);
+    color: #ff9800;
+}
+
+#transfer-list .empty-state {
+    text-align: center;
+    opacity: 0.5;
+    padding: 40px 20px;
+    font-style: italic;
+    color: var(--text-color);
+}
+
+/* Drag Overlay */
+#drag-overlay {
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 150;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    display: none;
+}
+
+.drag-overlay-card {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    padding: 32px;
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+    border: 2px dashed var(--primary-color);
+    text-align: center;
+    max-width: 90%;
+    width: 360px;
+}
+
+.drag-overlay-card h2 {
+    margin: 8px 0 0;
+    color: var(--text-color);
+}
+
+body.drag-active #drag-overlay {
+    pointer-events: auto;
+}
+
+/* Connection Type Badge on Peers */
+x-peer .connection-type {
+    margin-top: 4px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 9px;
+    font-weight: bold;
+    text-transform: uppercase;
+    background-color: var(--bg-color-secondary);
+    border: 1px solid var(--border-color);
+    opacity: 0.8;
+}
+
+x-peer .connection-type.p2p {
+    color: #4caf50;
+    border-color: rgba(76, 175, 80, 0.3);
+}
+
+x-peer .connection-type.relay {
+    color: #ff9800;
+    border-color: rgba(255, 152, 0, 0.3);
+}
+
+/* Nickname Edit Trigger */
+#displayName {
+    cursor: pointer;
+    font-weight: 600;
+    margin-bottom: 8px;
+    transition: opacity 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    border-radius: 16px;
+    background-color: var(--bg-color-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+#displayName:hover {
+    opacity: 0.8;
+    background-color: var(--border-color);
 }
 

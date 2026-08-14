@@ -43,6 +43,17 @@
                 <use xlink:href="#info-outline" />
             </svg>
         </a>
+        <a href="#" id="theme-toggle" class="icon-button" title="Toggle Theme">
+            <svg class="icon">
+                <use xlink:href="#theme-toggle-icon" />
+            </svg>
+        </a>
+        <a href="#" id="transfers-toggle" class="icon-button" title="Transfer Center" style="position: relative;">
+            <svg class="icon">
+                <use xlink:href="#swap-vert" />
+            </svg>
+            <span id="transfers-badge" class="badge" hidden>0</span>
+        </a>
         <a href="#" id="notification" class="icon-button" title="Enable Notifications" hidden>
             <svg class="icon">
                 <use xlink:href="#notifications" />
@@ -124,6 +135,48 @@
             </x-paper>
         </x-background>
     </x-dialog>
+    <!-- Edit Nickname Dialog -->
+    <x-dialog id="editNicknameDialog">
+        <form action="#">
+            <x-background class="full center">
+                <x-paper shadow="2">
+                    <h3>Edit Your Nickname</h3>
+                    <input type="text" id="nicknameInput" class="textarea" style="width: 100%; box-sizing: border-box;" maxlength="20" placeholder="Enter nickname" autocomplete="off" autofocus>
+                    <div class="row-reverse">
+                        <button class="button" type="submit" close>Save</button>
+                        <a class="button" close>Cancel</a>
+                    </div>
+                </x-paper>
+            </x-background>
+        </form>
+    </x-dialog>
+    <!-- Transfer Center Drawer -->
+    <div id="transferCenter" class="drawer">
+        <div class="drawer-header row">
+            <h3>Transfers</h3>
+            <div class="row-reverse grow" style="align-items: center;">
+                <a href="#" class="close-drawer icon-button" id="btn-close-drawer" title="Close" style="color: inherit;">
+                    <svg class="icon"><use xlink:href="#close" /></svg>
+                </a>
+                <button id="btn-clear-transfers" class="button-link" style="margin-right: 12px; font-size: 11px; padding: 4px 8px; border-radius: 12px; border: 1px solid var(--primary-color); background: transparent; color: var(--primary-color); cursor: pointer;">Clear All</button>
+            </div>
+        </div>
+        <div class="drawer-body">
+            <div id="transfer-list" class="column">
+                <div class="empty-state">No active or recent transfers</div>
+            </div>
+        </div>
+    </div>
+    <!-- Universal Drag & Drop Overlay -->
+    <div id="drag-overlay" class="full center column" style="display: none;">
+        <div class="drag-overlay-card center column">
+            <svg class="icon logo" style="--icon-size: 80px; margin-bottom: 16px; color: var(--primary-color);">
+                <use xlink:href="#wifi-tethering" />
+            </svg>
+            <h2>Drop anywhere to send files</h2>
+            <div class="drag-overlay-sub" style="opacity: 0.7; margin-top: 8px;">Drop files on a device to send</div>
+        </div>
+    </div>
     <!-- Toast -->
     <div class="toast-container full center">
         <x-toast class="row" shadow="1" id="toast">File Transfer Completed</x-toast>
@@ -170,6 +223,12 @@
     </x-about>
     <!-- SVG Icon Library -->
     <svg style="display: none;">
+        <symbol id="theme-toggle-icon" viewBox="0 0 24 24">
+            <path d="M12 22c5.52 0 10-4.48 10-10S17.52 2 12 2 2 6.48 2 12s4.48 10 10 10zm1-17.93c3.95.49 7 3.85 7 7.93s-3.05 7.44-7 7.93V4.07z"/>
+        </symbol>
+        <symbol id="swap-vert" viewBox="0 0 24 24">
+            <path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"/>
+        </symbol>
         <symbol id=wifi-tethering viewBox="0 0 24 24">
             <path d="M12 11c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 2c0-3.31-2.69-6-6-6s-6 2.69-6 6c0 2.22 1.21 4.15 3 5.19l1-1.74c-1.19-.7-2-1.97-2-3.45 0-2.21 1.79-4 4-4s4 1.79 4 4c0 1.48-.81 2.75-2 3.45l1 1.74c1.79-1.04 3-2.97 3-5.19zM12 3C6.48 3 2 7.48 2 13c0 3.7 2.01 6.92 4.99 8.65l1-1.73C5.61 18.53 4 15.96 4 13c0-4.42 3.58-8 8-8s8 3.58 8 8c0 2.96-1.61 5.53-4 6.92l1 1.73c2.99-1.73 5-4.95 5-8.65 0-5.52-4.48-10-10-10z"></path>
         </symbol>

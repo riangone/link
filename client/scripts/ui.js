@@ -8,8 +8,9 @@ window.iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 // set display name
 Events.on('display-name', e => {
     const me = e.detail.message;
-    const $displayName = $('displayName')
-    $displayName.textContent = 'You are known as ' + me.displayName;
+    const $displayName = $('displayName');
+    const savedNick = localStorage.getItem('custom-nickname');
+    $displayName.textContent = 'You are known as ' + (savedNick || me.displayName);
     $displayName.title = me.deviceName;
 });
 
@@ -21,6 +22,8 @@ class PeersUI {
         Events.on('peers', e => this._onPeers(e.detail));
         Events.on('file-progress', e => this._onFileProgress(e.detail));
         Events.on('paste', e => this._onPaste(e));
+        Events.on('peer-nickname-changed', e => this._onPeerNicknameChanged(e.detail));
+        Events.on('peer-fallback', e => this._onPeerFallback(e.detail));
     }
 
     _onPeerJoined(peer) {
@@ -52,15 +55,25 @@ class PeersUI {
         const $peers = $$('x-peers').innerHTML = '';
     }
 
+    _onPeerNicknameChanged(detail) {
+        const $peer = $(detail.peerId);
+        if ($peer && $peer.ui) {
+            $peer.ui.updateDisplayName(detail.displayName);
+        }
+    }
+
+    _onPeerFallback(peerId) {
+        const $peer = $(peerId);
+        if ($peer && $peer.ui) {
+            $peer.ui.setConnectionType('Relay');
+        }
+    }
+
     _onPaste(e) {
         const files = e.clipboardData.files || e.clipboardData.items
             .filter(i => i.type.indexOf('image') > -1)
             .map(i => i.getAsFile());
         const peers = document.querySelectorAll('x-peer');
-        // send the pasted image content to the only peer if there is one
-        // otherwise, select the peer somehow by notifying the client that
-        // "image data has been pasted, click the client to which to send it"
-        // not implemented
         if (files.length > 0 && peers.length === 1) {
             Events.fire('files-selected', {
                 files: files,
@@ -86,6 +99,7 @@ class PeerUI {
                 <div class="name font-subheading"></div>
                 <div class="device-name font-body2"></div>
                 <div class="status font-body2"></div>
+                <div class="connection-type font-body2 p2p">P2P</div>
             </label>`
     }
 
@@ -105,6 +119,9 @@ class PeerUI {
         el.querySelector('.device-name').textContent = this._deviceName();
         this.$el = el;
         this.$progress = el.querySelector('.progress');
+
+        const isRtc = window.isRtcSupported && this._peer.rtcSupported;
+        this.setConnectionType(isRtc ? 'P2P' : 'Relay');
     }
 
     _bindListeners(el) {
@@ -164,6 +181,19 @@ class PeerUI {
         if (progress >= 1) {
             this.setProgress(0);
             this.$el.removeAttribute('transfer');
+        }
+    }
+
+    updateDisplayName(name) {
+        this._peer.name.displayName = name;
+        this.$el.querySelector('.name').textContent = name;
+    }
+
+    setConnectionType(type) {
+        const $connType = this.$el.querySelector('.connection-type');
+        if ($connType) {
+            $connType.textContent = type;
+            $connType.className = `connection-type font-body2 ${type.toLowerCase()}`;
         }
     }
 
@@ -574,6 +604,351 @@ class RoomStatusUI {
     }
 }
 
+class ThemeManager {
+    constructor() {
+        this.$btn = $('theme-toggle');
+        if (!this.$btn) return;
+        this.$btn.addEventListener('click', e => {
+            e.preventDefault();
+            this.toggle();
+        });
+        this._loadTheme();
+    }
+    _loadTheme() {
+        const saved = localStorage.getItem('theme');
+        if (saved) {
+            document.body.className = 'theme-' + saved;
+        } else {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.body.className = prefersDark ? 'theme-dark' : 'theme-light';
+        }
+    }
+    toggle() {
+        const current = document.body.classList.contains('theme-dark') || document.body.className === 'theme-dark';
+        const next = current ? 'light' : 'dark';
+        document.body.className = 'theme-' + next;
+        localStorage.setItem('theme', next);
+    }
+}
+
+class EditNicknameDialog extends Dialog {
+    constructor() {
+        super('editNicknameDialog');
+        this.$input = this.$el.querySelector('#nicknameInput');
+        const form = this.$el.querySelector('form');
+        form.addEventListener('submit', e => this._save(e));
+        
+        const $displayName = $('displayName');
+        if ($displayName) {
+            $displayName.addEventListener('click', () => {
+                const currentName = $displayName.textContent.replace('You are known as ', '').trim();
+                this.$input.value = currentName;
+                this.show();
+            });
+        }
+    }
+    _save(e) {
+        e.preventDefault();
+        const val = this.$input.value.trim();
+        if (!val) return;
+        localStorage.setItem('custom-nickname', val);
+        Events.fire('change-nickname-request', val);
+        $('displayName').textContent = 'You are known as ' + val;
+        this.hide();
+    }
+}
+
+class TransferCenterUI {
+    constructor() {
+        this.$drawer = $('transferCenter');
+        this.$btnToggle = $('transfers-toggle');
+        this.$btnClose = $('btn-close-drawer');
+        this.$btnClear = $('btn-clear-transfers');
+        this.$badge = $('transfers-badge');
+        this.$list = $('transfer-list');
+
+        this.transfers = {}; // transferId -> { el, size, status, startTime }
+
+        if (this.$btnToggle) this.$btnToggle.addEventListener('click', e => { e.preventDefault(); this.toggle(); });
+        if (this.$btnClose) this.$btnClose.addEventListener('click', e => { e.preventDefault(); this.hide(); });
+        if (this.$btnClear) this.$btnClear.addEventListener('click', e => { e.preventDefault(); this.clearCompleted(); });
+
+        Events.on('transfer-queued', e => this._onQueued(e.detail));
+        Events.on('transfer-started', e => this._onStarted(e.detail));
+        Events.on('transfer-active', e => this._onActive(e.detail));
+        Events.on('file-progress', e => this._onProgress(e.detail));
+        Events.on('transfer-completed', e => this._onCompleted(e.detail));
+        Events.on('transfer-cancelled', e => this._onCancelled(e.detail));
+    }
+
+    toggle() {
+        this.$drawer.classList.toggle('show');
+    }
+
+    show() {
+        this.$drawer.classList.add('show');
+    }
+
+    hide() {
+        this.$drawer.classList.remove('show');
+    }
+
+    _updateBadge() {
+        let activeCount = 0;
+        for (const tid in this.transfers) {
+            const t = this.transfers[tid];
+            if (t.status === 'transferring' || t.status === 'queued') {
+                activeCount++;
+            }
+        }
+        if (activeCount > 0) {
+            this.$badge.textContent = activeCount;
+            this.$badge.hidden = false;
+        } else {
+            this.$badge.hidden = true;
+        }
+    }
+
+    _getPeerName(peerId) {
+        const $peer = $(peerId);
+        return $peer && $peer.ui ? $peer.ui._displayName() : 'Unknown Device';
+    }
+
+    _onQueued(detail) {
+        this._removeEmptyState();
+        const peerName = this._getPeerName(detail.peerId);
+        
+        const card = document.createElement('div');
+        card.className = 'transfer-item';
+        card.id = 't-card-' + detail.id;
+        card.innerHTML = `
+            <div class="file-info" title="${detail.name}">${detail.name}</div>
+            <div class="transfer-meta">
+                <span>To: ${peerName}</span>
+                <span class="status-badge queued">Queued</span>
+            </div>
+            <div class="progress-container">
+                <progress value="0" max="1"></progress>
+                <button class="cancel-btn">Cancel</button>
+            </div>
+        `;
+        
+        card.querySelector('.cancel-btn').addEventListener('click', e => {
+            Events.fire('cancel-transfer-request', { transferId: detail.id, peerId: detail.peerId });
+        });
+
+        this.$list.appendChild(card);
+        this.transfers[detail.id] = {
+            el: card,
+            size: detail.size,
+            status: 'queued'
+        };
+        this._updateBadge();
+    }
+
+    _onStarted(detail) {
+        this._removeEmptyState();
+        const existing = this.transfers[detail.id];
+        const peerName = this._getPeerName(detail.peerId);
+        const directionLabel = detail.direction === 'incoming' ? `From: ${peerName}` : `To: ${peerName}`;
+
+        if (existing) {
+            existing.status = 'transferring';
+            existing.startTime = Date.now();
+            existing.el.querySelector('.status-badge').className = 'status-badge transferring';
+            existing.el.querySelector('.status-badge').textContent = 'Transferring';
+        } else {
+            const card = document.createElement('div');
+            card.className = 'transfer-item';
+            card.id = 't-card-' + detail.id;
+            card.innerHTML = `
+                <div class="file-info" title="${detail.name}">${detail.name}</div>
+                <div class="transfer-meta">
+                    <span>${directionLabel}</span>
+                    <span class="status-badge transferring">Transferring</span>
+                </div>
+                <div class="progress-container">
+                    <progress value="0" max="1"></progress>
+                    <button class="cancel-btn">Cancel</button>
+                </div>
+            `;
+            card.querySelector('.cancel-btn').addEventListener('click', e => {
+                Events.fire('cancel-transfer-request', { transferId: detail.id, peerId: detail.peerId });
+            });
+            this.$list.appendChild(card);
+            this.transfers[detail.id] = {
+                el: card,
+                size: detail.size,
+                status: 'transferring',
+                startTime: Date.now()
+            };
+        }
+        this._updateBadge();
+    }
+
+    _onActive(detail) {
+        const existing = this.transfers[detail.id];
+        if (existing) {
+            existing.status = 'transferring';
+            existing.startTime = Date.now();
+            const badge = existing.el.querySelector('.status-badge');
+            badge.className = 'status-badge transferring';
+            badge.textContent = 'Transferring';
+        }
+        this._updateBadge();
+    }
+
+    _onProgress(detail) {
+        const transfer = this.transfers[detail.transferId];
+        if (!transfer) return;
+        
+        const progress = detail.progress;
+        const progressEl = transfer.el.querySelector('progress');
+        if (progressEl) progressEl.value = progress;
+
+        if (transfer.startTime) {
+            const duration = (Date.now() - transfer.startTime) / 1000;
+            if (duration > 0.5) {
+                const bytesSent = progress * transfer.size;
+                const speedBytes = bytesSent / duration;
+                const speedText = this._formatSpeed(speedBytes);
+                const badge = transfer.el.querySelector('.status-badge');
+                if (badge) badge.textContent = speedText;
+            }
+        }
+    }
+
+    _onCompleted(detail) {
+        const transfer = this.transfers[detail.id];
+        if (!transfer) return;
+        transfer.status = 'completed';
+        const progressEl = transfer.el.querySelector('progress');
+        if (progressEl) progressEl.value = 1;
+        const badge = transfer.el.querySelector('.status-badge');
+        if (badge) {
+            badge.className = 'status-badge completed';
+            badge.textContent = 'Done';
+        }
+        const cancelBtn = transfer.el.querySelector('.cancel-btn');
+        if (cancelBtn) cancelBtn.style.display = 'none';
+        this._updateBadge();
+    }
+
+    _onCancelled(detail) {
+        const transfer = this.transfers[detail.id];
+        if (!transfer) return;
+        transfer.status = 'cancelled';
+        const badge = transfer.el.querySelector('.status-badge');
+        if (badge) {
+            badge.className = 'status-badge cancelled';
+            badge.textContent = detail.status === 'remote-cancelled' ? 'Cancelled by peer' : 'Cancelled';
+        }
+        const cancelBtn = transfer.el.querySelector('.cancel-btn');
+        if (cancelBtn) cancelBtn.style.display = 'none';
+        this._updateBadge();
+    }
+
+    clearCompleted() {
+        for (const tid in this.transfers) {
+            const t = this.transfers[tid];
+            if (t.status === 'completed' || t.status === 'cancelled') {
+                t.el.remove();
+                delete this.transfers[tid];
+            }
+        }
+        this._checkEmptyState();
+    }
+
+    _removeEmptyState() {
+        const empty = this.$list.querySelector('.empty-state');
+        if (empty) empty.remove();
+    }
+
+    _checkEmptyState() {
+        if (this.$list.children.length === 0) {
+            this.$list.innerHTML = '<div class="empty-state">No active or recent transfers</div>';
+        }
+    }
+
+    _formatSpeed(bytesPerSec) {
+        if (bytesPerSec >= 1e6) {
+            return (Math.round(bytesPerSec / 1e5) / 10) + ' MB/s';
+        } else if (bytesPerSec >= 1000) {
+            return Math.round(bytesPerSec / 1000) + ' KB/s';
+        } else {
+            return Math.round(bytesPerSec) + ' B/s';
+        }
+    }
+}
+
+class UniversalDragAndDrop {
+    constructor() {
+        this.$overlay = $('drag-overlay');
+        this.dragEnterCount = 0;
+
+        window.addEventListener('dragenter', e => this._onDragEnter(e));
+        window.addEventListener('dragover', e => this._onDragOver(e));
+        window.addEventListener('dragleave', e => this._onDragLeave(e));
+        window.addEventListener('drop', e => this._onDrop(e));
+    }
+
+    _onDragEnter(e) {
+        e.preventDefault();
+        const peers = document.querySelectorAll('x-peer');
+        if (peers.length === 0) return;
+
+        this.dragEnterCount++;
+        if (this.dragEnterCount === 1) {
+            document.body.classList.add('drag-active');
+            this.$overlay.style.display = 'flex';
+            
+            const sub = this.$overlay.querySelector('.drag-overlay-sub');
+            if (peers.length === 1) {
+                const peerName = peers[0].ui ? peers[0].ui._displayName() : 'device';
+                sub.textContent = `Drop anywhere to send to ${peerName}`;
+                this.$overlay.style.pointerEvents = 'auto';
+            } else {
+                sub.textContent = 'Drop files directly on a device icon to send';
+                this.$overlay.style.pointerEvents = 'none';
+            }
+        }
+    }
+
+    _onDragOver(e) {
+        e.preventDefault();
+    }
+
+    _onDragLeave(e) {
+        e.preventDefault();
+        const peers = document.querySelectorAll('x-peer');
+        if (peers.length === 0) return;
+
+        this.dragEnterCount--;
+        if (this.dragEnterCount <= 0) {
+            this.dragEnterCount = 0;
+            this._hide();
+        }
+    }
+
+    _onDrop(e) {
+        e.preventDefault();
+        this.dragEnterCount = 0;
+        this._hide();
+
+        const peers = document.querySelectorAll('x-peer');
+        if (peers.length === 1 && e.dataTransfer && e.dataTransfer.files.length > 0) {
+            Events.fire('files-selected', {
+                files: e.dataTransfer.files,
+                to: peers[0].id
+            });
+        }
+    }
+
+    _hide() {
+        document.body.classList.remove('drag-active');
+        this.$overlay.style.display = 'none';
+    }
+}
 
 class Snapdrop {
     constructor() {
@@ -589,6 +964,11 @@ class Snapdrop {
             const networkStatusUI = new NetworkStatusUI();
             const webShareTargetUI = new WebShareTargetUI();
             const roomStatusUI = new RoomStatusUI();
+            
+            const themeManager = new ThemeManager();
+            const editNicknameDialog = new EditNicknameDialog();
+            const transferCenterUI = new TransferCenterUI();
+            const universalDragAndDrop = new UniversalDragAndDrop();
         });
     }
 }
