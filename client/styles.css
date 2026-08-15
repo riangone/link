@@ -1113,7 +1113,11 @@ body.drag-active #drag-overlay {
     transform: scale(0.95) translateY(12px);
     opacity: 0;
     z-index: 2;
-    pointer-events: all;
+    /* Only clickable while the About screen is actually open (#about:target).
+       Without this gate, this centered card sits invisibly (opacity:0) on
+       top of the peer list at all times and swallows every click/tap on
+       whatever is underneath it, even though nothing is visible. */
+    pointer-events: none;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1126,6 +1130,7 @@ body.drag-active #drag-overlay {
 
 #about:target .about-card {
     opacity: 1;
+    pointer-events: all;
     transform: scale(1) translateY(0);
 }
 
