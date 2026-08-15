@@ -23,6 +23,13 @@ Events.on('language-changed', () => {
     }
 });
 
+// Prevent the browser's default "open file in new tab" behavior when a file
+// is dropped anywhere outside of a specific drop target. Registered once at
+// module scope (was previously re-registered on window for every single
+// PeerUI instance, leaking one extra listener per peer joined/left).
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+
 class PeersUI {
 
     constructor() {
@@ -160,9 +167,6 @@ class PeerUI {
         el.addEventListener('touchend', e => this._onTouchEnd(e));
         el.addEventListener('touchmove', e => this._onTouchMove(e), { passive: true });
         el.addEventListener('touchcancel', e => this._onTouchCancel(e));
-        // prevent browser's default file drop behavior
-        Events.on('dragover', e => e.preventDefault());
-        Events.on('drop', e => e.preventDefault());
     }
 
     _displayName() {
