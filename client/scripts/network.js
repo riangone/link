@@ -1,6 +1,14 @@
 window.URL = window.URL || window.webkitURL;
 window.isRtcSupported = !!(window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection);
 
+/**
+ * WebSocket connection to the signaling server (server/index.js). Handles
+ * peer discovery (`peers`/`peer-joined`/`peer-left`), relays WebRTC
+ * offer/answer/ICE `signal` messages, and receives dynamic TURN
+ * credentials (`turn-config`). Does NOT carry file bytes — those go
+ * peer-to-peer over WebRTC data channels (see RTCPeer) once two peers
+ * have found each other through this connection.
+ */
 class ServerConnection {
 
     constructor() {
@@ -121,8 +129,19 @@ class ServerConnection {
     }
 }
 
+/**
+ * Base class for a connection to one remote peer. Owns the outgoing file
+ * queue (one file transferred at a time, in submission order — see
+ * `_dequeueFile`/`_sendFile`) and the chunked send/receive protocol built
+ * on top of whatever `_send()` transport the subclass provides
+ * (WebRTC data channel for RTCPeer, relayed WebSocket for WSPeer).
+ */
 class Peer {
 
+    /**
+     * @param {ServerConnection} serverConnection
+     * @param {string} peerId - id of the remote peer, as assigned by the signaling server
+     */
     constructor(serverConnection, peerId) {
         this._server = serverConnection;
         this._peerId = peerId;
@@ -134,6 +153,12 @@ class Peer {
         this._send(JSON.stringify(message));
     }
 
+    /**
+     * Queue one or more files for transfer to this peer. Files already
+     * queued/in-flight are unaffected; new files are appended and sent
+     * strictly after the current one finishes (see `_dequeueFile`).
+     * @param {FileList|File[]} files
+     */
     sendFiles(files) {
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
@@ -229,6 +254,9 @@ class Peer {
                 break;
             case 'text':
                 this._onTextReceived(message);
+                break;
+            case 'clipboard-sync':
+                this._onClipboardSyncReceived(message);
                 break;
         }
     }
@@ -328,8 +356,31 @@ class Peer {
         const escaped = decodeURIComponent(escape(atob(message.text)));
         Events.fire('text-received', { text: escaped, sender: this._peerId });
     }
+
+    /**
+     * Silently push a clipboard-sync payload to this peer. Distinct from
+     * sendText()/`text` messages: no dialog pops up on the receiving end,
+     * it's meant to transparently mirror the OS clipboard across paired
+     * devices (see ClipboardSync in clipboard-sync.js).
+     * @param {string} text
+     */
+    sendClipboardText(text) {
+        const unescaped = btoa(unescape(encodeURIComponent(text)));
+        this.sendJSON({ type: 'clipboard-sync', text: unescaped });
+    }
+
+    _onClipboardSyncReceived(message) {
+        const escaped = decodeURIComponent(escape(atob(message.text)));
+        Events.fire('clipboard-sync-received', { text: escaped, sender: this._peerId });
+    }
 }
 
+/**
+ * A peer reached over a real WebRTC RTCDataChannel (P2P, does not transit
+ * the signaling server once connected). Falls back to WSPeer
+ * (server-relayed) via `_fallbackToWSPeer()` if the data channel never
+ * opens (e.g. symmetric NAT without a working TURN relay).
+ */
 class RTCPeer extends Peer {
 
     constructor(serverConnection, peerId) {
@@ -471,6 +522,13 @@ class RTCPeer extends Peer {
     }
 }
 
+/**
+ * Owns the map of peerId -> Peer instance (RTCPeer or WSPeer) and reacts
+ * to signaling-server events (`peers`, `peer-joined`, `peer-left`,
+ * `signal`, `turn-config`) to create/tear down connections as devices
+ * come and go. This is the object UI code should go through to send
+ * files/text to a given peer id.
+ */
 class PeersManager {
 
     constructor(serverConnection) {
@@ -482,6 +540,7 @@ class PeersManager {
         Events.on('peers', e => this._onPeers(e.detail));
         Events.on('files-selected', e => this._onFilesSelected(e.detail));
         Events.on('send-text', e => this._onSendText(e.detail));
+        Events.on('clipboard-sync-broadcast', e => this._onClipboardSyncBroadcast(e.detail));
         Events.on('peer-left', e => this._onPeerLeft(e.detail));
         Events.on('turn-config', e => this._onTurnConfig(e.detail));
     }
@@ -555,6 +614,21 @@ class PeersManager {
         this.peers[message.to].sendText(message.text);
     }
 
+    /**
+     * Broadcast a clipboard-sync payload to every currently reachable peer
+     * (both direct RTCPeer connections and WSPeer relay fallbacks). Peers
+     * that never finished connecting are skipped rather than queued —
+     * clipboard sync is best-effort/"latest wins", not a guaranteed
+     * delivery like file transfers.
+     * @param {{text: string}} detail
+     */
+    _onClipboardSyncBroadcast(detail) {
+        Object.values(this.peers).forEach(peer => {
+            if (!peer || typeof peer._isConnected !== 'function' || !peer._isConnected()) return;
+            peer.sendClipboardText(detail.text);
+        });
+    }
+
     _onPeerLeft(peerId) {
         const peer = this.peers[peerId];
         delete this.peers[peerId];
@@ -569,6 +643,12 @@ class PeersManager {
 
 }
 
+/**
+ * Fallback peer transport: file bytes are relayed through the signaling
+ * WebSocket (server/index.js `_onMessage` relay-by-`to` logic) instead of
+ * a direct P2P WebRTC channel. Used when WebRTC isn't supported or a
+ * direct/TURN-relayed connection couldn't be established.
+ */
 class WSPeer extends Peer {
     constructor(serverConnection, peerId) {
         super(serverConnection, peerId);
@@ -658,8 +738,20 @@ class WSPeer extends Peer {
     }
 }
 
+/**
+ * Reads a File in fixed-size chunks (64 KB) grouped into partitions
+ * (1 MB), pausing after each partition until the receiver acknowledges
+ * it (see Peer#_onPartitionEnd / #_onReceivedPartitionEnd) — a simple
+ * flow-control scheme so a fast sender can't overrun a slow
+ * RTCDataChannel receive buffer.
+ */
 class FileChunker {
 
+    /**
+     * @param {File} file
+     * @param {(chunk: ArrayBuffer) => void} onChunk
+     * @param {(offset: number) => void} onPartitionEnd
+     */
     constructor(file, onChunk, onPartitionEnd) {
         this._chunkSize = 64000; // 64 KB
         this._maxPartitionSize = 1e6; // 1 MB
@@ -720,8 +812,16 @@ class FileChunker {
     }
 }
 
+/**
+ * Reassembles chunks received from a FileChunker (possibly relayed
+ * through WSPeer) back into a single Blob, tracking download progress.
+ */
 class FileDigester {
 
+    /**
+     * @param {{size: number, mime?: string, name: string}} meta
+     * @param {(file: {name: string, mime: string, size: number, blob: Blob}) => void} callback
+     */
     constructor(meta, callback) {
         this._buffer = [];
         this._bytesReceived = 0;

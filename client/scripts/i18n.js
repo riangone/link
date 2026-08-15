@@ -12,6 +12,8 @@ class I18n {
                 header_transfers_title: "Transfer Center",
                 header_notifications_title: "Enable Notifications",
                 header_install_title: "Install Link",
+                header_clipboard_sync_title: "Sync Clipboard Across Devices",
+                header_clipboard_sync_on_title: "Clipboard Sync is On (click to turn off)",
                 no_peers_msg: "Open Link on other devices to send files",
                 instructions_desktop: "Click to send files or right click to send a message",
                 instructions_mobile: "Tap to send files or long tap to send a message",
@@ -77,7 +79,11 @@ class I18n {
                 net_transfer_completed: "File transfer completed.",
                 net_transfer_cancelled_peer: "File transfer was cancelled by the other device.",
                 net_relay_limit: "Files > 10MB cannot be sent via relay (WebRTC failed).",
-                permission_error: "Notifications permission has been blocked\nas the user has dismissed the permission prompt several times.\nThis can be reset in Page Info\nwhich can be accessed by clicking the lock icon next to the URL."
+                permission_error: "Notifications permission has been blocked\nas the user has dismissed the permission prompt several times.\nThis can be reset in Page Info\nwhich can be accessed by clicking the lock icon next to the URL.",
+                clipboard_sync_enabled: "Clipboard sync enabled — copying text here now syncs to your other devices",
+                clipboard_sync_disabled: "Clipboard sync disabled",
+                clipboard_sync_received: "Clipboard synced from another device",
+                clipboard_sync_received_manual: "New clipboard content received, but this tab couldn't write to your clipboard automatically"
             },
             zh: {
                 header_about_title: "关于 Link",
@@ -85,6 +91,8 @@ class I18n {
                 header_transfers_title: "传输中心",
                 header_notifications_title: "启用通知",
                 header_install_title: "安装 Link",
+                header_clipboard_sync_title: "跨设备同步剪贴板",
+                header_clipboard_sync_on_title: "剪贴板同步已开启（点击关闭）",
                 no_peers_msg: "在其他设备上打开 Link 即可发送文件",
                 instructions_desktop: "点击发送文件，或右键发送文本消息",
                 instructions_mobile: "点击发送文件，或长按发送文本消息",
@@ -148,7 +156,11 @@ class I18n {
                 net_transfer_completed: "文件传输已完成。",
                 net_transfer_cancelled_peer: "文件传输已被对方设备取消。",
                 net_relay_limit: "文件大于 10MB 无法通过中继模式发送（WebRTC 直连失败）。",
-                permission_error: "通知权限已被阻止。\n可能由于您已多次拒绝此权限请求。\n您可以通过点击地址栏左侧的锁形图标，在“网站设置”中重置该权限。"
+                permission_error: "通知权限已被阻止。\n可能由于您已多次拒绝此权限请求。\n您可以通过点击地址栏左侧的锁形图标，在“网站设置”中重置该权限。",
+                clipboard_sync_enabled: "剪贴板同步已开启，在这里复制的文本会自动同步到您的其他设备",
+                clipboard_sync_disabled: "剪贴板同步已关闭",
+                clipboard_sync_received: "已从其他设备同步剪贴板",
+                clipboard_sync_received_manual: "收到新的剪贴板内容，但当前标签页无法自动写入剪贴板"
             },
             ja: {
                 header_about_title: "Link について",
@@ -156,6 +168,8 @@ class I18n {
                 header_transfers_title: "転送センター",
                 header_notifications_title: "通知を有効化",
                 header_install_title: "Link をインストール",
+                header_clipboard_sync_title: "デバイス間でクリップボードを同期",
+                header_clipboard_sync_on_title: "クリップボード同期はオンです（クリックでオフ）",
                 no_peers_msg: "他のデバイスで Link を開くとファイルを送信できます",
                 instructions_desktop: "クリックしてファイルを送信、または右クリックしてメッセージを送信",
                 instructions_mobile: "タップしてファイルを送信、または長押ししてメッセージを送信",
@@ -219,7 +233,11 @@ class I18n {
                 net_transfer_completed: "ファイル転送が完了しました。",
                 net_transfer_cancelled_peer: "ファイル転送が相手側のデバイスによってキャンセルされました。",
                 net_relay_limit: "10MBを超えるファイルは中継モードで送信できません（WebRTC直連に失敗しました）。",
-                permission_error: "通知の許可がブロックされています。\n過去に許可のポップアップが拒否された可能性があります。\nURL横の鍵アイコンをクリックし、ページ情報から許可設定をリセットできます。"
+                permission_error: "通知の許可がブロックされています。\n過去に許可のポップアップが拒否された可能性があります。\nURL横の鍵アイコンをクリックし、ページ情報から許可設定をリセットできます。",
+                clipboard_sync_enabled: "クリップボード同期をオンにしました。ここでコピーしたテキストは他のデバイスに自動同期されます",
+                clipboard_sync_disabled: "クリップボード同期をオフにしました",
+                clipboard_sync_received: "他のデバイスからクリップボードが同期されました",
+                clipboard_sync_received_manual: "新しいクリップボードの内容を受信しましたが、このタブでは自動的に書き込めませんでした"
             },
             ko: {
                 header_about_title: "Link 정보",
@@ -227,6 +245,8 @@ class I18n {
                 header_transfers_title: "전송 센터",
                 header_notifications_title: "알림 사용",
                 header_install_title: "Link 설치",
+                header_clipboard_sync_title: "기기 간 클립보드 동기화",
+                header_clipboard_sync_on_title: "클립보드 동기화 켜짐 (클릭하여 끄기)",
                 no_peers_msg: "다른 기기에서 Link를 열면 파일을 보낼 수 있습니다",
                 instructions_desktop: "클릭하여 파일을 보내거나 우클릭하여 메시지를 전송",
                 instructions_mobile: "탭하여 파일을 보내거나 길게 눌러 메시지를 전송",
@@ -290,7 +310,11 @@ class I18n {
                 net_transfer_completed: "파일 전송이 완료되었습니다.",
                 net_transfer_cancelled_peer: "상대방 기기에 의해 파일 전송이 취소되었습니다.",
                 net_relay_limit: "10MB보다 큰 파일은 릴레이 모드로 전송할 수 없습니다 (WebRTC 직접 연결 실패).",
-                permission_error: "알림 허용 권한이 차단되었습니다.\n사용자가 알림 창을 여러 번 무시했거나 거부했을 수 있습니다.\nURL 옆 자물쇠 아이콘을 클릭하여 설정 페이지에서 다시 초기화할 수 있습니다."
+                permission_error: "알림 허용 권한이 차단되었습니다.\n사용자가 알림 창을 여러 번 무시했거나 거부했을 수 있습니다.\nURL 옆 자물쇠 아이콘을 클릭하여 설정 페이지에서 다시 초기화할 수 있습니다.",
+                clipboard_sync_enabled: "클립보드 동기화가 켜졌습니다. 여기서 복사한 텍스트가 다른 기기와 자동으로 동기화됩니다",
+                clipboard_sync_disabled: "클립보드 동기화가 꺼졌습니다",
+                clipboard_sync_received: "다른 기기에서 클립보드가 동기화되었습니다",
+                clipboard_sync_received_manual: "새 클립보드 내용을 받았지만 이 탭에서 자동으로 쓰지 못했습니다"
             }
         };
 

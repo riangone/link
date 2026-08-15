@@ -253,6 +253,18 @@ a {
     color: var(--primary-color);
 }
 
+.icon-button.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.icon-button.active:hover {
+    background: var(--primary-color);
+    color: white;
+    opacity: 0.9;
+}
+
 .icon-button .badge {
     position: absolute;
     top: -4px;

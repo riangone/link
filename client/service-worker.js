@@ -1,4 +1,4 @@
-var CACHE_NAME = 'link-cache-v13';
+var CACHE_NAME = 'link-cache-v14';
 var urlsToCache = [
   'index.html',
   './',
@@ -6,6 +6,7 @@ var urlsToCache = [
   'scripts/i18n.js',
   'scripts/network.js',
   'scripts/ui.js',
+  'scripts/clipboard-sync.js',
   'scripts/clipboard.js',
   'sounds/blop.mp3',
   'images/favicon-96x96.png'

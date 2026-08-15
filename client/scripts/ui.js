@@ -1070,6 +1070,7 @@ class LinkApp {
             const editNicknameDialog = new EditNicknameDialog();
             const transferCenterUI = new TransferCenterUI();
             const universalDragAndDrop = new UniversalDragAndDrop();
+            const clipboardSync = new ClipboardSync();
 
             // Initialize page translation
             window.I18n.translatePage();
