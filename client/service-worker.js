@@ -1,4 +1,4 @@
-var CACHE_NAME = 'link-cache-v9';
+var CACHE_NAME = 'link-cache-v10';
 var urlsToCache = [
   'index.html',
   './',
