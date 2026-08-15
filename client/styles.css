@@ -399,6 +399,9 @@ x-peer label {
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     user-select: none;
     -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 }
 
 x-peer label:hover {
@@ -417,7 +420,6 @@ x-peer input[type="file"] {
     width: 0;
     height: 0;
     opacity: 0;
-    pointer-events: none;
 }
 
 x-peer x-icon {

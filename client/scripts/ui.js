@@ -156,8 +156,10 @@ class PeerUI {
         el.addEventListener('dragleave', e => this._onDragEnd(e));
         el.addEventListener('dragover', e => this._onDragOver(e));
         el.addEventListener('contextmenu', e => this._onRightClick(e));
-        el.addEventListener('touchstart', e => this._onTouchStart(e));
+        el.addEventListener('touchstart', e => this._onTouchStart(e), { passive: true });
         el.addEventListener('touchend', e => this._onTouchEnd(e));
+        el.addEventListener('touchmove', e => this._onTouchMove(e), { passive: true });
+        el.addEventListener('touchcancel', e => this._onTouchCancel(e));
         // prevent browser's default file drop behavior
         Events.on('dragover', e => e.preventDefault());
         Events.on('drop', e => e.preventDefault());
@@ -247,15 +249,42 @@ class PeerUI {
 
     _onTouchStart(e) {
         this._touchStart = Date.now();
-        this._touchTimer = setTimeout(_ => this._onTouchEnd(), 610);
+        this._isLongPress = false;
+        
+        if (e.touches && e.touches.length > 0) {
+            this._touchStartX = e.touches[0].clientX;
+            this._touchStartY = e.touches[0].clientY;
+        }
+
+        clearTimeout(this._touchTimer);
+        this._touchTimer = setTimeout(() => {
+            this._isLongPress = true;
+            if (navigator.vibrate) navigator.vibrate(50);
+            Events.fire('text-recipient', this._peer.id);
+        }, 600);
+    }
+
+    _onTouchMove(e) {
+        if (!this._touchStartX || !this._touchStartY || !e.touches || e.touches.length === 0) return;
+        
+        const deltaX = Math.abs(e.touches[0].clientX - this._touchStartX);
+        const deltaY = Math.abs(e.touches[0].clientY - this._touchStartY);
+        
+        if (deltaX > 10 || deltaY > 10) {
+            clearTimeout(this._touchTimer);
+        }
+    }
+
+    _onTouchCancel(e) {
+        clearTimeout(this._touchTimer);
+        this._isLongPress = false;
     }
 
     _onTouchEnd(e) {
-        if (Date.now() - this._touchStart < 500) {
-            clearTimeout(this._touchTimer);
-        } else { // this was a long tap
+        clearTimeout(this._touchTimer);
+        if (this._isLongPress) {
             if (e) e.preventDefault();
-            Events.fire('text-recipient', this._peer.id);
+            this._isLongPress = false;
         }
     }
 }
