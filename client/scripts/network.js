@@ -130,6 +130,53 @@ class ServerConnection {
 }
 
 /**
+ * Caps how many *outgoing* file transfers, across all peers combined, may
+ * be actively sending (post-header) at once. Each Peer still queues its
+ * own files strictly in submission order (`Peer._filesQueue`) — this only
+ * gates when a peer is allowed to move a file from "queued" to "active",
+ * so fanning a send out to many peers at once doesn't open a data channel
+ * per peer simultaneously and doesn't force every receiver to buffer a
+ * file in memory at the same time (see FileDigester, which holds the
+ * whole incoming file in RAM until it's complete).
+ *
+ * Deliberately does NOT throttle inbound transfers: a peer sending to us
+ * has no way to know our slots are full without a protocol-level "busy,
+ * retry" handshake, which is out of scope here.
+ */
+class TransferScheduler {
+    constructor(maxConcurrent = 3) {
+        this._max = maxConcurrent;
+        this._active = 0;
+        this._waiters = []; // FIFO of onGranted callbacks
+    }
+
+    /**
+     * @param {() => void} onGranted - invoked once a slot is available,
+     *   synchronously if one is free right now.
+     */
+    requestSlot(onGranted) {
+        if (this._active < this._max) {
+            this._active++;
+            onGranted();
+        } else {
+            this._waiters.push(onGranted);
+        }
+    }
+
+    releaseSlot() {
+        if (this._active === 0) return; // guard against a stray double-release
+        this._active--;
+        const next = this._waiters.shift();
+        if (next) {
+            this._active++;
+            next();
+        }
+    }
+}
+
+const transferScheduler = new TransferScheduler();
+
+/**
  * Base class for a connection to one remote peer. Owns the outgoing file
  * queue (one file transferred at a time, in submission order — see
  * `_dequeueFile`/`_sendFile`) and the chunked send/receive protocol built
@@ -147,6 +194,8 @@ class Peer {
         this._peerId = peerId;
         this._filesQueue = [];
         this._busy = false;
+        this._pendingTransferId = null; // reserved locally, waiting on a global TransferScheduler slot
+        this._holdsSlot = false; // true once TransferScheduler actually granted us a slot
     }
 
     sendJSON(message) {
@@ -180,13 +229,31 @@ class Peer {
 
     _dequeueFile() {
         if (!this._filesQueue.length) return;
+        if (this._busy) return;
         this._busy = true;
         const file = this._filesQueue.shift();
-        Events.fire('transfer-active', { id: file.transferId });
-        this._sendFile(file);
+        this._pendingTransferId = file.transferId;
+        transferScheduler.requestSlot(() => {
+            if (this._pendingTransferId !== file.transferId) {
+                // cancelled (or peer torn down) while waiting for a global slot
+                transferScheduler.releaseSlot();
+                return;
+            }
+            this._pendingTransferId = null;
+            this._sendFile(file);
+        });
+    }
+
+    /** Give back a scheduler slot if (and only if) we're currently holding one. */
+    _releaseSlotIfHeld() {
+        if (!this._holdsSlot) return;
+        this._holdsSlot = false;
+        transferScheduler.releaseSlot();
     }
 
     _sendFile(file) {
+        this._holdsSlot = true;
+        Events.fire('transfer-active', { id: file.transferId });
         this._activeTransferId = file.transferId;
         this.sendJSON({
             type: 'header',
@@ -310,6 +377,7 @@ class Peer {
         this._reader = null;
         this._busy = false;
         this._activeTransferId = null;
+        this._releaseSlotIfHeld();
         this._dequeueFile();
         Events.fire('notify-user', window.I18n.t('net_transfer_completed'));
     }
@@ -321,6 +389,14 @@ class Peer {
             }
             this.sendJSON({ type: 'cancel-transfer', transferId: transferId });
             this._cleanActiveTransfer('cancelled');
+        } else if (this._pendingTransferId === transferId) {
+            // Reserved this peer's one local "in-flight" spot but still
+            // queued behind the global TransferScheduler cap — never sent
+            // a header, so there's nothing to tell the remote side.
+            this._pendingTransferId = null;
+            this._busy = false;
+            Events.fire('transfer-cancelled', { id: transferId, status: 'cancelled' });
+            this._dequeueFile();
         } else {
             const lenBefore = this._filesQueue.length;
             this._filesQueue = this._filesQueue.filter(file => file.transferId !== transferId);
@@ -343,6 +419,7 @@ class Peer {
         this._chunker = null;
         this._digester = null;
         this._busy = false;
+        this._releaseSlotIfHeld(); // no-op if we're the receiver side (never held a slot)
         Events.fire('transfer-cancelled', { id: tid, status: status });
         this._dequeueFile();
     }
@@ -576,6 +653,13 @@ class PeersManager {
                 if (oldPeer._conn) oldPeer._conn.close();
             } catch (e) {}
 
+            // The in-flight file (if any) was already shifted out of
+            // _filesQueue by _dequeueFile and isn't requeued here, so any
+            // scheduler slot oldPeer was holding/awaiting for it would
+            // otherwise leak.
+            oldPeer._pendingTransferId = null;
+            if (oldPeer._releaseSlotIfHeld) oldPeer._releaseSlotIfHeld();
+
             const filesQueue = oldPeer._filesQueue || [];
             const wsPeer = new WSPeer(this._server, peerId);
             wsPeer._filesQueue = filesQueue;
@@ -639,6 +723,13 @@ class PeersManager {
         if (peer._conn) {
             try { peer._conn.close(); } catch (e) {}
         }
+        // Drop any global TransferScheduler slot this peer was holding or
+        // waiting on, so a mid-transfer disconnect doesn't permanently
+        // shrink everyone else's concurrency budget. Clearing
+        // _pendingTransferId also makes the queued requestSlot() callback
+        // (if any) a no-op instead of sending into a torn-down connection.
+        peer._pendingTransferId = null;
+        if (peer._releaseSlotIfHeld) peer._releaseSlotIfHeld();
     }
 
 }
