@@ -1,0 +1,14 @@
+{
+  "name": "link-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Root-level dev tooling for the Link project (Playwright E2E tests only). The app itself has no build step: server/ and client/ are plain Node/vanilla-JS and are run/served as-is.",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:server": "npm --prefix server test",
+    "test": "npm run test:server && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0"
+  }
+}

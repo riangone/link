@@ -2,3 +2,8 @@ node_modules
 .DS_Store
 fqdn.env
 /docker/certs
+
+# Playwright E2E test output (tests/e2e/*.spec.js)
+/test-results/
+/playwright-report/
+/blob-report/

@@ -527,7 +527,7 @@ x-peer .connection-type.relay {
     width: 68px;
     height: 68px;
     position: absolute;
-    top: 16px;
+    top: 24px;
     left: calc(50% - 34px);
     clip: rect(0px, 68px, 68px, 34px);
     --progress: rotate(0deg);
@@ -1274,7 +1274,7 @@ body.theme-dark #about x-background {
     .progress {
         width: 52px;
         height: 52px;
-        top: 10px;
+        top: 18px;
         left: calc(50% - 26px);
         clip: rect(0px, 52px, 52px, 26px);
     }
