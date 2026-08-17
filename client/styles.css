@@ -752,6 +752,218 @@ x-dialog .row-reverse {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+/* Chat thread (SendTextDialog) - a scrollable per-peer message history
+   above the composer, replacing the old single "last message" popup. */
+.text-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 45vh;
+    overflow-y: auto;
+    margin-bottom: 14px;
+    padding-right: 2px;
+}
+
+.text-thread:empty {
+    display: none;
+}
+
+.text-thread-empty {
+    color: var(--text-color);
+    opacity: 0.5;
+    font-size: 13px;
+    text-align: center;
+    padding: 12px 0;
+}
+
+.text-msg {
+    display: flex;
+    flex-direction: column;
+    max-width: 85%;
+}
+
+.text-msg-outgoing {
+    align-self: flex-end;
+    align-items: flex-end;
+}
+
+.text-msg-incoming {
+    align-self: flex-start;
+    align-items: flex-start;
+}
+
+.text-msg-bubble {
+    background: var(--bg-color-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 10px 14px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--text-color);
+    word-break: break-word;
+    white-space: pre-wrap;
+    cursor: pointer;
+}
+
+.text-msg-outgoing .text-msg-bubble {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: transparent;
+}
+
+.text-msg-bubble a {
+    color: inherit;
+    text-decoration: underline;
+}
+
+.text-msg-status {
+    font-size: 11px;
+    opacity: 0.6;
+    margin-top: 3px;
+    padding: 0 4px;
+}
+
+.text-msg-status-failed {
+    color: var(--error-color);
+    opacity: 1;
+}
+
+.text-msg-status-retryable {
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+/* Voice messages (SendTextDialog) - recording bar shown above the composer
+   while VoiceRecorder is active, and the inline playable bubble rendered
+   for {type: 'voice'} entries in the chat thread (see ui.js
+   _renderVoiceBubble). Audio itself never touches this file - it's stored
+   client-side in IndexedDB via voice-store.js. */
+.voice-record-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    border-radius: 12px;
+    background: var(--bg-color-secondary);
+    border: 1px solid var(--border-color);
+    font-size: 13px;
+}
+
+.voice-record-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--error-color, #e53935);
+    animation: voice-record-pulse 1.2s ease-in-out infinite;
+    flex-shrink: 0;
+}
+
+@keyframes voice-record-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+#voiceRecordTime {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.voice-record-hint {
+    opacity: 0.7;
+    flex-grow: 1;
+}
+
+.voice-record-bar .icon-button {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.voice-record-bar .icon-button .icon {
+    width: 16px;
+    height: 16px;
+}
+
+.voice-msg-bubble {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-color-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 8px 12px;
+    min-width: 160px;
+}
+
+.text-msg-outgoing .voice-msg-bubble {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: transparent;
+}
+
+.voice-msg-bubble.voice-msg-pending,
+.voice-msg-bubble.voice-msg-unavailable {
+    min-width: 0;
+    font-size: 13px;
+    font-style: italic;
+    opacity: 0.7;
+}
+
+.voice-play-btn {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(127, 127, 127, 0.18);
+    color: inherit;
+    cursor: pointer;
+    padding: 0;
+}
+
+.text-msg-outgoing .voice-play-btn {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.voice-play-btn .icon {
+    width: 18px;
+    height: 18px;
+}
+
+.voice-msg-track {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(127, 127, 127, 0.25);
+    overflow: hidden;
+}
+
+.text-msg-outgoing .voice-msg-track {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.voice-msg-progress {
+    height: 100%;
+    width: 0%;
+    background: currentColor;
+    opacity: 0.8;
+    border-radius: 2px;
+}
+
+.voice-msg-duration {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.75;
+    flex-shrink: 0;
+}
+
 /* Standard Buttons */
 .button {
     padding: 12px 24px;

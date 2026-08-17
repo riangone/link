@@ -24,7 +24,11 @@ const TURN_URLS = [
 
 // --- Abuse-protection tunables (all overridable via env for ops flexibility) ---
 const ROOM_MAX_PEERS = parseInt(process.env.ROOM_MAX_PEERS || '50', 10);
-const RATE_LIMIT_MAX_MESSAGES = parseInt(process.env.RATE_LIMIT_MAX_MESSAGES || '30', 10); // per window
+// 60 (not 30): chat text relayed over WSPeer (WebRTC fallback) is now chunked
+// (see TEXT_CHUNK_CHARS in client/scripts/network.js) and each chunk plus its
+// text-ack counts as a separate signaling message, so a single long pasted
+// message from one peer can legitimately burst well past a 30/window budget.
+const RATE_LIMIT_MAX_MESSAGES = parseInt(process.env.RATE_LIMIT_MAX_MESSAGES || '60', 10); // per window
 const RATE_LIMIT_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '1000', 10); // 1s window
 const WS_MAX_PAYLOAD_BYTES = parseInt(process.env.WS_MAX_PAYLOAD_BYTES || String(64 * 1024), 10); // signaling msgs are small; file bytes go over WebRTC data channels, not this socket
 

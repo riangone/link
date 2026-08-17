@@ -398,18 +398,166 @@ class ReceiveDialog extends Dialog {
 }
 
 
+/**
+ * Wraps MediaRecorder to capture a single voice message. One instance is
+ * reused across recordings (see SendTextDialog._recorder) - start()/stop()
+ * just re-arm it. Deliberately has no knowledge of peers/network; it only
+ * ever hands back a Blob + duration via onStop, exactly like picking a file
+ * from an <input type=file> hands back a File. What happens to that Blob
+ * (Peer#sendVoice in network.js) is the caller's problem.
+ */
+class VoiceRecorder {
+
+    static MAX_DURATION_MS = 60000; // hard cap so one voice message can't grow unbounded
+
+    constructor() {
+        this._mediaRecorder = null;
+        this._stream = null;
+        this._chunks = [];
+        this._startTime = 0;
+        this._maxTimer = null;
+        this._cancelled = false;
+        this.onStop = null;  // (blob: Blob, durationSeconds: number) => void
+        this.onError = null; // (error: Error) => void
+    }
+
+    get isRecording() {
+        return !!this._mediaRecorder && this._mediaRecorder.state === 'recording';
+    }
+
+    async start() {
+        if (this.isRecording) return;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+            this.onError && this.onError(new Error('voice recording not supported'));
+            return;
+        }
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+            this.onError && this.onError(e);
+            return;
+        }
+        this._stream = stream;
+        this._chunks = [];
+        this._cancelled = false;
+        const mimeType = VoiceRecorder._pickMimeType();
+        this._mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+        this._mediaRecorder.addEventListener('dataavailable', e => {
+            if (e.data && e.data.size > 0) this._chunks.push(e.data);
+        });
+        this._mediaRecorder.addEventListener('stop', () => this._onRecorderStop());
+        this._startTime = Date.now();
+        this._mediaRecorder.start();
+        this._maxTimer = setTimeout(() => this.stop(), VoiceRecorder.MAX_DURATION_MS);
+    }
+
+    /** Stop and keep the recording (fires onStop). */
+    stop() {
+        clearTimeout(this._maxTimer);
+        if (this._mediaRecorder && this._mediaRecorder.state !== 'inactive') {
+            this._mediaRecorder.stop();
+        }
+        this._releaseStream();
+    }
+
+    /** Stop and discard the recording (onStop is not called). */
+    cancel() {
+        this._cancelled = true;
+        this.stop();
+    }
+
+    _onRecorderStop() {
+        const durationSeconds = Math.max(0, (Date.now() - this._startTime) / 1000);
+        const mimeType = this._mediaRecorder ? (this._mediaRecorder.mimeType || 'audio/webm') : 'audio/webm';
+        const blob = new Blob(this._chunks, { type: mimeType });
+        this._chunks = [];
+        this._mediaRecorder = null;
+        const cancelled = this._cancelled;
+        this._cancelled = false;
+        if (cancelled || blob.size === 0) return;
+        this.onStop && this.onStop(blob, durationSeconds);
+    }
+
+    _releaseStream() {
+        if (this._stream) {
+            this._stream.getTracks().forEach(t => t.stop());
+            this._stream = null;
+        }
+    }
+
+    static _pickMimeType() {
+        if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return null;
+        const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4'];
+        return candidates.find(type => MediaRecorder.isTypeSupported(type)) || null;
+    }
+}
+
+/**
+ * Compose dialog *and* per-peer chat thread. Replaces the old pair of
+ * SendTextDialog ("compose, fire-and-forget, dialog closes")
+ * / ReceiveTextDialog ("last message received, overwrites on every new
+ * one") with a single scrollable history keyed by peer id
+ * (`this._threads`), fed by the `message-updated` (outgoing status
+ * transitions: sending/delivered/failed - see Peer#_recordText in
+ * network.js) and `text-received` (incoming) events. Network-layer state
+ * (network.js `Peer#_textHistory`) is the source of truth for retries/acks;
+ * this class keeps its own light mirror purely for rendering.
+ */
 class SendTextDialog extends Dialog {
     constructor() {
         super('sendTextDialog');
-        Events.on('text-recipient', e => this._onRecipient(e.detail))
         this.$text = this.$el.querySelector('#textInput');
-        const button = this.$el.querySelector('form');
-        button.addEventListener('submit', e => this._send(e));
+        this.$thread = this.$el.querySelector('#textThread');
+        this._threads = new Map(); // peerId -> [{id, text?, type?, duration?, direction, status, timestamp}]
+        this._recipient = null;
+
+        // Voice recording/playback state. One VoiceRecorder is reused across
+        // recordings; at most one voice message plays back at a time
+        // (_playingAudio), independent of DOM rebuilds in _renderThread -
+        // see _renderVoiceBubble/_bindVoiceProgress for how a re-render
+        // reattaches to still-playing audio instead of restarting it.
+        this._recorder = new VoiceRecorder();
+        this._recorder.onStop = (blob, duration) => this._onRecordingStop(blob, duration);
+        this._recorder.onError = e => this._onRecordingError(e);
+        this._recordTimer = null;
+        this._playingAudio = null; // {id, audio, url, _progressHandler}
+
+        this.$voiceBar = this.$el.querySelector('#voiceRecordBar');
+        this.$voiceTime = this.$el.querySelector('#voiceRecordTime');
+        this.$voiceRecordBtn = this.$el.querySelector('#voiceRecordBtn');
+        this.$voiceCancelBtn = this.$el.querySelector('#voiceCancelBtn');
+
+        Events.on('text-recipient', e => this._onRecipient(e.detail));
+        Events.on('message-updated', e => this._onMessageUpdated(e.detail));
+        Events.on('text-received', e => this._onTextReceived(e.detail));
+        Events.on('voice-message', e => this._onVoiceMessage(e.detail));
+
+        const form = this.$el.querySelector('form');
+        form.addEventListener('submit', e => this._send(e));
+
+        if (this.$voiceRecordBtn) {
+            this.$voiceRecordBtn.addEventListener('click', e => {
+                e.preventDefault();
+                this._recorder.isRecording ? this._stopRecording() : this._startRecording();
+            });
+        }
+        if (this.$voiceCancelBtn) {
+            this.$voiceCancelBtn.addEventListener('click', e => {
+                e.preventDefault();
+                this._cancelRecording();
+            });
+        }
     }
 
     _onRecipient(recipient) {
+        if (this._recipient !== recipient) {
+            this.$text.textContent = '';
+            this._cancelRecording();
+        }
         this._recipient = recipient;
         this._handleShareTargetText();
+        this._renderThread();
         this.show();
 
         const range = document.createRange();
@@ -418,7 +566,87 @@ class SendTextDialog extends Dialog {
         range.selectNodeContents(this.$text);
         sel.removeAllRanges();
         sel.addRange(range);
+    }
 
+    hide() {
+        this._cancelRecording();
+        if (this._playingAudio) {
+            this._playingAudio.audio.pause();
+        }
+        super.hide();
+    }
+
+    async _startRecording() {
+        if (!this._recipient || this._recorder.isRecording) return;
+        await this._recorder.start();
+        if (!this._recorder.isRecording) return; // start() failed (denied/unsupported) - onError already handled it
+        if (this.$voiceBar) this.$voiceBar.hidden = false;
+        if (this.$voiceRecordBtn) {
+            this.$voiceRecordBtn.classList.add('active');
+            this.$voiceRecordBtn.innerHTML = '<svg class="icon"><use xlink:href="#stop-circle" /></svg>';
+        }
+        this._recordStart = Date.now();
+        this._updateRecordTimer();
+        this._recordTimer = setInterval(() => this._updateRecordTimer(), 250);
+    }
+
+    _stopRecording() {
+        if (!this._recorder.isRecording) return;
+        this._recorder.stop(); // fires onStop -> _onRecordingStop, which does the actual send
+        this._resetRecordingUI();
+    }
+
+    _cancelRecording() {
+        if (!this._recorder.isRecording) return;
+        this._recorder.cancel();
+        this._resetRecordingUI();
+    }
+
+    _resetRecordingUI() {
+        clearInterval(this._recordTimer);
+        this._recordTimer = null;
+        if (this.$voiceBar) this.$voiceBar.hidden = true;
+        if (this.$voiceRecordBtn) {
+            this.$voiceRecordBtn.classList.remove('active');
+            this.$voiceRecordBtn.innerHTML = '<svg class="icon"><use xlink:href="#mic" /></svg>';
+        }
+    }
+
+    _updateRecordTimer() {
+        if (!this.$voiceTime) return;
+        const elapsed = (Date.now() - this._recordStart) / 1000;
+        this.$voiceTime.textContent = this._formatDuration(elapsed);
+    }
+
+    _onRecordingStop(blob, duration) {
+        if (!this._recipient) return;
+        Events.fire('voice-selected', { to: this._recipient, blob, duration });
+    }
+
+    _onRecordingError(e) {
+        console.error('VoiceRecorder:', e);
+        this._resetRecordingUI();
+        Events.fire('notify-user', window.I18n.t('voice_permission_denied'));
+    }
+
+    _onVoiceMessage(detail) {
+        this._upsert(detail.peerId, {
+            id: detail.id,
+            type: 'voice',
+            duration: detail.duration,
+            direction: detail.direction,
+            status: detail.status,
+            timestamp: detail.timestamp
+        });
+        if (detail.direction === 'incoming' && detail.status === 'delivered') {
+            window.blop.play();
+            if (this._recipient !== detail.peerId) {
+                this._recipient = detail.peerId;
+                this.$text.textContent = '';
+            }
+            this.show();
+        }
+        if (detail.peerId === this._recipient) this._renderThread();
     }
 
     _handleShareTargetText() {
@@ -429,41 +657,243 @@ class SendTextDialog extends Dialog {
 
     _send(e) {
         e.preventDefault();
-        Events.fire('send-text', {
-            to: this._recipient,
-            text: this.$text.innerText
-        });
-    }
-}
-
-class ReceiveTextDialog extends Dialog {
-    constructor() {
-        super('receiveTextDialog');
-        Events.on('text-received', e => this._onText(e.detail))
-        this.$text = this.$el.querySelector('#text');
-        const $copy = this.$el.querySelector('#copy');
-        copy.addEventListener('click', _ => this._onCopy());
+        const text = this.$text.innerText.trim();
+        if (!text || !this._recipient) return;
+        Events.fire('send-text', { to: this._recipient, text });
+        this.$text.textContent = '';
     }
 
-    _onText(e) {
-        this.$text.innerHTML = '';
-        const text = e.text;
-        if (isURL(text)) {
-            const $a = document.createElement('a');
-            $a.href = text;
-            $a.target = '_blank';
-            $a.textContent = text;
-            this.$text.appendChild($a);
-        } else {
-            this.$text.textContent = text;
+    _upsert(peerId, message) {
+        if (!peerId) return;
+        let thread = this._threads.get(peerId);
+        if (!thread) {
+            thread = [];
+            this._threads.set(peerId, thread);
         }
-        this.show();
-        window.blop.play();
+        const existing = thread.find(m => m.id === message.id);
+        if (existing) {
+            Object.assign(existing, message);
+        } else {
+            thread.push(message);
+            if (thread.length > 200) thread.shift(); // mirrors network.js's own bound, see Peer#_recordText
+        }
     }
 
-    async _onCopy() {
-        await navigator.clipboard.writeText(this.$text.textContent);
-        Events.fire('notify-user', window.I18n.t('copied_clipboard'));
+    _onMessageUpdated(detail) {
+        this._upsert(detail.peerId, detail);
+        if (detail.peerId === this._recipient) this._renderThread();
+    }
+
+    _onTextReceived(detail) {
+        this._upsert(detail.sender, {
+            id: detail.id,
+            text: detail.text,
+            direction: 'incoming',
+            status: 'delivered',
+            timestamp: Date.now()
+        });
+        window.blop.play();
+        if (this._recipient !== detail.sender) {
+            // Mirrors the old ReceiveTextDialog auto-popup: jump to this
+            // peer's thread even if we were composing to someone else.
+            this._recipient = detail.sender;
+            this.$text.textContent = '';
+        }
+        this._renderThread();
+        this.show();
+    }
+
+    _renderThread() {
+        this.$thread.innerHTML = '';
+        const thread = this._threads.get(this._recipient) || [];
+        if (!thread.length) {
+            const $empty = document.createElement('div');
+            $empty.className = 'text-thread-empty';
+            $empty.textContent = window.I18n.t('dialog_chat_empty');
+            this.$thread.appendChild($empty);
+            return;
+        }
+        thread.forEach(message => this.$thread.appendChild(this._renderMessage(message)));
+        this.$thread.scrollTop = this.$thread.scrollHeight;
+    }
+
+    _renderMessage(message) {
+        const $msg = document.createElement('div');
+        $msg.className = 'text-msg text-msg-' + message.direction;
+
+        if (message.type === 'voice') {
+            $msg.appendChild(this._renderVoiceBubble(message));
+        } else {
+            const $bubble = document.createElement('div');
+            $bubble.className = 'text-msg-bubble';
+            $bubble.title = window.I18n.t('click_to_copy');
+            if (isURL(message.text)) {
+                const $a = document.createElement('a');
+                $a.href = message.text;
+                $a.target = '_blank';
+                $a.textContent = message.text;
+                $bubble.appendChild($a);
+            } else {
+                $bubble.textContent = message.text;
+            }
+            $bubble.addEventListener('click', () => this._copy(message.text));
+            $msg.appendChild($bubble);
+        }
+
+        if (message.direction === 'outgoing') {
+            const $status = document.createElement('div');
+            $status.className = 'text-msg-status text-msg-status-' + message.status;
+            $status.textContent = window.I18n.t('msg_status_' + message.status);
+            if (message.status === 'failed') {
+                if (message.type === 'voice') {
+                    $status.textContent = window.I18n.t('voice_status_failed');
+                } else {
+                    $status.textContent += ' · ' + window.I18n.t('msg_retry');
+                    $status.classList.add('text-msg-status-retryable');
+                    $status.addEventListener('click', () => Events.fire('send-text', { to: this._recipient, text: message.text }));
+                }
+            }
+            $msg.appendChild($status);
+        }
+        return $msg;
+    }
+
+    /**
+     * Renders one voice-message bubble. Playback state (this._playingAudio)
+     * lives outside the DOM so it survives _renderThread() rebuilding the
+     * whole list on every unrelated event (new message, status change,
+     * language switch) - see _toggleVoicePlayback/_bindVoiceProgress.
+     */
+    _renderVoiceBubble(message) {
+        const $bubble = document.createElement('div');
+        $bubble.className = 'voice-msg-bubble';
+
+        if (message.status === 'receiving') {
+            $bubble.classList.add('voice-msg-pending');
+            $bubble.textContent = window.I18n.t('voice_receiving');
+            return $bubble;
+        }
+        if (message.status === 'failed') {
+            $bubble.classList.add('voice-msg-unavailable');
+            $bubble.textContent = window.I18n.t('voice_status_failed');
+            return $bubble;
+        }
+
+        const isPlaying = !!(this._playingAudio && this._playingAudio.id === message.id && !this._playingAudio.audio.paused);
+
+        const $btn = document.createElement('button');
+        $btn.type = 'button';
+        $btn.className = 'voice-play-btn';
+        $btn.title = window.I18n.t('voice_play');
+        $btn.innerHTML = `<svg class="icon"><use xlink:href="#${isPlaying ? 'pause' : 'play-arrow'}" /></svg>`;
+
+        const $track = document.createElement('div');
+        $track.className = 'voice-msg-track';
+        const $progress = document.createElement('div');
+        $progress.className = 'voice-msg-progress';
+        $track.appendChild($progress);
+
+        const $duration = document.createElement('span');
+        $duration.className = 'voice-msg-duration';
+        $duration.textContent = this._formatDuration(message.duration);
+
+        $btn.addEventListener('click', () => this._toggleVoicePlayback(message.id, message.duration, $btn, $progress, $duration));
+
+        $bubble.appendChild($btn);
+        $bubble.appendChild($track);
+        $bubble.appendChild($duration);
+
+        if (this._playingAudio && this._playingAudio.id === message.id) {
+            this._bindVoiceProgress(this._playingAudio, $progress, $duration, message.duration);
+            if (isPlaying) {
+                const total = this._playingAudio.audio.duration && isFinite(this._playingAudio.audio.duration) ? this._playingAudio.audio.duration : message.duration;
+                $progress.style.width = total > 0 ? Math.min(100, (this._playingAudio.audio.currentTime / total) * 100) + '%' : '0%';
+            }
+        }
+
+        return $bubble;
+    }
+
+    async _toggleVoicePlayback(id, duration, $btn, $progress, $duration) {
+        if (this._playingAudio && this._playingAudio.id === id) {
+            const audio = this._playingAudio.audio;
+            if (audio.paused) {
+                audio.play();
+                $btn.innerHTML = '<svg class="icon"><use xlink:href="#pause" /></svg>';
+            } else {
+                audio.pause();
+                $btn.innerHTML = '<svg class="icon"><use xlink:href="#play-arrow" /></svg>';
+            }
+            return;
+        }
+
+        if (this._playingAudio) {
+            this._playingAudio.audio.pause();
+            this._playingAudio = null;
+        }
+
+        let record;
+        try {
+            record = await VoiceStore.get(id);
+        } catch (e) {
+            console.error('VoiceStore: read failed', e);
+        }
+        if (!record || !record.blob) {
+            Events.fire('notify-user', window.I18n.t('voice_unavailable'));
+            return;
+        }
+
+        const url = URL.createObjectURL(record.blob);
+        const audio = new Audio(url);
+        this._playingAudio = { id, audio, url, _progressHandler: null };
+
+        audio.addEventListener('ended', () => {
+            $btn.innerHTML = '<svg class="icon"><use xlink:href="#play-arrow" /></svg>';
+            $progress.style.width = '0%';
+            $duration.textContent = this._formatDuration(duration);
+            URL.revokeObjectURL(url);
+            if (this._playingAudio && this._playingAudio.id === id) this._playingAudio = null;
+        });
+
+        this._bindVoiceProgress(this._playingAudio, $progress, $duration, duration);
+        audio.play();
+        $btn.innerHTML = '<svg class="icon"><use xlink:href="#pause" /></svg>';
+    }
+
+    /**
+     * (Re)binds the timeupdate listener that drives one voice bubble's
+     * progress bar to `playing.audio`, replacing whatever listener was
+     * previously bound (e.g. from before _renderThread rebuilt the DOM) so
+     * we never stack multiple listeners on the same long-lived Audio
+     * instance.
+     */
+    _bindVoiceProgress(playing, $progress, $duration, fallbackDuration) {
+        if (playing._progressHandler) {
+            playing.audio.removeEventListener('timeupdate', playing._progressHandler);
+        }
+        const handler = () => {
+            const total = playing.audio.duration && isFinite(playing.audio.duration) ? playing.audio.duration : fallbackDuration;
+            if (total > 0) $progress.style.width = Math.min(100, (playing.audio.currentTime / total) * 100) + '%';
+            $duration.textContent = this._formatDuration(Math.max(0, total - playing.audio.currentTime));
+        };
+        playing._progressHandler = handler;
+        playing.audio.addEventListener('timeupdate', handler);
+    }
+
+    _formatDuration(seconds) {
+        const s = Math.max(0, Math.round(seconds || 0));
+        const m = Math.floor(s / 60);
+        const r = s % 60;
+        return m + ':' + String(r).padStart(2, '0');
+    }
+
+    async _copy(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            Events.fire('notify-user', window.I18n.t('copied_clipboard'));
+        } catch (e) {
+            console.error('Clipboard write failed', e);
+        }
     }
 }
 
@@ -495,6 +925,11 @@ class Notifications {
         }
         Events.on('text-received', e => this._messageNotification(e.detail.text));
         Events.on('file-received', e => this._downloadNotification(e.detail.name));
+        Events.on('voice-message', e => {
+            if (e.detail.direction === 'incoming' && e.detail.status === 'delivered') {
+                this._voiceNotification();
+            }
+        });
     }
 
     _requestPermission() {
@@ -551,6 +986,12 @@ class Notifications {
             const notification = this._notify(message, window.I18n.t('click_to_download'));
             if (!window.isDownloadSupported) return;
             this._bind(notification, e => this._download(notification));
+        }
+    }
+
+    _voiceNotification() {
+        if (document.visibilityState !== 'visible') {
+            this._notify(window.I18n.t('voice_notification_title'));
         }
     }
 
@@ -1059,7 +1500,6 @@ class LinkApp {
         Events.on('load', e => {
             const receiveDialog = new ReceiveDialog();
             const sendTextDialog = new SendTextDialog();
-            const receiveTextDialog = new ReceiveTextDialog();
             const toast = new Toast();
             const notifications = new Notifications();
             const networkStatusUI = new NetworkStatusUI();
@@ -1071,6 +1511,11 @@ class LinkApp {
             const transferCenterUI = new TransferCenterUI();
             const universalDragAndDrop = new UniversalDragAndDrop();
             const clipboardSync = new ClipboardSync();
+
+            // Best-effort housekeeping for locally-stored voice message
+            // audio (see voice-store.js) - keeps a long-lived browser
+            // profile from accumulating IndexedDB usage forever.
+            if (window.VoiceStore) window.VoiceStore.pruneOlderThan();
 
             // Initialize page translation
             window.I18n.translatePage();

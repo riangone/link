@@ -2,6 +2,39 @@ window.URL = window.URL || window.webkitURL;
 window.isRtcSupported = !!(window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection);
 
 /**
+ * Base64 <-> UTF-8 text codec shared by every message payload that needs to
+ * cross the wire as JSON (chat text, clipboard sync). Centralizing this
+ * means `sendText`/`sendClipboardText` (and their receive-side
+ * counterparts) don't each hand-roll the same
+ * `btoa(unescape(encodeURIComponent(...)))` dance, and any future message
+ * type (reactions, @mentions, ...) gets encode/decode for free.
+ */
+const MessageCodec = {
+    encode(text) {
+        return btoa(unescape(encodeURIComponent(text)));
+    },
+    decode(encoded) {
+        return decodeURIComponent(escape(atob(encoded)));
+    }
+};
+
+// Chat-message tuning. TEXT_CHUNK_CHARS keeps each wire message's base64
+// payload well under the signaling server's WS_MAX_PAYLOAD_BYTES (64KB,
+// see server/index.js) so a long chat message sent over the WSPeer relay
+// fallback is never silently dropped by the server the way a single
+// unchunked message would be - it reuses the same chunk+reassemble idea
+// file transfers already rely on, instead of a size-limited special case.
+const TEXT_CHUNK_CHARS = 32000; // ~32KB of base64 per wire message, well under the 64KB WS cap
+const TEXT_ACK_TIMEOUT_MS = 8000; // how long to wait for a text-ack before treating a send as failed/needing retry
+const TEXT_MAX_RETRIES = 3;
+
+// RTCDataChannel backpressure watermarks (see Peer#_waitForBufferSpace /
+// RTCPeer#_waitForBufferSpace). A fast sender on a slow link can otherwise
+// pile megabytes into `bufferedAmount` between partition acks.
+const RTC_BUFFERED_AMOUNT_HIGH_WATERMARK = 8 * 1024 * 1024; // pause starting the next partition above this
+const RTC_BUFFERED_AMOUNT_LOW_WATERMARK = 1 * 1024 * 1024;  // resume once buffered amount drains back below this
+
+/**
  * WebSocket connection to the signaling server (server/index.js). Handles
  * peer discovery (`peers`/`peer-joined`/`peer-left`), relays WebRTC
  * offer/answer/ICE `signal` messages, and receives dynamic TURN
@@ -37,7 +70,10 @@ class ServerConnection {
         if (this._isConnected() || this._isConnecting()) return;
         const ws = new WebSocket(this._endpoint());
         ws.binaryType = 'arraybuffer';
-        ws.onopen = e => console.log('WS: server connected');
+        ws.onopen = e => {
+            console.log('WS: server connected');
+            Events.fire('ws-connected');
+        };
         ws.onmessage = e => this._onMessage(e.data);
         ws.onclose = e => this._onDisconnect();
         ws.onerror = e => console.error(e);
@@ -196,6 +232,11 @@ class Peer {
         this._busy = false;
         this._pendingTransferId = null; // reserved locally, waiting on a global TransferScheduler slot
         this._holdsSlot = false; // true once TransferScheduler actually granted us a slot
+
+        this._textHistory = []; // {id, text, direction: 'outgoing'|'incoming', status, timestamp} - bounded chat thread with this peer
+        this._pendingTexts = new Map(); // id -> {text, attempts, timer} - outgoing messages awaiting a text-ack
+        this._textOutbox = []; // ids queued because we had no live connection when sendText() was called
+        this._incomingTexts = new Map(); // id -> {parts: string[]} - in-progress reassembly of a chunked incoming message
     }
 
     sendJSON(message) {
@@ -251,29 +292,100 @@ class Peer {
         transferScheduler.releaseSlot();
     }
 
+    /**
+     * Send a recorded voice message. Reuses the exact same chunked
+     * send/receive protocol as sendFiles() (FileChunker/FileDigester,
+     * backpressure, the global TransferScheduler) - a voice message is
+     * transport-wise just a small file - but differs in three ways:
+     *
+     *   1. It jumps to the front of _filesQueue instead of the back:
+     *      recording is a synchronous "hit send, expect it to go now"
+     *      interaction, so it shouldn't sit behind an in-flight multi-GB
+     *      file transfer to the same peer.
+     *   2. It never touches the file-received/download UI - both sides
+     *      persist the audio Blob into VoiceStore (IndexedDB) instead, and
+     *      the app-level "server/relay never stores this" requirement means
+     *      there's no URL to hand around, only local Blobs.
+     *   3. It fails fast instead of queuing when not currently connected
+     *      (path A from the design discussion: no store-and-forward for
+     *      voice - if the peer isn't reachable right now, the message
+     *      doesn't go, unlike sendText()'s outbox/retry).
+     *
+     * @param {Blob} blob - recorded audio, e.g. from MediaRecorder
+     * @param {number} duration - seconds
+     * @returns {string} transferId, also used as the VoiceStore key and the
+     *   id in every 'voice-message' event for this message
+     */
+    sendVoice(blob, duration) {
+        const transferId = 'voice-' + Math.random().toString(36).substring(2, 9);
+        blob.transferId = transferId;
+        blob.name = 'voice-message';
+        blob.isVoice = true;
+        blob.duration = duration;
+
+        VoiceStore.put(transferId, blob, { duration, peerId: this._peerId, direction: 'outgoing' })
+            .catch(e => console.error('VoiceStore: failed to persist outgoing voice message', e));
+
+        if (!this._isConnected()) {
+            Events.fire('voice-message', {
+                id: transferId, peerId: this._peerId, duration,
+                direction: 'outgoing', status: 'failed', timestamp: Date.now()
+            });
+            return transferId;
+        }
+
+        Events.fire('voice-message', {
+            id: transferId, peerId: this._peerId, duration,
+            direction: 'outgoing', status: 'sending', timestamp: Date.now()
+        });
+
+        this._filesQueue.unshift(blob);
+        if (!this._busy) this._dequeueFile();
+        return transferId;
+    }
+
     _sendFile(file) {
         this._holdsSlot = true;
-        Events.fire('transfer-active', { id: file.transferId });
+        this._activeIsVoice = !!file.isVoice;
+        this._activeVoiceDuration = file.duration;
+        this._activeVoiceDirection = 'outgoing';
         this._activeTransferId = file.transferId;
         this.sendJSON({
             type: 'header',
             transferId: file.transferId,
             name: file.name,
             mime: file.type,
-            size: file.size
-        });
-        Events.fire('transfer-started', {
-            id: file.transferId,
-            name: file.name,
             size: file.size,
-            peerId: this._peerId,
-            direction: 'outgoing',
-            status: 'transferring'
+            isVoice: !!file.isVoice,
+            duration: file.duration
         });
+        if (!file.isVoice) {
+            Events.fire('transfer-active', { id: file.transferId });
+            Events.fire('transfer-started', {
+                id: file.transferId,
+                name: file.name,
+                size: file.size,
+                peerId: this._peerId,
+                direction: 'outgoing',
+                status: 'transferring'
+            });
+        }
         this._chunker = new FileChunker(file,
             chunk => this._send(chunk),
             offset => this._onPartitionEnd(offset));
-        this._chunker.nextPartition();
+        this._waitForBufferSpace(() => this._chunker.nextPartition());
+    }
+
+    /**
+     * Give the transport a chance to apply backpressure before starting the
+     * next partition. The base implementation is a no-op (fires `cb`
+     * immediately) because most transports (WSPeer, relayed through the
+     * signaling socket) don't expose a meaningful buffered-amount signal;
+     * RTCPeer overrides this to actually wait on `bufferedamountlow`.
+     * @param {() => void} cb
+     */
+    _waitForBufferSpace(cb) {
+        cb();
     }
 
     _onPartitionEnd(offset) {
@@ -286,7 +398,7 @@ class Peer {
 
     _sendNextPartition() {
         if (!this._chunker || this._chunker.isFileEnd()) return;
-        this._chunker.nextPartition();
+        this._waitForBufferSpace(() => this._chunker.nextPartition());
     }
 
     _sendProgress(progress) {
@@ -322,6 +434,9 @@ class Peer {
             case 'text':
                 this._onTextReceived(message);
                 break;
+            case 'text-ack':
+                this._onTextAck(message);
+                break;
             case 'clipboard-sync':
                 this._onClipboardSyncReceived(message);
                 break;
@@ -331,19 +446,29 @@ class Peer {
     _onFileHeader(header) {
         this._lastProgress = 0;
         this._activeTransferId = header.transferId;
+        this._activeIsVoice = !!header.isVoice;
+        this._activeVoiceDuration = header.duration;
+        this._activeVoiceDirection = 'incoming';
         this._digester = new FileDigester({
             name: header.name,
             mime: header.mime,
             size: header.size
         }, file => this._onFileReceived(file));
-        Events.fire('transfer-started', {
-            id: header.transferId,
-            name: header.name,
-            size: header.size,
-            peerId: this._peerId,
-            direction: 'incoming',
-            status: 'transferring'
-        });
+        if (header.isVoice) {
+            Events.fire('voice-message', {
+                id: header.transferId, peerId: this._peerId, duration: header.duration,
+                direction: 'incoming', status: 'receiving', timestamp: Date.now()
+            });
+        } else {
+            Events.fire('transfer-started', {
+                id: header.transferId,
+                name: header.name,
+                size: header.size,
+                peerId: this._peerId,
+                direction: 'incoming',
+                status: 'transferring'
+            });
+        }
     }
 
     _onChunkReceived(chunk) {
@@ -364,22 +489,44 @@ class Peer {
     }
 
     _onFileReceived(proxyFile) {
-        Events.fire('transfer-completed', { id: this._activeTransferId });
-        Events.fire('file-received', proxyFile);
+        if (this._activeIsVoice) {
+            VoiceStore.put(this._activeTransferId, proxyFile.blob, {
+                duration: this._activeVoiceDuration, peerId: this._peerId, direction: 'incoming'
+            }).catch(e => console.error('VoiceStore: failed to persist incoming voice message', e));
+            Events.fire('voice-message', {
+                id: this._activeTransferId, peerId: this._peerId, duration: this._activeVoiceDuration,
+                direction: 'incoming', status: 'delivered', timestamp: Date.now()
+            });
+        } else {
+            Events.fire('transfer-completed', { id: this._activeTransferId });
+            Events.fire('file-received', proxyFile);
+        }
         this.sendJSON({ type: 'transfer-complete' });
         this._activeTransferId = null;
+        this._activeIsVoice = false;
         this._busy = false;
     }
 
     _onTransferCompleted() {
-        Events.fire('transfer-completed', { id: this._activeTransferId });
+        const wasVoice = this._activeIsVoice;
+        if (wasVoice) {
+            Events.fire('voice-message', {
+                id: this._activeTransferId, peerId: this._peerId, duration: this._activeVoiceDuration,
+                direction: 'outgoing', status: 'delivered', timestamp: Date.now()
+            });
+        } else {
+            Events.fire('transfer-completed', { id: this._activeTransferId });
+        }
         this._onDownloadProgress(1);
         this._reader = null;
         this._busy = false;
         this._activeTransferId = null;
+        this._activeIsVoice = false;
         this._releaseSlotIfHeld();
         this._dequeueFile();
-        Events.fire('notify-user', window.I18n.t('net_transfer_completed'));
+        if (!wasVoice) {
+            Events.fire('notify-user', window.I18n.t('net_transfer_completed'));
+        }
     }
 
     cancelTransfer(transferId) {
@@ -415,40 +562,164 @@ class Peer {
 
     _cleanActiveTransfer(status) {
         const tid = this._activeTransferId;
+        const wasVoice = this._activeIsVoice;
+        const voiceDuration = this._activeVoiceDuration;
+        const voiceDirection = this._activeVoiceDirection;
         this._activeTransferId = null;
+        this._activeIsVoice = false;
         this._chunker = null;
         this._digester = null;
         this._busy = false;
         this._releaseSlotIfHeld(); // no-op if we're the receiver side (never held a slot)
-        Events.fire('transfer-cancelled', { id: tid, status: status });
+        if (wasVoice) {
+            Events.fire('voice-message', {
+                id: tid, peerId: this._peerId, duration: voiceDuration,
+                direction: voiceDirection, status: 'failed', timestamp: Date.now()
+            });
+        } else {
+            Events.fire('transfer-cancelled', { id: tid, status: status });
+        }
         this._dequeueFile();
     }
 
+    /**
+     * Queue a chat message for delivery. Unlike the old fire-and-forget
+     * version, this never silently drops text: if we're not connected right
+     * now it waits in `_textOutbox` for a reconnect (see `_flushTextOutbox`),
+     * and once sent it's tracked in `_pendingTexts` until a `text-ack`
+     * arrives or `TEXT_MAX_RETRIES` is exhausted (see `_onTextTimeout`).
+     * Every state transition (sending/delivered/failed) is broadcast via a
+     * `message-updated` event and appended to `_textHistory` so the UI can
+     * render a persistent per-peer thread instead of a single "last
+     * message" popup.
+     * @param {string} text
+     * @returns {string} the message id, so callers can correlate UI state if they want to
+     */
     sendText(text) {
-        const unescaped = btoa(unescape(encodeURIComponent(text)));
-        this.sendJSON({ type: 'text', text: unescaped });
+        const id = 'msg-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+        this._pendingTexts.set(id, { text, attempts: 0, timer: null });
+        this._recordText(id, text, 'outgoing', 'sending');
+        this._dispatchText(id, text);
+        return id;
+    }
+
+    /** Append/update one message in this peer's thread and notify the UI. */
+    _recordText(id, text, direction, status) {
+        let entry = this._textHistory.find(m => m.id === id);
+        if (!entry) {
+            entry = { id, text, direction, status, timestamp: Date.now() };
+            this._textHistory.push(entry);
+            // Keep the in-memory thread bounded; this is a live chat aid, not persistent storage.
+            if (this._textHistory.length > 200) this._textHistory.shift();
+        } else {
+            entry.status = status;
+        }
+        Events.fire('message-updated', {
+            peerId: this._peerId,
+            id, text, direction, status,
+            timestamp: entry.timestamp
+        });
+    }
+
+    /**
+     * Actually put a message on the wire (chunked if needed), or park it in
+     * the outbox if the transport isn't connected. Also (re)arms the
+     * per-message ack timer.
+     */
+    _dispatchText(id, text) {
+        if (!this._isConnected()) {
+            if (!this._textOutbox.includes(id)) this._textOutbox.push(id);
+            return;
+        }
+        const idx = this._textOutbox.indexOf(id);
+        if (idx > -1) this._textOutbox.splice(idx, 1);
+
+        const encoded = MessageCodec.encode(text);
+        const total = Math.max(1, Math.ceil(encoded.length / TEXT_CHUNK_CHARS));
+        for (let i = 0; i < total; i++) {
+            const part = encoded.substring(i * TEXT_CHUNK_CHARS, (i + 1) * TEXT_CHUNK_CHARS);
+            this.sendJSON({ type: 'text', id, index: i, total, text: part });
+        }
+        this._armTextAckTimer(id);
+    }
+
+    _armTextAckTimer(id) {
+        const pending = this._pendingTexts.get(id);
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        pending.timer = setTimeout(() => this._onTextTimeout(id), TEXT_ACK_TIMEOUT_MS);
+    }
+
+    _onTextTimeout(id) {
+        const pending = this._pendingTexts.get(id);
+        if (!pending) return; // already acked in the meantime
+        pending.attempts++;
+        if (pending.attempts > TEXT_MAX_RETRIES) {
+            this._pendingTexts.delete(id);
+            this._recordText(id, pending.text, 'outgoing', 'failed');
+            return;
+        }
+        this._recordText(id, pending.text, 'outgoing', 'sending');
+        this._dispatchText(id, pending.text);
+    }
+
+    _onTextAck(message) {
+        const pending = this._pendingTexts.get(message.id);
+        if (!pending) return; // late/duplicate ack, or already timed out and given up
+        clearTimeout(pending.timer);
+        this._pendingTexts.delete(message.id);
+        this._recordText(message.id, pending.text, 'outgoing', 'delivered');
+    }
+
+    /**
+     * Resend anything that was queued while disconnected. Called once a
+     * transport becomes usable again (RTCPeer on channel open, and by
+     * PeersManager on signaling-socket reconnect for WSPeer).
+     */
+    _flushTextOutbox() {
+        if (!this._textOutbox.length || !this._isConnected()) return;
+        const ids = this._textOutbox.splice(0);
+        ids.forEach(id => {
+            const pending = this._pendingTexts.get(id);
+            if (pending) this._dispatchText(id, pending.text);
+        });
     }
 
     _onTextReceived(message) {
-        const escaped = decodeURIComponent(escape(atob(message.text)));
-        Events.fire('text-received', { text: escaped, sender: this._peerId });
+        const total = message.total || 1;
+        let entry = this._incomingTexts.get(message.id);
+        if (!entry) {
+            entry = { parts: new Array(total) };
+            this._incomingTexts.set(message.id, entry);
+        }
+        entry.parts[message.index || 0] = message.text;
+        if (entry.parts.some(part => part === undefined)) return; // still waiting on more chunks
+
+        this._incomingTexts.delete(message.id);
+        const text = MessageCodec.decode(entry.parts.join(''));
+        this._recordText(message.id, text, 'incoming', 'delivered');
+        // Ack only once the full (possibly multi-chunk) message has been
+        // reassembled, so the sender's retry only fires for messages we
+        // genuinely never finished receiving.
+        this.sendJSON({ type: 'text-ack', id: message.id });
+        Events.fire('text-received', { text, sender: this._peerId, id: message.id });
     }
 
     /**
      * Silently push a clipboard-sync payload to this peer. Distinct from
      * sendText()/`text` messages: no dialog pops up on the receiving end,
      * it's meant to transparently mirror the OS clipboard across paired
-     * devices (see ClipboardSync in clipboard-sync.js).
+     * devices (see ClipboardSync in clipboard-sync.js). Best-effort/"latest
+     * wins" like the rest of clipboard sync, so it deliberately does not go
+     * through the ack/retry/outbox pipeline sendText() uses.
      * @param {string} text
      */
     sendClipboardText(text) {
-        const unescaped = btoa(unescape(encodeURIComponent(text)));
-        this.sendJSON({ type: 'clipboard-sync', text: unescaped });
+        this.sendJSON({ type: 'clipboard-sync', text: MessageCodec.encode(text) });
     }
 
     _onClipboardSyncReceived(message) {
-        const escaped = decodeURIComponent(escape(atob(message.text)));
-        Events.fire('clipboard-sync-received', { text: escaped, sender: this._peerId });
+        Events.fire('clipboard-sync-received', { text: MessageCodec.decode(message.text), sender: this._peerId });
     }
 }
 
@@ -530,6 +801,7 @@ class RTCPeer extends Peer {
         channel.onmessage = e => this._onMessage(e.data);
         channel.onclose = e => this._onChannelClosed();
         this._channel = channel;
+        this._flushTextOutbox();
     }
 
     _onChannelClosed() {
@@ -574,8 +846,44 @@ class RTCPeer extends Peer {
     }
 
     _send(message) {
-        if (!this._channel) return this.refresh();
-        this._channel.send(message);
+        if (!this._isConnected()) {
+            this.refresh();
+            return false;
+        }
+        try {
+            this._channel.send(message);
+            return true;
+        } catch (e) {
+            // e.g. the channel closed in the instant between our readyState
+            // check and .send() (peer navigated away, network blip). Don't
+            // let this bubble up as an uncaught exception - just try to
+            // reconnect; anything relying on delivery confirmation (chat
+            // text) has its own ack/retry/outbox layer above this.
+            console.error('RTC: send failed', e);
+            this.refresh();
+            return false;
+        }
+    }
+
+    /**
+     * Pause the file-transfer partition loop while the data channel's send
+     * buffer is above the high watermark, resuming once it drains back
+     * below the low watermark. Without this a fast sender on a slow link
+     * can pile many MB into `bufferedAmount` between partition acks.
+     * @param {() => void} cb
+     */
+    _waitForBufferSpace(cb) {
+        const channel = this._channel;
+        if (!channel || channel.bufferedAmount <= RTC_BUFFERED_AMOUNT_HIGH_WATERMARK) {
+            cb();
+            return;
+        }
+        channel.bufferedAmountLowThreshold = RTC_BUFFERED_AMOUNT_LOW_WATERMARK;
+        const onLow = () => {
+            channel.removeEventListener('bufferedamountlow', onLow);
+            cb();
+        };
+        channel.addEventListener('bufferedamountlow', onLow);
     }
 
     _sendSignal(signal) {
@@ -617,9 +925,24 @@ class PeersManager {
         Events.on('peers', e => this._onPeers(e.detail));
         Events.on('files-selected', e => this._onFilesSelected(e.detail));
         Events.on('send-text', e => this._onSendText(e.detail));
+        Events.on('voice-selected', e => this._onVoiceSelected(e.detail));
         Events.on('clipboard-sync-broadcast', e => this._onClipboardSyncBroadcast(e.detail));
         Events.on('peer-left', e => this._onPeerLeft(e.detail));
         Events.on('turn-config', e => this._onTurnConfig(e.detail));
+        Events.on('ws-connected', e => this._flushAllTextOutboxes());
+    }
+
+    /**
+     * Retry any chat messages that were queued while disconnected. RTCPeer
+     * already flushes itself as soon as its data channel opens; this covers
+     * WSPeer (relayed over the signaling socket, so "connected" tracks the
+     * signaling socket itself) reconnecting after `ServerConnection`'s
+     * 5s retry timer fires.
+     */
+    _flushAllTextOutboxes() {
+        Object.values(this.peers).forEach(peer => {
+            if (peer && typeof peer._flushTextOutbox === 'function') peer._flushTextOutbox();
+        });
     }
 
     _onTurnConfig(config) {
@@ -696,6 +1019,12 @@ class PeersManager {
 
     _onSendText(message) {
         this.peers[message.to].sendText(message.text);
+    }
+
+    _onVoiceSelected(message) {
+        const peer = this.peers[message.to];
+        if (!peer) return;
+        peer.sendVoice(message.blob, message.duration);
     }
 
     /**
