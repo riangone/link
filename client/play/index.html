@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>对战大厅 · Link</title>
+<meta name="description" content="双人实时对战：点一下自动匹配对手，或用 4 位房间号约朋友。五子棋、弹球、气垫球、坦克、大乱斗、光轮。">
+<meta name="theme-color" content="#0f1222">
+<link rel="icon" href="../images/favicon-96x96.png">
+<style>
+:root{--bg:#0f1222;--card:#1a1f38;--line:#2a3158;--fg:#eef0ff;--mut:#9aa3d0;--ac:#5b8cff;--ok:#2fd18b}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,-apple-system,"PingFang SC","Hiragino Sans","Malgun Gothic",sans-serif;min-height:100vh;padding:16px 16px calc(24px + env(safe-area-inset-bottom))}
+main{max-width:560px;margin:0 auto}
+header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+header h1{font-size:22px;flex:1}
+header a{color:var(--mut);text-decoration:none;font-size:22px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:99px;padding:6px 12px;font-size:14px;color:var(--fg);cursor:pointer;white-space:nowrap;max-width:45vw;overflow:hidden;text-overflow:ellipsis}
+.online{font-size:13px;color:var(--mut);margin-bottom:12px}
+.online b{color:var(--ok)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 10px;padding-top:6px}
+.g{position:relative;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 6px 12px;text-align:center;cursor:pointer;color:var(--fg);font:inherit;transition:transform .1s}
+.g:active{transform:scale(.96)}
+.g .e{font-size:38px;display:block;margin-bottom:6px}
+.g .n{font-size:14px;font-weight:600}
+.g .w{display:none;position:absolute;top:-9px;right:8px;left:8px;font-size:11px;color:#06281a;background:var(--ok);border-radius:99px;padding:1px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:p 1.4s infinite}
+.g.has .w{display:block}
+.g.has{border-color:var(--ok)}
+@keyframes p{50%{opacity:.6}}
+.code{display:flex;gap:8px;margin-top:18px}
+.code input{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--fg);font-size:22px;letter-spacing:.4em;text-align:center;padding:10px}
+.code input::placeholder{letter-spacing:normal;font-size:15px;color:var(--mut)}
+button.b{background:var(--ac);border:0;border-radius:12px;color:#fff;font:inherit;font-weight:600;padding:10px 18px;cursor:pointer}
+button.s{background:transparent;border:1px solid var(--line);color:var(--mut)}
+.foot{margin-top:22px;text-align:center;font-size:13px}
+.foot a{color:var(--mut)}
+#ov{position:fixed;inset:0;background:rgba(8,10,22,.92);display:none;align-items:center;justify-content:center;padding:20px;z-index:9}
+#ov.on{display:flex}
+.box{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:24px 20px;width:100%;max-width:360px;text-align:center}
+.box .e{font-size:48px}
+.box .t{font-size:18px;font-weight:600;margin:8px 0 2px}
+.dots::after{content:'';animation:d 1.2s steps(4) infinite}
+@keyframes d{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+.box .c{font-size:44px;font-weight:800;letter-spacing:.15em;margin:14px 0 2px;font-variant-numeric:tabular-nums}
+.box .h{font-size:13px;color:var(--mut)}
+.box .row{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+#toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#000c;color:#fff;padding:8px 16px;border-radius:99px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:10}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <a href="https://0101.click/" aria-label="home">←</a>
+    <h1 data-t="title">⚔️ 对战大厅</h1>
+    <button class="chip" id="me" title="改名">👤 …</button>
+  </header>
+  <p class="online" id="online">&nbsp;</p>
+  <div class="grid" id="grid"></div>
+  <form class="code" id="cf" autocomplete="off">
+    <input id="ci" inputmode="numeric" pattern="\d{4}" maxlength="4" data-ph="code_ph" placeholder="朋友的房间号">
+    <button class="b" data-t="join">加入</button>
+  </form>
+  <p class="foot"><a href="../" data-t="lan">同一个 Wi-Fi？去 Link 首页点对方头像约战 →</a></p>
+</main>
+
+<div id="ov"><div class="box" id="box"></div></div>
+<div id="toast"></div>
+
+<script>
+(function () {
+'use strict';
+var GAMES = [
+  { id: 'gomoku', e: '⚫' }, { id: 'pong', e: '🏓' }, { id: 'hockey', e: '🥅' },
+  { id: 'tanks', e: '💥' }, { id: 'brawl', e: '🥊' }, { id: 'tron', e: '🏍️' }
+];
+var S = {
+  zh: { title: '⚔️ 对战大厅', gomoku: '五子棋', pong: '弹球对战', hockey: '气垫球', tanks: '坦克对战', brawl: '萌团大乱斗', tron: '光轮对战',
+    online: '<b>●</b> {n} 人在大厅', waiting_tag: '{name} 在等', code_ph: '朋友的房间号', join: '加入',
+    lan: '同一个 Wi-Fi？去 Link 首页点对方头像约战 →', finding: '正在找对手', private: '等朋友加入',
+    code_hint: '把房间号告诉朋友，或直接分享链接', share: '分享邀请', only_friend: '只等朋友', cancel: '取消',
+    found: '匹配成功！', vs: '对手：{name}', no_code: '房间号不存在或已失效', expired: '房间已过期，请重新开始',
+    copied: '链接已复制', offline: '连接中断，正在重连…', rename: '你的名字（对手会看到）', share_text: '来 0101.click 和我对战{game}！房间号 {code}', player: '玩家' },
+  ja: { title: '⚔️ 対戦ロビー', gomoku: '五目並べ', pong: 'ポン対戦', hockey: 'エアホッケー', tanks: 'タンク対戦', brawl: 'もちもち大乱闘', tron: 'ライトサイクル',
+    online: '<b>●</b> ロビーに {n} 人', waiting_tag: '{name} が待機中', code_ph: '友だちのルーム番号', join: '参加',
+    lan: '同じ Wi-Fi なら Link トップで相手をタップ →', finding: '対戦相手を探しています', private: '友だちを待っています',
+    code_hint: 'ルーム番号を伝えるか、リンクを共有', share: '招待を共有', only_friend: '友だちだけ', cancel: 'キャンセル',
+    found: 'マッチ成立！', vs: '相手：{name}', no_code: 'ルーム番号が見つかりません', expired: 'ルームの期限切れです',
+    copied: 'リンクをコピーしました', offline: '接続が切れました。再接続中…', rename: 'あなたの名前（相手に表示）', share_text: '0101.click で{game}対戦しよう！ルーム番号 {code}', player: 'プレイヤー' },
+  ko: { title: '⚔️ 대전 로비', gomoku: '오목', pong: '퐁 대전', hockey: '에어하키', tanks: '탱크 대전', brawl: '모찌 난투', tron: '라이트사이클',
+    online: '<b>●</b> 로비에 {n}명', waiting_tag: '{name} 대기 중', code_ph: '친구의 방 번호', join: '참가',
+    lan: '같은 Wi-Fi라면 Link 홈에서 상대를 탭 →', finding: '상대를 찾는 중', private: '친구를 기다리는 중',
+    code_hint: '방 번호를 알려주거나 링크를 공유하세요', share: '초대 공유', only_friend: '친구만', cancel: '취소',
+    found: '매칭 성공!', vs: '상대: {name}', no_code: '방 번호가 없거나 만료되었습니다', expired: '방이 만료되었습니다',
+    copied: '링크를 복사했습니다', offline: '연결이 끊겼습니다. 재연결 중…', rename: '내 이름 (상대에게 표시)', share_text: '0101.click에서 {game} 대전하자! 방 번호 {code}', player: '플레이어' },
+  en: { title: '⚔️ Game Lobby', gomoku: 'Gomoku', pong: 'Pong', hockey: 'Air Hockey', tanks: 'Tanks', brawl: 'Mochi Brawl', tron: 'Light Cycles',
+    online: '<b>●</b> {n} in lobby', waiting_tag: '{name} waiting', code_ph: "Friend's room code", join: 'Join',
+    lan: 'Same Wi-Fi? Tap them on the Link home page →', finding: 'Finding an opponent', private: 'Waiting for your friend',
+    code_hint: 'Tell your friend the code, or share the link', share: 'Share invite', only_friend: 'Friends only', cancel: 'Cancel',
+    found: 'Matched!', vs: 'vs {name}', no_code: 'Room code not found', expired: 'Room expired, start again',
+    copied: 'Link copied', offline: 'Disconnected, reconnecting…', rename: 'Your name (shown to opponent)', share_text: 'Play {game} with me on 0101.click! Room code {code}', player: 'Player' }
+};
+var qs = new URLSearchParams(location.search);
+var lang = qs.get('lang') || localStorage.getItem('language') || (navigator.language || 'en').slice(0, 2);
+if (!S[lang]) lang = 'en';
+document.documentElement.lang = lang;
+function t(k, r) { var s = S[lang][k] || S.en[k] || k; for (var x in (r || {})) s = s.split('{' + x + '}').join(r[x]); return s; }
+function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+document.title = t('title').replace(/^\S+\s/, '') + ' · Link';
+document.querySelectorAll('[data-t]').forEach(function (el) { el.textContent = t(el.dataset.t); });
+document.querySelectorAll('[data-ph]').forEach(function (el) { el.placeholder = t(el.dataset.ph); });
+
+var name = localStorage.getItem('custom-nickname');
+if (!name) { name = t('player') + Math.floor(100 + Math.random() * 900); }
+var meEl = document.getElementById('me');
+function showName() { meEl.textContent = '👤 ' + name; }
+showName();
+meEl.title = t('rename');
+meEl.onclick = function () {
+  var v = prompt(t('rename'), name);
+  if (v && v.trim()) { name = v.trim().slice(0, 16); localStorage.setItem('custom-nickname', name); showName(); }
+};
+
+var grid = document.getElementById('grid');
+GAMES.forEach(function (g) {
+  var b = document.createElement('button');
+  b.className = 'g'; b.id = 'g-' + g.id;
+  b.innerHTML = '<span class="w"></span><span class="e">' + g.e + '</span><span class="n">' + esc(t(g.id)) + '</span>';
+  b.onclick = function () { quick(g.id); };
+  grid.appendChild(b);
+});
+
+var toastEl = document.getElementById('toast'), toastT;
+function toast(m) { toastEl.textContent = m; toastEl.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(function () { toastEl.classList.remove('on'); }, 2600); }
+
+var ov = document.getElementById('ov'), box = document.getElementById('box');
+var state = null; // { game, code, public }
+function gameOf(id) { for (var i = 0; i < GAMES.length; i++) if (GAMES[i].id === id) return GAMES[i]; return { id: id, e: '🎮' }; }
+function inviteUrl(code) { return location.origin + location.pathname + '#' + code; }
+
+function showWaiting() {
+  var g = gameOf(state.game);
+  box.innerHTML =
+    '<div class="e">' + g.e + '</div>' +
+    '<div class="t"><span class="dots">' + esc(t(state.public ? 'finding' : 'private')) + '</span></div>' +
+    '<div class="h">' + esc(t(g.id)) + '</div>' +
+    (state.code ? '<div class="c">' + state.code + '</div><div class="h">' + esc(t('code_hint')) + '</div>' : '') +
+    '<div class="row">' +
+      (state.code ? '<button class="b" id="sh">' + esc(t('share')) + '</button>' : '') +
+      (state.public ? '<button class="b s" id="of">' + esc(t('only_friend')) + '</button>' : '') +
+      '<button class="b s" id="cx">' + esc(t('cancel')) + '</button>' +
+    '</div>';
+  ov.classList.add('on');
+  var sh = document.getElementById('sh');
+  if (sh) sh.onclick = share;
+  var of = document.getElementById('of');
+  if (of) of.onclick = function () { send({ type: 'match-create', game: state.game, name: name }); };
+  document.getElementById('cx').onclick = cancel;
+}
+function share() {
+  var url = inviteUrl(state.code), text = t('share_text', { game: t(state.game), code: state.code });
+  if (navigator.share) { navigator.share({ title: t('title'), text: text, url: url }).catch(function () {}); return; }
+  (navigator.clipboard ? navigator.clipboard.writeText(text + ' ' + url) : Promise.reject()).then(function () { toast(t('copied')); }, function () { prompt('', url); });
+}
+function cancel() { send({ type: 'match-leave' }); state = null; ov.classList.remove('on'); if (/^#\d{4}$/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search); }
+function quick(game) { if (!state) send({ type: 'match-join', game: game, name: name }); }
+function joinCode(code) { send({ type: 'match-join', code: code, name: name }); }
+
+document.getElementById('cf').onsubmit = function (e) {
+  e.preventDefault();
+  var v = document.getElementById('ci').value.replace(/\D/g, '');
+  if (v.length === 4) joinCode(v);
+};
+document.getElementById('ci').oninput = function () { this.value = this.value.replace(/\D/g, '').slice(0, 4); if (this.value.length === 4) joinCode(this.value); };
+
+var ws, queue = [], retry = 0;
+function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); else queue.push(m); }
+function connect() {
+  var root = location.pathname.replace(/\/play\/?(index\.html)?$/, '');
+  var rid = 'lobby-' + Math.random().toString(36).slice(2, 12);
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host + root + '/server/webrtc?room=' + rid);
+  ws.onopen = function () {
+    retry = 0;
+    ws.send(JSON.stringify({ type: 'lobby-subscribe' }));
+    while (queue.length) ws.send(JSON.stringify(queue.shift()));
+  };
+  ws.onmessage = function (ev) {
+    var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    if (m.type === 'ping') { ws.send(JSON.stringify({ type: 'pong' })); return; }
+    if (m.type === 'lobby-stats') return stats(m);
+    if (m.type === 'match-waiting') { state = { game: m.game, code: m.code, public: m.public }; return showWaiting(); }
+    if (m.type === 'match-found') return found(m);
+    if (m.type === 'match-error') {
+      if (m.reason === 'no-code') { toast(t('no_code')); document.getElementById('ci').value = ''; }
+      else if (m.reason === 'expired') { toast(t('expired')); state = null; ov.classList.remove('on'); }
+    }
+  };
+  ws.onclose = function () {
+    if (state) { state = null; ov.classList.remove('on'); }
+    if (found.done) return;
+    toast(t('offline'));
+    setTimeout(connect, Math.min(1000 * Math.pow(2, retry++), 15000));
+  };
+}
+function stats(m) {
+  document.getElementById('online').innerHTML = t('online', { n: Math.max(1, m.online || 1) });
+  GAMES.forEach(function (g) {
+    var el = document.getElementById('g-' + g.id), w = m.waiting && m.waiting[g.id];
+    var mine = state && state.public && state.game === g.id;
+    var on = !!(w && w.length && !mine);
+    el.classList.toggle('has', on);
+    el.querySelector('.w').textContent = on ? t('waiting_tag', { name: w[0] }) : '';
+  });
+}
+function found(m) {
+  found.done = true;
+  var g = gameOf(m.game);
+  box.innerHTML = '<div class="e">' + g.e + '</div><div class="t">' + esc(t('found')) + '</div><div class="h">' + esc(t('vs', { name: m.opponent || '?' })) + '</div>';
+  ov.classList.add('on');
+  var url = new URL('../' + m.game + '/', location.href);
+  if (m.opponent) url.searchParams.set('opponent', m.opponent);
+  url.hash = 'room-' + m.roomId;
+  try { ws.close(); } catch (e) {}
+  setTimeout(function () { location.href = url.toString(); }, 700);
+}
+
+// opened from a shared invite link: /play/#1234
+var hc = location.hash.match(/^#(\d{4})$/);
+if (hc) { joinCode(hc[1]); history.replaceState(null, '', location.pathname + location.search); }
+// one-tap entry from 0101.click: /play/?g=gomoku starts quick match right away
+else if (qs.get('g') && GAMES.some(function (g) { return g.id === qs.get('g'); })) {
+  quick(qs.get('g'));
+  qs.delete('g'); history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs : ''));
+}
+connect();
+// back-button from a game restores a stale page from bfcache: start fresh
+window.addEventListener('pageshow', function (e) { if (e.persisted) location.reload(); });
+})();
+</script>
+</body>
+</html>
