@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>对战大厅 · Link</title>
-<meta name="description" content="双人实时对战：点一下自动匹配对手，或用 4 位房间号约朋友。五子棋、弹球、气垫球、坦克、大乱斗、光轮。">
+<meta name="description" content="双人实时对战：点一下自动匹配对手，或用 4 位房间号约朋友。五子棋、弹球、气垫球、坦克、大乱斗、光轮、泡泡枪；不想等也能直接和程序对战。">
 <meta name="theme-color" content="#0f1222">
 <link rel="icon" href="../images/favicon-96x96.png">
 <style>
@@ -44,6 +44,17 @@ button.s{background:transparent;border:1px solid var(--line);color:var(--mut)}
 .box .c{font-size:44px;font-weight:800;letter-spacing:.15em;margin:14px 0 2px;font-variant-numeric:tabular-nums}
 .box .h{font-size:13px;color:var(--mut)}
 .box .row{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+.mode{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px;margin-bottom:10px}
+.mode button{flex:1;background:transparent;border:0;border-radius:10px;color:var(--mut);font:inherit;font-size:15px;font-weight:600;padding:9px 6px;cursor:pointer}
+.mode button.on{background:var(--ac);color:#fff}
+.lv{display:none;gap:6px;justify-content:center;margin-bottom:12px}
+body.bot .lv{display:flex}
+.lv button{background:transparent;border:1px solid var(--line);border-radius:99px;color:var(--mut);font:inherit;font-size:14px;padding:5px 12px;cursor:pointer}
+.lv button.on{border-color:#fbbf24;color:var(--fg);background:#fbbf2422}
+body.bot .g .w{display:none!important}
+body.bot .g.has{border-color:var(--line)}
+.g .bt{display:none;position:absolute;top:6px;right:8px;font-size:14px}
+body.bot .g .bt{display:block}
 #toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#000c;color:#fff;padding:8px 16px;border-radius:99px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:10}
 #toast.on{opacity:1}
 </style>
@@ -55,6 +66,15 @@ button.s{background:transparent;border:1px solid var(--line);color:var(--mut)}
     <h1 data-t="title">⚔️ 对战大厅</h1>
     <button class="chip" id="me" title="改名">👤 …</button>
   </header>
+  <div class="mode" id="mode" role="tablist">
+    <button type="button" data-m="pvp" data-t="m_pvp">👥 真人对战</button>
+    <button type="button" data-m="bot" data-t="m_bot">🤖 人机对战</button>
+  </div>
+  <div class="lv" id="lv">
+    <button type="button" data-lv="easy" data-t="easy">🍼 简单</button>
+    <button type="button" data-lv="normal" data-t="normal">🍬 普通</button>
+    <button type="button" data-lv="hard" data-t="hard">🌶️ 困难</button>
+  </div>
   <p class="online" id="online">&nbsp;</p>
   <div class="grid" id="grid"></div>
   <form class="code" id="cf" autocomplete="off">
@@ -72,28 +92,29 @@ button.s{background:transparent;border:1px solid var(--line);color:var(--mut)}
 'use strict';
 var GAMES = [
   { id: 'gomoku', e: '⚫' }, { id: 'pong', e: '🏓' }, { id: 'hockey', e: '🥅' },
-  { id: 'tanks', e: '💥' }, { id: 'brawl', e: '🥊' }, { id: 'tron', e: '🏍️' }
+  { id: 'tanks', e: '💥' }, { id: 'brawl', e: '🥊' }, { id: 'tron', e: '🏍️' }, { id: 'blaster', e: '🫧' },
+  { id: 'blocks', e: '🍬' }, { id: 'bombs', e: '💧' }, { id: 'tag', e: '👻' }, { id: 'paint', e: '🎨' }, { id: 'kart', e: '🏎️' }, { id: 'kart3d', e: '🏁' }, { id: 'spin', e: '🌀' }
 ];
 var S = {
-  zh: { title: '⚔️ 对战大厅', gomoku: '五子棋', pong: '弹球对战', hockey: '气垫球', tanks: '坦克对战', brawl: '萌团大乱斗', tron: '光轮对战',
+  zh: { m_pvp: '👥 真人对战', m_bot: '🤖 人机对战', easy: '🍼 简单', normal: '🍬 普通', hard: '🌶️ 困难', vs_bot: '🤖 不等了，先和程序玩', title: '⚔️ 对战大厅', gomoku: '五子棋', pong: '弹球对战', hockey: '气垫球', tanks: '坦克对战', brawl: '萌团大乱斗', tron: '光轮对战', blaster: '泡泡枪 FPS', blocks: '萌萌方块', bombs: '水弹大作战', tag: '泡泡鬼抓人', paint: '滚筒涂地', kart: '卡丁车', kart3d: '3D卡丁车', spin: '爆旋陀螺',
     online: '<b>●</b> {n} 人在大厅', waiting_tag: '{name} 在等', code_ph: '朋友的房间号', join: '加入',
     lan: '同一个 Wi-Fi？去 Link 首页点对方头像约战 →', finding: '正在找对手', private: '等朋友加入',
     code_hint: '把房间号告诉朋友，或直接分享链接', share: '分享邀请', only_friend: '只等朋友', cancel: '取消',
     found: '匹配成功！', vs: '对手：{name}', no_code: '房间号不存在或已失效', expired: '房间已过期，请重新开始',
     copied: '链接已复制', offline: '连接中断，正在重连…', rename: '你的名字（对手会看到）', share_text: '来 0101.click 和我对战{game}！房间号 {code}', player: '玩家' },
-  ja: { title: '⚔️ 対戦ロビー', gomoku: '五目並べ', pong: 'ポン対戦', hockey: 'エアホッケー', tanks: 'タンク対戦', brawl: 'もちもち大乱闘', tron: 'ライトサイクル',
+  ja: { m_pvp: '👥 人と対戦', m_bot: '🤖 CPU 対戦', easy: '🍼 かんたん', normal: '🍬 ふつう', hard: '🌶️ むずかしい', vs_bot: '🤖 待たずに CPU と対戦', title: '⚔️ 対戦ロビー', gomoku: '五目並べ', pong: 'ポン対戦', hockey: 'エアホッケー', tanks: 'タンク対戦', brawl: 'もちもち大乱闘', tron: 'ライトサイクル', blaster: 'バブルFPS', blocks: 'キャンディブロック', bombs: '水風船バトル', tag: 'バブル鬼ごっこ', paint: 'ローラーぬりぬり', kart: 'カート', kart3d: '3Dカート', spin: 'ベイバトル',
     online: '<b>●</b> ロビーに {n} 人', waiting_tag: '{name} が待機中', code_ph: '友だちのルーム番号', join: '参加',
     lan: '同じ Wi-Fi なら Link トップで相手をタップ →', finding: '対戦相手を探しています', private: '友だちを待っています',
     code_hint: 'ルーム番号を伝えるか、リンクを共有', share: '招待を共有', only_friend: '友だちだけ', cancel: 'キャンセル',
     found: 'マッチ成立！', vs: '相手：{name}', no_code: 'ルーム番号が見つかりません', expired: 'ルームの期限切れです',
     copied: 'リンクをコピーしました', offline: '接続が切れました。再接続中…', rename: 'あなたの名前（相手に表示）', share_text: '0101.click で{game}対戦しよう！ルーム番号 {code}', player: 'プレイヤー' },
-  ko: { title: '⚔️ 대전 로비', gomoku: '오목', pong: '퐁 대전', hockey: '에어하키', tanks: '탱크 대전', brawl: '모찌 난투', tron: '라이트사이클',
+  ko: { m_pvp: '👥 사람과 대전', m_bot: '🤖 컴퓨터 대전', easy: '🍼 쉬움', normal: '🍬 보통', hard: '🌶️ 어려움', vs_bot: '🤖 기다리지 않고 컴퓨터와 대전', title: '⚔️ 대전 로비', gomoku: '오목', pong: '퐁 대전', hockey: '에어하키', tanks: '탱크 대전', brawl: '모찌 난투', tron: '라이트사이클', blaster: '버블 FPS', blocks: '캔디 블록', bombs: '물풍선 대작전', tag: '버블 술래잡기', paint: '롤러 땅따먹기', kart: '카트', kart3d: '3D카트', spin: '팽이 배틀',
     online: '<b>●</b> 로비에 {n}명', waiting_tag: '{name} 대기 중', code_ph: '친구의 방 번호', join: '참가',
     lan: '같은 Wi-Fi라면 Link 홈에서 상대를 탭 →', finding: '상대를 찾는 중', private: '친구를 기다리는 중',
     code_hint: '방 번호를 알려주거나 링크를 공유하세요', share: '초대 공유', only_friend: '친구만', cancel: '취소',
     found: '매칭 성공!', vs: '상대: {name}', no_code: '방 번호가 없거나 만료되었습니다', expired: '방이 만료되었습니다',
     copied: '링크를 복사했습니다', offline: '연결이 끊겼습니다. 재연결 중…', rename: '내 이름 (상대에게 표시)', share_text: '0101.click에서 {game} 대전하자! 방 번호 {code}', player: '플레이어' },
-  en: { title: '⚔️ Game Lobby', gomoku: 'Gomoku', pong: 'Pong', hockey: 'Air Hockey', tanks: 'Tanks', brawl: 'Mochi Brawl', tron: 'Light Cycles',
+  en: { m_pvp: '👥 vs Human', m_bot: '🤖 vs Computer', easy: '🍼 Easy', normal: '🍬 Normal', hard: '🌶️ Hard', vs_bot: '🤖 Skip waiting, play the computer', title: '⚔️ Game Lobby', gomoku: 'Gomoku', pong: 'Pong', hockey: 'Air Hockey', tanks: 'Tanks', brawl: 'Mochi Brawl', tron: 'Light Cycles', blaster: 'Bubble FPS', blocks: 'Candy Blocks', bombs: 'Water Balloons', tag: 'Bubble Tag', paint: 'Roller Paint', kart: 'Kart Racing', kart3d: 'Kart 3D', spin: 'Bey Battle',
     online: '<b>●</b> {n} in lobby', waiting_tag: '{name} waiting', code_ph: "Friend's room code", join: 'Join',
     lan: 'Same Wi-Fi? Tap them on the Link home page →', finding: 'Finding an opponent', private: 'Waiting for your friend',
     code_hint: 'Tell your friend the code, or share the link', share: 'Share invite', only_friend: 'Friends only', cancel: 'Cancel',
@@ -121,12 +142,37 @@ meEl.onclick = function () {
   if (v && v.trim()) { name = v.trim().slice(0, 16); localStorage.setItem('custom-nickname', name); showName(); }
 };
 
+// 对手模式：真人匹配 / 人机（记住上次的选择）
+var LEVELS = ['easy', 'normal', 'hard'];
+var mode = localStorage.getItem('lobby-mode') === 'bot' ? 'bot' : 'pvp';
+var botLevel = LEVELS.indexOf(localStorage.getItem('lobby-bot-level')) >= 0 ? localStorage.getItem('lobby-bot-level') : 'normal';
+function renderMode() {
+  document.body.classList.toggle('bot', mode === 'bot');
+  document.querySelectorAll('#mode button').forEach(function (b) { b.classList.toggle('on', b.dataset.m === mode); });
+  document.querySelectorAll('#lv button').forEach(function (b) { b.classList.toggle('on', b.dataset.lv === botLevel); });
+}
+document.querySelectorAll('#mode button').forEach(function (b) {
+  b.onclick = function () { mode = b.dataset.m; localStorage.setItem('lobby-mode', mode); renderMode(); };
+});
+document.querySelectorAll('#lv button').forEach(function (b) {
+  b.onclick = function () { botLevel = b.dataset.lv; localStorage.setItem('lobby-bot-level', botLevel); renderMode(); };
+});
+renderMode();
+function playBot(game) {
+  var url = new URL('../' + game + '/', location.href);
+  url.searchParams.set('bot', botLevel);
+  url.hash = 'bot-' + Math.random().toString(36).slice(2, 9);
+  found.done = true;
+  try { if (ws) ws.close(); } catch (e) {}
+  location.href = url.toString();
+}
+
 var grid = document.getElementById('grid');
 GAMES.forEach(function (g) {
   var b = document.createElement('button');
   b.className = 'g'; b.id = 'g-' + g.id;
-  b.innerHTML = '<span class="w"></span><span class="e">' + g.e + '</span><span class="n">' + esc(t(g.id)) + '</span>';
-  b.onclick = function () { quick(g.id); };
+  b.innerHTML = '<span class="w"></span><span class="bt">🤖</span><span class="e">' + g.e + '</span><span class="n">' + esc(t(g.id)) + '</span>';
+  b.onclick = function () { if (mode === 'bot') playBot(g.id); else quick(g.id); };
   grid.appendChild(b);
 });
 
@@ -149,13 +195,15 @@ function showWaiting() {
       (state.code ? '<button class="b" id="sh">' + esc(t('share')) + '</button>' : '') +
       (state.public ? '<button class="b s" id="of">' + esc(t('only_friend')) + '</button>' : '') +
       '<button class="b s" id="cx">' + esc(t('cancel')) + '</button>' +
-    '</div>';
+    '</div>' +
+    '<div class="row"><button class="b s" id="vb">' + esc(t('vs_bot')) + '</button></div>';
   ov.classList.add('on');
   var sh = document.getElementById('sh');
   if (sh) sh.onclick = share;
   var of = document.getElementById('of');
   if (of) of.onclick = function () { send({ type: 'match-create', game: state.game, name: name }); };
   document.getElementById('cx').onclick = cancel;
+  document.getElementById('vb').onclick = function () { var g = state.game; send({ type: 'match-leave' }); state = null; playBot(g); };
 }
 function share() {
   var url = inviteUrl(state.code), text = t('share_text', { game: t(state.game), code: state.code });

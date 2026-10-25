@@ -1,0 +1,518 @@
+:root {
+    --bg-color: #161324;
+    --panel-bg: #211d35;
+    --border-color: #383157;
+    --text-primary: #fdf7ff;
+    --text-secondary: #b5a8d4;
+    --primary-color: #ff6b9d; /* 蜜桃粉 - P1 / Host */
+    --primary-glow: rgba(255, 107, 157, 0.35);
+    --secondary-color: #4dd0e1; /* 布丁蓝 - P2 / Client */
+    --secondary-glow: rgba(77, 208, 225, 0.35);
+    --accent-color: #ffd54f; /* 元气金黄 */
+    --danger-color: #ff5252;
+    --font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-cute: 'Fredoka', 'Plus Jakarta Sans', sans-serif;
+    --font-mono: 'Orbitron', monospace;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+body {
+    background: radial-gradient(circle at top, #271f42 0%, #141122 100%);
+    color: var(--text-primary);
+    font-family: var(--font-family);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 18px;
+    overflow-x: hidden;
+}
+
+.game-container {
+    width: 100%;
+    max-width: 1040px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Header */
+.game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-weight: 900;
+    font-size: 24px;
+    letter-spacing: 1.5px;
+}
+
+.logo-link {
+    color: var(--text-primary);
+}
+
+.logo-brawl {
+    color: var(--primary-color);
+    text-shadow: 0 0 14px var(--primary-glow);
+}
+
+.cute-badge {
+    font-family: var(--font-family);
+    font-size: 11px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #ff6b9d, #ffa06b);
+    color: #1c1226;
+    padding: 3px 9px;
+    border-radius: 999px;
+    letter-spacing: 0.5px;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.stats {
+    display: flex;
+    gap: 12px;
+}
+
+.stat-box {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 7px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 128px;
+}
+
+.p1-box {
+    border-color: rgba(255, 107, 157, 0.45);
+}
+
+.p2-box {
+    border-color: rgba(77, 208, 225, 0.45);
+}
+
+.stat-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+}
+
+.stat-value {
+    font-family: var(--font-mono);
+    font-size: 20px;
+    font-weight: 900;
+    color: var(--text-primary);
+}
+
+/* Main Panel */
+.main-panel {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+    align-items: start;
+}
+
+@media (min-width: 920px) {
+    .main-panel {
+        grid-template-columns: minmax(520px, 760px) 1fr;
+    }
+}
+
+.stage-column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Canvas Wrapper */
+.canvas-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    aspect-ratio: 760 / 440;
+    background: #1c1630;
+    border: 3px solid var(--border-color);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+}
+
+#game-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Touch Controls */
+.touch-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 10px 14px;
+    flex-wrap: wrap;
+}
+
+.touch-dpad,
+.touch-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.touch-btn {
+    font-family: var(--font-family);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-primary);
+    background: #2e2849;
+    border: 2px solid #483f70;
+    border-radius: 12px;
+    padding: 10px 14px;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 0.08s ease, background 0.15s ease;
+    box-shadow: 0 4px 0 #181429;
+}
+
+.touch-btn:active,
+.touch-btn.active {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 #181429;
+}
+
+.dpad-btn {
+    min-width: 52px;
+}
+
+.jump-btn {
+    background: #39315c;
+    border-color: #63569c;
+}
+
+.act-punch {
+    background: linear-gradient(135deg, #ff6b9d, #ff477e);
+    color: #1c1024;
+    border-color: #ff9ebb;
+}
+
+.act-heavy {
+    background: linear-gradient(135deg, #ffd54f, #ffb300);
+    color: #241905;
+    border-color: #ffe57f;
+}
+
+.act-guard {
+    background: linear-gradient(135deg, #4dd0e1, #26c6da);
+    color: #0b2429;
+    border-color: #80deea;
+}
+
+/* Overlay */
+.overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 16, 36, 0.86);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 22px;
+    transition: opacity 0.25s ease;
+    z-index: 10;
+}
+
+.overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.overlay-content {
+    text-align: center;
+    max-width: 380px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.overlay-content.hidden {
+    display: none;
+}
+
+.mascot-row {
+    font-size: 32px;
+    line-height: 1.2;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+}
+
+.overlay-content h2 {
+    font-family: var(--font-mono);
+    font-size: 24px;
+    letter-spacing: 1.5px;
+    color: var(--text-primary);
+}
+
+.neon-text {
+    color: var(--primary-color) !important;
+    text-shadow: 0 0 16px var(--primary-glow);
+}
+
+.danger-text {
+    color: var(--danger-color) !important;
+    text-shadow: 0 0 15px rgba(255, 82, 82, 0.4);
+}
+
+.tagline {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* Room Invite */
+.room-info {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    padding: 12px 14px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: left;
+}
+
+.room-info .label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-secondary);
+    letter-spacing: 1px;
+}
+
+.invite-link-container {
+    display: flex;
+    gap: 8px;
+}
+
+#invite-url {
+    flex: 1;
+    min-width: 0;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 12px;
+    outline: none;
+}
+
+/* Connection Spinner */
+.connection-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--secondary-color);
+}
+
+.spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(77, 208, 225, 0.25);
+    border-top-color: var(--secondary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Buttons */
+.btn {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    padding: 12px 24px;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #ff6b9d, #ff8e53);
+    color: #1b1024;
+    box-shadow: 0 6px 20px var(--primary-glow);
+}
+
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(255, 107, 157, 0.55);
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background: var(--border-color);
+    color: var(--text-primary);
+    padding: 8px 14px;
+    font-size: 10px;
+    border-radius: 8px;
+}
+
+.btn-secondary:hover {
+    background: #4b4275;
+}
+
+/* Side Panel */
+.side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.panel-section {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 16px;
+}
+
+.panel-section h3 {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: var(--accent-color);
+    margin-bottom: 12px;
+}
+
+.control-keys {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    font-size: 12px;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.key-row kbd {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 2px 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--secondary-color);
+}
+
+.note-row {
+    color: var(--text-secondary);
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+.status-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.status-grid span {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.status-online {
+    color: #4ade80 !important;
+}
+
+.status-offline {
+    color: var(--danger-color) !important;
+}
+
+.final-score-text {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    color: var(--text-secondary);
+}
+
+/* Footer */
+.game-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 4px;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13px;
+    transition: color 0.2s ease;
+}
+
+.back-link:hover {
+    color: var(--text-primary);
+}
+
+/* client role: start button carries .hidden but .btn had no hide rule, so
+   the client saw a START button that did nothing (looked like "not connected") */
+.btn.hidden { display: none; }
+
+/* ---- GameFit 触屏手柄：左手 ◀ ▶，右手 2×2 动作键 ---- */
+html.gf .touch-controls { flex-wrap: nowrap; padding: 6px 10px; align-items: flex-end; }
+html.gf .touch-dpad { gap: 10px; }
+html.gf .touch-dpad .dpad-btn { width: 76px; height: 76px; font-size: 26px; padding: 0; border-radius: 18px; }
+html.gf .touch-actions {
+    display: grid; grid-template-columns: 64px 74px; grid-template-rows: 64px 74px; gap: 8px; align-items: center; justify-items: center;
+}
+html.gf .touch-actions .touch-btn {
+    width: 100%; height: 100%; padding: 0; border-radius: 50%; font-size: 24px; line-height: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+}
+html.gf .touch-actions .touch-btn small { font-size: 10px; font-weight: 700; }
+html.gf .touch-actions .act-punch { font-size: 30px; }
+html.gf-float-controls .touch-controls { justify-content: space-between; }
+html.gf-float-controls .touch-dpad .dpad-btn { width: 66px; height: 66px; }
+html.gf-float-controls .touch-actions { grid-template-columns: 56px 64px; grid-template-rows: 56px 64px; }

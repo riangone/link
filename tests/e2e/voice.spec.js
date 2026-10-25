@@ -100,4 +100,78 @@ test.describe('voice messages', () => {
             await ctxB.close();
         }
     });
+
+    /**
+     * Chat history persistence (see ChatHistoryStore in voice-store.js).
+     * Text and voice messages both write through to IndexedDB on every
+     * status transition; SendTextDialog#_onRecipient hydrates the thread
+     * from there on open. peerId is a session cookie (server/index.js) with
+     * no Max-Age, so it survives a same-tab reload - that's the scenario
+     * this covers ("path A": history keyed by peerId, reload-safe, but not
+     * expected to survive the *other* side's browser restart).
+     */
+    test('text and voice history survive a page reload and voice stays playable', async () => {
+        const ctxA = await browser.newContext({ permissions: ['microphone'] });
+        const ctxB = await browser.newContext({ permissions: ['microphone'] });
+        const pageA = await ctxA.newPage();
+        const pageB = await ctxB.newPage();
+
+        try {
+            await pageA.goto(dev.url);
+            await pageB.goto(dev.url);
+
+            await expect(pageA.locator('x-peer')).toHaveCount(1, { timeout: 10_000 });
+            await expect(pageB.locator('x-peer')).toHaveCount(1, { timeout: 10_000 });
+
+            await pageA.locator('x-peer label').first().click({ button: 'right' });
+            await expect(pageA.locator('#sendTextDialog')).toBeVisible();
+
+            // Text message
+            await pageA.locator('#textInput').fill('hello history');
+            await pageA.locator('#sendTextDialog button[type="submit"]').click();
+            await expect(pageA.locator('.text-msg-bubble', { hasText: 'hello history' })).toBeVisible({ timeout: 5_000 });
+
+            // Voice message on top of it, same thread
+            await pageA.locator('#voiceRecordBtn').click();
+            await expect(pageA.locator('#voiceRecordBar')).toBeVisible({ timeout: 5_000 });
+            await pageA.waitForTimeout(1500);
+            await pageA.locator('#voiceRecordBtn').click();
+            await expect(pageA.locator('.voice-msg-bubble')).toHaveCount(1, { timeout: 5_000 });
+            await expect(pageA.locator('.voice-msg-bubble.voice-msg-unavailable')).toHaveCount(0);
+
+            await expect(pageB.locator('.voice-msg-bubble')).toHaveCount(1, { timeout: 10_000 });
+
+            // Give the write-through to IndexedDB a moment to land before reloading.
+            await pageA.waitForTimeout(500);
+            await pageB.waitForTimeout(500);
+
+            await pageA.reload();
+            await pageB.reload();
+
+            await expect(pageA.locator('x-peer')).toHaveCount(1, { timeout: 10_000 });
+            await expect(pageB.locator('x-peer')).toHaveCount(1, { timeout: 10_000 });
+
+            await pageA.locator('x-peer label').first().click({ button: 'right' });
+            await expect(pageA.locator('#sendTextDialog')).toBeVisible();
+            await expect(pageA.locator('.text-msg-bubble', { hasText: 'hello history' })).toBeVisible({ timeout: 5_000 });
+            await expect(pageA.locator('.voice-msg-bubble')).toHaveCount(1, { timeout: 5_000 });
+            await expect(pageA.locator('.voice-msg-bubble.voice-msg-unavailable')).toHaveCount(0);
+
+            await pageB.locator('x-peer label').first().click({ button: 'right' });
+            await expect(pageB.locator('#sendTextDialog')).toBeVisible();
+            await expect(pageB.locator('.text-msg-bubble', { hasText: 'hello history' })).toBeVisible({ timeout: 5_000 });
+            await expect(pageB.locator('.voice-msg-bubble')).toHaveCount(1, { timeout: 5_000 });
+
+            // Voice must still be playable after reload - the audio blob
+            // (VoiceStore) persisted independently of the history row
+            // (ChatHistoryStore) that points to it.
+            await pageB.locator('.voice-msg-bubble .voice-play-btn').click();
+            await expect.poll(() => {
+                return pageB.locator('.voice-msg-progress').first().evaluate(el => el.style.width);
+            }, { timeout: 5_000 }).not.toBe('0%');
+        } finally {
+            await ctxA.close();
+            await ctxB.close();
+        }
+    });
 });

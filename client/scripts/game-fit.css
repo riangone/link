@@ -1,0 +1,209 @@
+/* GameFit layout — see scripts/game-fit.js. Loaded after each game's style.css;
+   everything is scoped under html.gf so a page without the script is unchanged. */
+
+html.gf, html.gf body { height: 100%; }
+html.gf body {
+    min-height: 0 !important;
+    height: 100vh;
+    height: 100dvh;
+    padding: 0 !important;
+    margin: 0;
+    display: block !important;
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
+html.gf .game-container {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100%;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+}
+html.gf .game-footer { display: none !important; }
+
+/* ---- header: one compact row ---- */
+html.gf .game-header {
+    flex: none;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 2px 0 6px !important;
+    margin: 0 !important;
+    min-width: 0;
+}
+html.gf .game-header > .logo { margin-right: auto; white-space: nowrap; min-width: 0; }
+html.gf .game-header .stats, html.gf .game-header .header-actions { min-width: 0; flex-wrap: nowrap; }
+.gf-tools { display: flex; gap: 6px; flex: none; }
+.gf-btn {
+    flex: none;
+    width: 34px; height: 34px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, .18);
+    background: rgba(255, 255, 255, .06);
+    color: inherit;
+    font: 600 17px/1 system-ui, sans-serif;
+    text-decoration: none;
+    cursor: pointer;
+    padding: 0;
+}
+.gf-btn:hover { background: rgba(255, 255, 255, .14); }
+.gf-info[aria-expanded="true"] { border-color: currentColor; }
+.gf-close { display: none; }
+
+/* ---- main area ---- */
+html.gf .main-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    margin: 0 !important;
+}
+html.gf .gf-stage {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    width: auto !important;
+    max-width: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+    position: relative;
+}
+html.gf .gf-stage > * { flex: none; max-width: none !important; }
+html.gf .gf-box {
+    flex: 1 1 auto !important;
+    min-height: 120px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+html.gf .canvas-wrapper {
+    flex: none;
+    max-width: none !important;
+    max-height: none !important;
+    aspect-ratio: auto !important;
+    margin: 0 !important;
+    width: 100%;
+}
+html.gf .canvas-wrapper canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+    touch-action: none;
+}
+/* the overlay now covers the whole stage box */
+html.gf .gf-box > .overlay {
+    position: absolute !important;
+    inset: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    border-radius: 14px;
+    overflow-y: auto;
+    z-index: 20;
+    display: flex;
+    align-items: safe center;
+    justify-content: center;
+}
+html.gf .gf-box > .overlay.hidden { pointer-events: none; }
+html.gf .gf-box > .overlay .overlay-content { max-height: none; margin: auto; }
+
+/* ---- side panel: right column on wide screens, drawer otherwise ---- */
+html.gf .side-panel {
+    flex: none;
+    width: 270px !important;
+    overflow-y: auto;
+    min-height: 0;
+    position: relative;
+}
+@media (max-width: 1099px), (max-height: 520px) {
+    html.gf .side-panel { display: none !important; }
+    html.gf .side-panel.gf-open {
+        display: flex !important;
+        flex-direction: column;
+        position: fixed;
+        z-index: 60;
+        top: 52px; right: 8px; bottom: 8px;
+        width: min(340px, calc(100vw - 16px)) !important;
+        padding: 10px;
+        border-radius: 16px;
+        background: rgba(12, 14, 24, .94);
+        box-shadow: 0 16px 50px rgba(0, 0, 0, .55);
+        backdrop-filter: blur(8px);
+    }
+    html.gf .side-panel.gf-open .gf-close { display: inline-flex; align-self: flex-end; }
+}
+@media (min-width: 1100px) and (min-height: 521px) {
+    .gf-info { display: none !important; }
+}
+
+/* ---- landscape-only games held upright ---- */
+.gf-rotate-hint { display: none !important; }
+html.gf-touch.gf-portrait.gf-landscape-only .gf-rotate-hint {
+    display: block !important;
+    text-align: center;
+    font-size: 12px;
+    opacity: .75;
+    padding: 2px 0;
+}
+
+/* ---- phones ---- */
+@media (max-width: 640px), (max-height: 500px) {
+    html.gf .game-header { padding: 0 0 3px !important; }
+    html.gf .game-header .orientation-toggle { padding: 6px 8px !important; }
+    html.gf .game-header .orientation-toggle #orientation-label { display: none; }
+    html.gf .game-header .logo { font-size: 15px !important; letter-spacing: 1px !important; gap: 4px !important; }
+    html.gf .game-header .logo .badge { display: none !important; }
+    html.gf .game-header .stats { gap: 6px !important; }
+    html.gf .game-header .stat-box { padding: 3px 8px !important; min-width: 0 !important; gap: 4px !important; border-radius: 8px !important; }
+    html.gf .game-header .stat-label { font-size: 8px !important; max-width: 74px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    html.gf .game-header .stat-value { font-size: 15px !important; }
+    .gf-btn { width: 30px; height: 30px; font-size: 15px; border-radius: 8px; }
+    html.gf .game-container { gap: 4px !important; }
+    html.gf .canvas-wrapper { padding: 4px !important; }
+}
+@media (max-width: 560px) {
+    html.gf .game-header > .logo { display: none !important; }
+    html.gf .game-header .stats, html.gf .game-header .header-actions { margin-right: auto; }
+}
+
+/* ---- phones in landscape: controls float over the stage margins ---- */
+html.gf-float-controls .game-header { padding-bottom: 2px !important; }
+html.gf-float-controls .gf-stage > .touch-controls {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    z-index: 10;
+    pointer-events: none;
+    margin: 0 !important;
+    padding: 0 4px 4px !important;
+    background: none !important;
+    border: none !important;
+}
+html.gf-float-controls .gf-stage > .touch-controls > * { pointer-events: auto; }
+html.gf-float-controls .touch-btn, html.gf-float-controls .mkey { opacity: .82; }
+
+/* ---- side columns (see fit(): wide stage with HUD/buttons around the canvas) ---- */
+.gf-side { display: contents; }
+html.gf-side .gf-stage { flex-direction: row !important; align-items: stretch !important; gap: 10px !important; }
+html.gf-side .gf-side {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+    flex: 0 1 190px;
+    min-width: 0;
+    overflow-y: auto;
+}
+html.gf-side .gf-side:empty { flex-basis: 0; }
+html.gf-side .gf-side > * { width: 100% !important; max-width: none !important; margin: 0 !important; }
+html.gf-side .gf-rotate-hint { display: none !important; }
+html.gf:not(.gf-touch) .touch-controls { display: none !important; }

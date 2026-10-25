@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Link Kart 3D - 第一视角卡丁车大奖赛</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Orbitron:wght@500;700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../scripts/game-fit.css">
+</head>
+<body>
+    <div class="game-container">
+        <header class="game-header">
+            <div class="logo">
+                <span class="logo-link">LINK</span>
+                <span class="logo-kart">KART 3D</span>
+                <span class="tactical-badge">大奖赛</span>
+            </div>
+            <div class="header-actions">
+                <div class="stats">
+                    <div class="stat-box p1-box">
+                        <span class="stat-label" id="p1-label">🐰 草莓兔 (HOST)</span>
+                        <span id="p1-score" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-box p2-box">
+                        <span class="stat-label" id="p2-label">🐱 汽水猫 (CLIENT)</span>
+                        <span id="p2-score" class="stat-value">0</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-panel">
+            <div class="stage-column">
+                <div class="canvas-wrapper">
+                    <canvas id="game-canvas" width="800" height="450" tabindex="0"></canvas>
+
+                    <div id="overlay" class="overlay">
+                        <div class="overlay-content" id="lobby-screen">
+                            <div class="mascot-row">🐰 🏎️💨 🐱</div>
+                            <h2>LINK KART 3D</h2>
+                            <p class="tagline">追尾视角卡丁车 1v1！漂移喷火、吃金币、踩加速带、抢道具盒，3 圈先冲线者获胜</p>
+                            <div class="room-info">
+                                <span class="label">INVITATION LINK (复制发给好友即可联机)</span>
+                                <div class="invite-link-container">
+                                    <input type="text" id="invite-url" readonly value="...">
+                                    <button id="copy-btn" class="btn btn-secondary">COPY</button>
+                                </div>
+                            </div>
+                            <div class="connection-status">
+                                <span class="spinner"></span>
+                                <span id="connection-state-text">正在连接信号服务器...</span>
+                            </div>
+                        </div>
+
+                        <div class="overlay-content hidden" id="ready-screen">
+                            <div class="mascot-row">🏁 READY? 🏁</div>
+                            <h2>OPPONENT CONNECTED</h2>
+                            <p class="tagline" id="role-text">准备好发车了吗？</p>
+                            <button id="start-btn" class="btn btn-primary">START RACE</button>
+                        </div>
+
+                        <div class="overlay-content hidden" id="gameover-screen">
+                            <div class="mascot-row" id="winner-mascot">🏆</div>
+                            <h2 id="win-loss-title" class="neon-text">VICTORY!</h2>
+                            <p class="final-score-text">WINS: <span id="final-score">0 - 0</span></p>
+                            <button id="restart-btn" class="btn btn-primary">RACE AGAIN</button>
+                        </div>
+
+                        <div class="overlay-content hidden" id="disconnect-screen">
+                            <div class="mascot-row">📡</div>
+                            <h2 class="danger-text">CONNECTION LOST</h2>
+                            <p class="tagline">对手已离开赛道，请返回大厅重新邀请</p>
+                            <button id="lobby-btn" class="btn btn-primary">RETURN TO LOBBY</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="touch-controls" aria-label="Touch Controls">
+                    <div class="touch-dpad">
+                        <div id="move-stick" class="move-stick" aria-label="Steer"><div id="move-knob" class="move-knob">🛞</div></div>
+                    </div>
+                    <div class="touch-hint">左右转向<br>下拉刹车</div>
+                    <div class="touch-actions">
+                        <button type="button" class="touch-btn act-dash" data-action="drift">🌀<small>漂移</small></button>
+                        <button type="button" class="touch-btn act-fire" data-action="item">🎁<small>道具</small></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="side-panel">
+                <div class="panel-section instructions">
+                    <h3>DRIVER MANUAL (驾驶指南)</h3>
+                    <div class="control-keys">
+                        <div class="key-row"><kbd>W / ↑</kbd> 油门，<kbd>S / ↓</kbd> 刹车/倒车，<kbd>A D / ← →</kbd> 左右转向（镜头跟在车后）</div>
+                        <div class="key-row"><kbd>Shift / K</kbd>：🌀 <strong>漂移</strong> — 转弯时按住，火花 <span style="color:#38bdf8">蓝</span> → <span style="color:#fb923c">橙</span> → <span style="color:#e879f9">紫</span>，松开喷火加速</div>
+                        <div class="key-row"><kbd>Space / J</kbd>：🎁 使用道具 — 🍌 香蕉皮、🫧 追踪泡泡、🍄 加速蘑菇、🛡️ 护盾</div>
+                        <div class="key-row note-row">🪙 金币越多极速越高（最多 10 枚，被击中会掉 3 枚）；踩 <strong>⏩ 加速带</strong> 瞬间提速；倒数结束前一瞬间踩油门可获得 <strong>起步加速</strong>！跑完 <strong>3 圈</strong> 先冲线者获胜！</div>
+                    </div>
+                </div>
+
+                <div class="panel-section status-section">
+                    <h3>NETWORK STATUS</h3>
+                    <div class="status-grid">
+                        <div>状态: <span id="status-text" class="status-offline">DISCONNECTED</span></div>
+                        <div>延迟: <span id="ping-text">-- ms</span></div>
+                        <div>角色: <span id="role-status-text">SPECTATOR</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="game-footer">
+            <a href="../" class="back-link">
+                <svg class="back-icon" viewBox="0 0 24 24" width="16" height="16">
+                    <path fill="currentColor" d="M20,11H7.83l5.59-5.59L12,4l-8,8l8,8l1.41-1.41L7.83,13H20V11z"/>
+                </svg>
+                返回 LINK 主界面
+            </a>
+        </footer>
+    </div>
+
+    <script src="../scripts/game-session.js"></script>
+    <script src="../scripts/game-bot.js" data-lobby="../play/"></script>
+    <script src="../scripts/game-fit.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

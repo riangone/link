@@ -115,6 +115,32 @@ class ServerConnection {
             case 'peer-message':
                 Events.fire('peer-message', msg);
                 break;
+            case 'find-device-result':
+                Events.fire('find-device-result', msg);
+                break;
+            case 'public-devices':
+                Events.fire('public-devices', msg.devices);
+                break;
+            case 'public-peer-joined':
+                Events.fire('public-peer-joined', msg);
+                break;
+            case 'public-peer-left':
+                Events.fire('public-peer-left', msg);
+                break;
+            case 'invite':
+                Events.fire('friend-invite', msg);
+                break;
+            case 'invite-response':
+                Events.fire('friend-invite-response', msg);
+                break;
+            case 'invite-cancel':
+                Events.fire('friend-invite-cancel', msg);
+                break;
+            case 'game-invite':
+            case 'game-invite-response':
+            case 'game-invite-cancel':
+                Events.fire(msg.type, msg);
+                break;
             default:
                 console.error('WS: unkown message type', msg);
         }
@@ -806,7 +832,23 @@ class RTCPeer extends Peer {
 
     _onChannelClosed() {
         console.log('RTC: channel closed', this._peerId);
-        if (!this.isCaller) return;
+        // BUG (pre-existing, inherited from upstream snapdrop): this used to
+        // read `this.isCaller` (no underscore), a property that is never
+        // assigned anywhere — only `_openConnection()` sets `this._isCaller`.
+        // That made this guard permanently `undefined` -> always falsy, so
+        // *every* channel-close (caller or not; fired from here on both the
+        // `disconnected` connectionState case AND the raw
+        // `channel.onclose` handler in `_onChannelOpened`) silently did
+        // nothing: no reopen attempt, no fallback. On a clean same-network
+        // P2P link the channel rarely closes mid-session so this dead path
+        // went unnoticed; over a TURN relay / flaky NAT it's routine for the
+        // channel to drop while the RTCPeerConnection lingers in
+        // `disconnected` (which never reaches the `failed` case that *does*
+        // call `_fallbackToWSPeer()`), so messages queued at that point had
+        // no path to ever resume - matching the "stuck on sending…" reports
+        // even after the _onPeerFallback text-migration fix, since fallback
+        // was never being triggered in the first place for this case.
+        if (!this._isCaller) return;
         this._connect(this._peerId, true); // reopen the channel
     }
 
@@ -930,6 +972,21 @@ class PeersManager {
         Events.on('peer-left', e => this._onPeerLeft(e.detail));
         Events.on('turn-config', e => this._onTurnConfig(e.detail));
         Events.on('ws-connected', e => this._flushAllTextOutboxes());
+        // Fired by FriendsManager (friends.js) once a deviceId-based invite
+        // is accepted: `peerId` is a real, live peer id (resolved via
+        // 'find-device'), just not one that arrived through the normal
+        // same-room 'peers'/'peer-joined' roster. Open a connection to it
+        // exactly like `_onPeers` does for a room peer, so file
+        // transfer/chat "just work" with friends too.
+        Events.on('friend-connect', e => this._onFriendConnect(e.detail));
+    }
+
+    _onFriendConnect(peerId) {
+        if (this.peers[peerId]) {
+            this.peers[peerId].refresh();
+            return;
+        }
+        this.peers[peerId] = new RTCPeer(this._server, peerId);
     }
 
     /**
@@ -986,11 +1043,43 @@ class PeersManager {
             const filesQueue = oldPeer._filesQueue || [];
             const wsPeer = new WSPeer(this._server, peerId);
             wsPeer._filesQueue = filesQueue;
+
+            // Migrate chat state too. Without this, any text message still
+            // "in flight" on the RTCPeer (armed ack timer, or parked in its
+            // outbox because the channel had already dropped) gets orphaned
+            // on `oldPeer` the instant it's discarded below: oldPeer's own
+            // _isConnected() keeps returning false forever (its _conn is
+            // null/closed), so _onTextTimeout's retry path just re-parks the
+            // message in oldPeer._textOutbox - which nothing ever flushes
+            // again - instead of re-arming the timer. Net effect: the UI
+            // freezes on "sending…" permanently instead of retrying over the
+            // new WSPeer or eventually flipping to "failed". This is exactly
+            // the cross-network path (RTC failed -> WSPeer relay), so it's
+            // the common case for this bug, not an edge case.
+            wsPeer._textHistory = oldPeer._textHistory;
+            wsPeer._incomingTexts = oldPeer._incomingTexts;
+            const pendingIds = Array.from(oldPeer._pendingTexts.keys());
+            pendingIds.forEach(id => {
+                const pending = oldPeer._pendingTexts.get(id);
+                clearTimeout(pending.timer);
+                pending.timer = null;
+                wsPeer._pendingTexts.set(id, pending);
+            });
+            oldPeer._pendingTexts.clear();
+            oldPeer._textOutbox = [];
+
             this.peers[peerId] = wsPeer;
 
             if (filesQueue.length > 0) {
                 wsPeer._dequeueFile();
             }
+            // Re-dispatch every still-pending message over the new
+            // transport now that WSPeer (tracking the already-open
+            // signaling socket) is the live connection for this peer.
+            pendingIds.forEach(id => {
+                const pending = wsPeer._pendingTexts.get(id);
+                if (pending) wsPeer._dispatchText(id, pending.text);
+            });
             console.log(`Successfully fell back to WSPeer for peer ${peerId}`);
         }
     }

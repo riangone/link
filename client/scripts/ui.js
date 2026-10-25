@@ -53,6 +53,11 @@ class PeersUI {
                     const isRelay = $connType.classList.contains('relay');
                     $connType.textContent = window.I18n.t(isRelay ? 'relay' : 'p2p');
                 }
+                const $game = $peer.querySelector('.peer-game-btn');
+                if ($game) {
+                    $game.title = window.I18n.t('game_invite_button_title');
+                    $game.querySelector('span').textContent = window.I18n.t('game_invite_button');
+                }
             }
         });
     }
@@ -132,6 +137,7 @@ class PeerUI {
                 <div class="device-name font-body2"></div>
                 <div class="status font-body2"></div>
                 <div class="connection-type font-body2 p2p">P2P</div>
+                <button type="button" class="peer-game-btn" title="${window.I18n.t('game_invite_button_title')}">🎮 <span>${window.I18n.t('game_invite_button')}</span></button>
             </label>`
     }
 
@@ -167,6 +173,20 @@ class PeerUI {
         el.addEventListener('touchend', e => this._onTouchEnd(e));
         el.addEventListener('touchmove', e => this._onTouchMove(e), { passive: true });
         el.addEventListener('touchcancel', e => this._onTouchCancel(e));
+
+        // "Challenge" button: pick a game and invite this peer (game-invite.js).
+        // It lives inside the <label>, so swallow the click (no file picker)
+        // and the touchstart (no long-press -> text dialog).
+        const $game = el.querySelector('.peer-game-btn');
+        if ($game) {
+            if (!window.GameInviteUI) { $game.remove(); return; }
+            $game.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+            $game.addEventListener('click', e => {
+                e.preventDefault();
+                e.stopPropagation();
+                Events.fire('game-invite-pick', { peerId: this._peer.id, name: this._displayName() });
+            });
+        }
     }
 
     _displayName() {
@@ -511,6 +531,10 @@ class SendTextDialog extends Dialog {
         this.$thread = this.$el.querySelector('#textThread');
         this._threads = new Map(); // peerId -> [{id, text?, type?, duration?, direction, status, timestamp}]
         this._recipient = null;
+        // peerIds whose history we've already asked ChatHistoryStore for
+        // this session, so switching back and forth between chats doesn't
+        // re-hit IndexedDB every time - see _ensureThreadLoaded.
+        this._loadedPeers = new Set();
 
         // Voice recording/playback state. One VoiceRecorder is reused across
         // recordings; at most one voice message plays back at a time
@@ -550,14 +574,14 @@ class SendTextDialog extends Dialog {
         }
     }
 
-    _onRecipient(recipient) {
+    async _onRecipient(recipient) {
         if (this._recipient !== recipient) {
             this.$text.textContent = '';
             this._cancelRecording();
         }
         this._recipient = recipient;
         this._handleShareTargetText();
-        this._renderThread();
+        this._renderThread(); // instant paint with whatever's already in memory
         this.show();
 
         const range = document.createRange();
@@ -566,6 +590,42 @@ class SendTextDialog extends Dialog {
         range.selectNodeContents(this.$text);
         sel.removeAllRanges();
         sel.addRange(range);
+
+        // Backfill from IndexedDB (see ChatHistoryStore in voice-store.js).
+        // Runs after the dialog is already shown so opening chat never
+        // waits on a DB round trip; re-renders once history lands.
+        await this._ensureThreadLoaded(recipient);
+        if (this._recipient === recipient) this._renderThread();
+    }
+
+    /**
+     * Hydrates this._threads.get(peerId) from ChatHistoryStore the first
+     * time this peer's chat is opened in this session. Safe to call
+     * repeatedly - no-ops once a peer has been loaded (or has messages
+     * from this session already, e.g. an incoming message arrived before
+     * the user ever opened the dialog).
+     */
+    async _ensureThreadLoaded(peerId) {
+        if (!peerId || !window.ChatHistoryStore || this._loadedPeers.has(peerId)) return;
+        this._loadedPeers.add(peerId);
+        let history = [];
+        try {
+            history = await ChatHistoryStore.getThread(peerId);
+        } catch (e) {
+            console.error('ChatHistoryStore: read failed', e);
+        }
+        if (!history.length) return;
+        const live = this._threads.get(peerId);
+        if (!live) {
+            this._threads.set(peerId, history);
+            return;
+        }
+        // Messages may have arrived (and been _upsert()-ed) while we were
+        // awaiting the DB read above - merge instead of clobbering them.
+        const liveIds = new Set(live.map(m => m.id));
+        const merged = history.filter(m => !liveIds.has(m.id)).concat(live);
+        merged.sort((a, b) => a.timestamp - b.timestamp);
+        this._threads.set(peerId, merged);
     }
 
     hide() {
@@ -671,11 +731,20 @@ class SendTextDialog extends Dialog {
             this._threads.set(peerId, thread);
         }
         const existing = thread.find(m => m.id === message.id);
+        let entry;
         if (existing) {
             Object.assign(existing, message);
+            entry = existing;
         } else {
             thread.push(message);
             if (thread.length > 200) thread.shift(); // mirrors network.js's own bound, see Peer#_recordText
+            entry = message;
+        }
+        // Write-through to IndexedDB so the thread survives reload/reopen
+        // (see ChatHistoryStore in voice-store.js). Fire-and-forget: a
+        // failed persist shouldn't block rendering the live thread.
+        if (window.ChatHistoryStore) {
+            ChatHistoryStore.put(peerId, entry).catch(e => console.error('ChatHistoryStore: write failed', e));
         }
     }
 
@@ -1497,7 +1566,17 @@ class LinkApp {
         const server = new ServerConnection();
         const peers = new PeersManager(server);
         const peersUI = new PeersUI();
+        // exposed for friends.js/friends-ui.js, which are independent,
+        // optional add-ons built on the same signaling connection
+        window.serverConnection = server;
+        const friends = window.FriendsManager ? new FriendsManager(server) : null;
+        window.friendsManager = friends;
         Events.on('load', e => {
+            // FriendsUI (friends-ui.js) extends Dialog, defined further up
+            // in this file, so it can only be constructed once this whole
+            // script has finished executing — deferring to 'load' (like
+            // every other Dialog subclass here) guarantees that.
+            const friendsUI = (friends && window.FriendsUI) ? new FriendsUI(friends) : null;
             const receiveDialog = new ReceiveDialog();
             const sendTextDialog = new SendTextDialog();
             const toast = new Toast();
@@ -1513,9 +1592,12 @@ class LinkApp {
             const clipboardSync = new ClipboardSync();
 
             // Best-effort housekeeping for locally-stored voice message
-            // audio (see voice-store.js) - keeps a long-lived browser
-            // profile from accumulating IndexedDB usage forever.
+            // audio and chat history (see voice-store.js) - keeps a
+            // long-lived browser profile from accumulating IndexedDB usage
+            // forever. Same retention window for both so history doesn't
+            // outlive the audio it points to.
             if (window.VoiceStore) window.VoiceStore.pruneOlderThan();
+            if (window.ChatHistoryStore) window.ChatHistoryStore.pruneOlderThan();
 
             // Initialize page translation
             window.I18n.translatePage();

@@ -1265,6 +1265,292 @@ x-toast[show] {
     padding: 60px 20px;
 }
 
+/* Friends Drawer */
+.friends-my-code {
+    align-items: stretch;
+    gap: 6px;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.friends-my-code label {
+    color: var(--text-muted);
+}
+
+.friends-my-code input,
+.friends-add input {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color-secondary);
+    color: var(--text-color);
+}
+
+.friends-add {
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.friends-add .button {
+    padding: 8px 16px;
+    white-space: nowrap;
+}
+
+#btnScanFriendQr {
+    flex-shrink: 0;
+}
+
+#myDeviceQrWrap {
+    flex-direction: column;
+    gap: 8px;
+}
+
+#myDeviceQr {
+    border-radius: 8px;
+    background: #fff;
+    padding: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+#myDeviceQrWrap .font-body2 {
+    max-width: 220px;
+    font-size: 12px;
+}
+
+#qrScanDialog x-paper {
+    max-width: 360px;
+}
+
+#qrScanVideo {
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+}
+
+#friends-list .empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 40px 20px;
+}
+
+.friend-row {
+    gap: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 14px;
+    background: var(--bg-color-secondary);
+    border: 1px solid var(--border-color);
+    /* A row now carries up to 3 action buttons (connect / invite-to-Pong /
+       remove) alongside the label — wrap instead of overflowing the 360px
+       drawer on narrow viewports or with longer translated button text. */
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.friend-row-label {
+    min-width: 0;
+}
+
+.friend-row-label .font-subheading {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.friend-row-status {
+    color: var(--text-muted);
+}
+
+.friend-row-status.friend-online {
+    color: var(--success-color, #16a34a);
+}
+
+.friend-row button.button-link {
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--primary-color);
+    background: transparent;
+    color: var(--primary-color);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.friend-row button.button-link:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* Online-friends panel on the main page (not the Friends drawer) — see
+   friends-ui.js #_renderOnlinePeers. Deliberately `position: fixed` and kept
+   *out* of the normal document flow: the home screen is a fixed single-view
+   layout (`body { overflow-y: hidden }`) with the footer pinned via
+   `position: absolute; bottom: 0`, sized to just fit the existing
+   header/peers/instructions stack. Adding this panel into that flow would
+   grow the centered content past the viewport and get clipped/occluded
+   under the footer on common viewport heights. Floating it avoids touching
+   that layout budget at all, at the cost of overlapping peer cards on very
+   small screens — acceptable since it only ever holds a handful of compact
+   chips (friends online at once), not the potentially-larger local-peers grid. */
+#online-friends-section {
+    position: fixed;
+    top: 72px;
+    right: 16px;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    max-width: min(240px, calc(100vw - 32px));
+}
+
+#online-friends-section[hidden] {
+    display: none;
+}
+
+.online-friends-title {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 10px;
+    font-weight: 700;
+    text-align: right;
+}
+
+x-friend-peer {
+    display: block;
+    animation: peer-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+x-friend-peer .friend-peer-card {
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+x-friend-peer x-icon {
+    --icon-size: 16px;
+    width: var(--icon-size);
+    height: var(--icon-size);
+    padding: 8px;
+    border-radius: 50%;
+    background: var(--bg-color-secondary);
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+}
+
+x-friend-peer .friend-peer-info {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+x-friend-peer .name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+x-friend-peer .status {
+    font-size: 10px;
+    font-weight: 600;
+}
+
+x-friend-peer .status.friend-online {
+    color: var(--success-color, #16a34a);
+}
+
+x-friend-peer .friend-pong-btn {
+    flex: none;
+    font-size: 10px;
+    padding: 5px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--primary-color);
+    background: transparent;
+    color: var(--primary-color);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+x-friend-peer .friend-pong-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+#public-devices-list .empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 24px 20px;
+}
+
+/* Visibility toggle (public-directory opt-in) — small on/off pill, no deps */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
+.switch input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    margin: 0;
+    cursor: pointer;
+    z-index: 1;
+}
+
+.switch .slider {
+    position: absolute;
+    pointer-events: none;
+    cursor: pointer;
+    inset: 0;
+    background-color: var(--border-color);
+    border-radius: 22px;
+    transition: background-color .15s ease;
+}
+
+.switch .slider::before {
+    content: "";
+    position: absolute;
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #fff;
+    border-radius: 50%;
+    transition: transform .15s ease;
+}
+
+.switch input:checked + .slider {
+    background-color: var(--primary-color);
+}
+
+.switch input:checked + .slider::before {
+    transform: translateX(18px);
+}
+
 /* Universal Drag Overlay styling */
 #drag-overlay {
     background-color: rgba(9, 10, 15, 0.4);
@@ -1524,3 +1810,90 @@ body.theme-dark #about x-background {
         content: attr(mobile);
     }
 }
+
+/* ---- Game challenge (game-invite.js) ---- */
+x-peer .peer-game-btn {
+    margin-top: 10px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--primary-color);
+    background: transparent;
+    color: var(--primary-color);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s, color 0.2s;
+}
+x-peer .peer-game-btn:hover,
+x-peer .peer-game-btn:focus-visible {
+    background: var(--primary-color);
+    color: #fff;
+}
+x-peer[transfer] .peer-game-btn { display: none; }
+
+.game-picker-hint {
+    color: var(--text-muted);
+    margin: -4px 0 16px;
+}
+.game-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+}
+.game-picker-grid[hidden],
+.game-picker-waiting[hidden] { display: none; }
+.game-picker-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 14px 6px;
+    border-radius: 18px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color-secondary);
+    color: var(--text-color);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.game-picker-item:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: var(--primary-color);
+    box-shadow: 0 8px 20px -8px rgba(59, 130, 246, 0.5);
+}
+.game-picker-item:disabled { opacity: 0.5; cursor: default; }
+.game-picker-emoji { font-size: 30px; line-height: 1; }
+.game-picker-waiting {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 0;
+    text-align: center;
+}
+.game-picker-spinner {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    animation: game-spin 0.9s linear infinite;
+}
+@keyframes game-spin { to { transform: rotate(360deg); } }
+
+.game-invite-paper { text-align: center; }
+.game-invite-emoji {
+    font-size: 56px;
+    line-height: 1.2;
+    margin: 4px 0 8px;
+    animation: game-bounce 1s ease-in-out infinite;
+}
+@keyframes game-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+.game-invite-countdown { color: var(--text-muted); margin-top: 8px; }
+#gameInviteAccept { background: var(--primary-color); color: #fff; }

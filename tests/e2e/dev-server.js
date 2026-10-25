@@ -33,6 +33,11 @@ const MIME_TYPES = {
 function serveStatic(req, res) {
     let reqPath = decodeURIComponent(req.url.split('?')[0]);
     if (reqPath === '/') reqPath = '/index.html';
+    // Directory requests (e.g. '/pong/', used by the friend-invite ->
+    // Pong-room redirect) need an index.html fallback, same as production's
+    // Caddy `file_server` directive — this bare Node static server doesn't
+    // do that automatically.
+    else if (reqPath.endsWith('/')) reqPath += 'index.html';
     const filePath = path.join(CLIENT_ROOT, reqPath);
 
     // Prevent path traversal outside of client/

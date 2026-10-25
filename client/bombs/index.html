@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Link 水弹大作战</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../scripts/game-fit.css">
+</head>
+<body>
+    <div class="game-container">
+        <header class="game-header">
+            <div class="logo">
+                <span class="logo-link">LINK</span>
+                <span class="logo-tron">水弹</span>
+            </div>
+            <div class="header-actions">
+                <div class="stats">
+                    <div class="stat-box">
+                        <span class="stat-label">我</span>
+                        <span id="p1-score" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label" id="p2-label">对手</span>
+                        <span id="p2-score" class="stat-value">0</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-panel">
+            <div class="stage-column">
+                <div class="canvas-wrapper">
+                    <canvas id="game-canvas" width="440" height="560"></canvas>
+
+                    <div id="overlay" class="overlay">
+                        <div class="overlay-content" id="lobby-screen">
+                            <h2>💧 水弹大作战</h2>
+                            <p class="tagline">放水球、炸箱子、捡道具，把对手困进泡泡再戳破！</p>
+                            <div class="room-info">
+                                <span class="label">邀请链接（发给朋友一起玩）</span>
+                                <div class="invite-link-container">
+                                    <input type="text" id="invite-url" readonly value="...">
+                                    <button id="copy-btn" class="btn btn-secondary">复制</button>
+                                </div>
+                            </div>
+                            <div class="connection-status">
+                                <span class="spinner"></span>
+                                <span id="connection-state-text">正在等待对手加入...</span>
+                            </div>
+                        </div>
+
+                        <div class="overlay-content hidden" id="ready-screen">
+                            <h2>对手已连接</h2>
+                            <p class="tagline" id="role-text">准备好就开始吧</p>
+                            <button id="start-btn" class="btn btn-primary">开始！</button>
+                        </div>
+
+                        <div class="overlay-content hidden" id="gameover-screen">
+                            <h2 id="win-loss-title" class="neon-text">结束</h2>
+                            <p class="final-score-text">比分 <span id="final-score">0 - 0</span></p>
+                            <button id="restart-btn" class="btn btn-primary">再来一局</button>
+                        </div>
+
+                        <div class="overlay-content hidden" id="disconnect-screen">
+                            <h2 class="danger-text">连接断开</h2>
+                            <p>对方已离开</p>
+                            <button id="lobby-btn" class="btn btn-primary">返回</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="touch-controls" id="touch-controls">
+                    <div class="stick-zone" id="stick-zone">按住任意处拖动移动<div class="stick-knob" id="stick-knob"></div></div>
+                    <button class="bomb-btn" id="bomb-btn" data-action="bomb">💧<small>放水球</small></button>
+                </div>
+            </div>
+
+            <div class="side-panel">
+                <div class="panel-section instructions">
+                    <h3>操作</h3>
+                    <div class="control-keys">
+                        <div class="key-row"><kbd>WASD</kbd>/<kbd>方向键</kbd> 移动</div>
+                        <div class="key-row"><kbd>空格</kbd>/<kbd>J</kbd> 放水球（被困时用 📌 自救）</div>
+                        <div class="key-row note-row">水柱打中会被困进泡泡 3 秒；对手碰到泡泡就会戳破 → 输。道具：💧 水球数 · 🌊 水柱长度 · 👟 速度 · 📌 自救针。</div>
+                    </div>
+                </div>
+                <div class="panel-section status-section">
+                    <h3>状态</h3>
+                    <div class="status-grid">
+                        <div>状态: <span id="status-text" class="status-offline">未连接</span></div>
+                        <div>延迟: <span id="ping-text">-- ms</span></div>
+                        <div>角色: <span id="role-status-text">-</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="game-footer">
+            <a href="../" class="back-link">返回 LINK 主界面</a>
+        </footer>
+    </div>
+
+    <script src="../scripts/game-session.js"></script>
+    <script src="../scripts/game-bot.js" data-lobby="../play/"></script>
+    <script src="../scripts/game-fit.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

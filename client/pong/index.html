@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-Y1P7PMMM6V"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-Y1P7PMMM6V');
+    </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Link Pong - 双人联网对战弹球</title>
+    <!-- 引入 Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../scripts/game-fit.css">
+</head>
+<body>
+    <div class="game-container">
+        <!-- 头部信息 -->
+        <header class="game-header">
+            <div class="logo">
+                <span class="logo-link">LINK</span>
+                <span class="logo-pong">PONG</span>
+            </div>
+            <div class="header-actions">
+                <button id="orientation-btn" class="btn btn-secondary orientation-toggle" type="button" aria-pressed="false">
+                    <span class="orientation-icon" aria-hidden="true">⤾</span><span id="orientation-label">纵向模式</span>
+                </button>
+                <div class="stats">
+                    <div class="stat-box">
+                        <span class="stat-label">P1 (YOU)</span>
+                        <span id="p1-score" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">P2 (OPPONENT)</span>
+                        <span id="p2-score" class="stat-value">0</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主面板 -->
+        <div class="main-panel">
+            <!-- 游戏画布区域 -->
+            <div class="canvas-wrapper">
+                <canvas id="game-canvas" width="700" height="400"></canvas>
+                
+                <!-- 开始/暂停/游戏结束/联机 覆盖层 -->
+                <div id="overlay" class="overlay">
+                    <!-- 联机大厅 / 房间连接画面 -->
+                    <div class="overlay-content" id="lobby-screen">
+                        <h2>PONG MULTIPLAYER</h2>
+                        <p class="tagline">低延迟 WebRTC P2P 联网对战通道已就绪</p>
+                        
+                        <div class="room-info">
+                            <span class="label">INVITATION LINK (SHARE TO PLAY)</span>
+                            <div class="invite-link-container">
+                                <input type="text" id="invite-url" readonly value="...">
+                                <button id="copy-btn" class="btn btn-secondary">COPY</button>
+                            </div>
+                        </div>
+                        
+                        <div class="connection-status">
+                            <span class="spinner"></span>
+                            <span id="connection-state-text">正在寻找或等待对手加入...</span>
+                        </div>
+                    </div>
+
+                    <!-- 准备就绪，可以开始 -->
+                    <div class="overlay-content hidden" id="ready-screen">
+                        <h2>OPPONENT CONNECTED</h2>
+                        <p class="tagline" id="role-text">你是 Host (左侧挡板)，掌握核心物理模拟</p>
+                        <button id="start-btn" class="btn btn-primary">START SIMULATION</button>
+                    </div>
+
+                    <!-- 游戏结束 覆盖层 -->
+                    <div class="overlay-content hidden" id="gameover-screen">
+                        <h2 id="win-loss-title" class="neon-text">MATCH COMPLETE</h2>
+                        <p class="final-score-text">FINAL SCORE: <span id="final-score">0 - 0</span></p>
+                        <button id="restart-btn" class="btn btn-primary">PLAY AGAIN</button>
+                    </div>
+
+                    <!-- 对手断开连接 -->
+                    <div class="overlay-content hidden" id="disconnect-screen">
+                        <h2 class="danger-text">CONNECTION LOST</h2>
+                        <p>对方已断开连接，系统正在重置中...</p>
+                        <button id="lobby-btn" class="btn btn-primary">RETURN TO LOBBY</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 控制与设置面板 -->
+            <div class="side-panel">
+                <div class="panel-section instructions">
+                    <h3>CONTROL MODULES</h3>
+                    <div class="control-keys">
+                        <div class="key-row"><kbd>▲</kbd> 或 <kbd>W</kbd> (向上移动)</div>
+                        <div class="key-row"><kbd>▼</kbd> 或 <kbd>S</kbd> (向下移动)</div>
+                        <div class="key-row note-row">直接拖拽屏幕亦可控制</div>
+                        <div class="key-row note-row" id="orientation-hint">当前模式：横向</div>
+                    </div>
+                </div>
+
+                <div class="panel-section status-section">
+                    <h3>STATUS</h3>
+                    <div class="status-grid">
+                        <div>状态: <span id="status-text" class="status-offline">DISCONNECTED</span></div>
+                        <div>延迟: <span id="ping-text">-- ms</span></div>
+                        <div>角色: <span id="role-status-text">SPECTATOR</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 移动端虚拟键盘 (默认在PC上隐藏) -->
+        <div class="mobile-controls" id="mobile-controls">
+            <button class="mkey mkey-up" id="mkey-up">▲ UP</button>
+            <button class="mkey mkey-down" id="mkey-down">▼ DOWN</button>
+        </div>
+
+        <!-- 底部导航 -->
+        <footer class="game-footer">
+            <a href="../" class="back-link">
+                <svg class="back-icon" viewBox="0 0 24 24" width="16" height="16">
+                    <path fill="currentColor" d="M20,11H7.83l5.59-5.59L12,4l-8,8l8,8l1.41-1.41L7.83,13H20V11z"/>
+                </svg>
+                返回 LINK 主界面
+            </a>
+        </footer>
+    </div>
+    
+    <script src="../scripts/game-session.js"></script>
+    <script src="../scripts/game-bot.js" data-lobby="../play/"></script>
+    <script src="../scripts/game-fit.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

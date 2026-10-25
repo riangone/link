@@ -1,0 +1,204 @@
+:root {
+    --bg: #2a2140;
+    --panel: #352a52;
+    --border: #4d3f73;
+    --text: #fff7fb;
+    --muted: #cbbde6;
+    --p1: #ff8fc0;   /* 奶糖兔 */
+    --p2: #ffc56b;   /* 可可熊 / 机器人 */
+    --accent: #7fe0ff;
+    --danger: #ff7a8a;
+    --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --cute: 'Fredoka', 'Plus Jakarta Sans', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+
+body {
+    background: radial-gradient(circle at top, #43336b 0%, #1d1630 100%);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 14px;
+}
+
+.game-container { width: 100%; max-width: 1120px; display: flex; flex-direction: column; gap: 12px; }
+
+.game-header {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.logo { display: flex; align-items: center; gap: 8px; font-family: var(--cute); font-weight: 700; font-size: 1.5rem; }
+.logo-link { color: var(--accent); }
+.logo-blaster { color: var(--p1); }
+.badge {
+    font-size: .72rem; padding: 3px 9px; border-radius: 999px;
+    background: rgba(255, 143, 192, .18); color: var(--p1); border: 1px solid rgba(255, 143, 192, .45);
+}
+
+.stats { display: flex; gap: 10px; }
+.stat-box {
+    display: flex; align-items: center; gap: 10px; padding: 6px 14px; border-radius: 14px;
+    background: var(--panel); border: 2px solid var(--border);
+}
+.p1-box { border-color: rgba(255, 143, 192, .6); }
+.p2-box { border-color: rgba(255, 197, 107, .6); }
+.stat-label { font-size: .8rem; color: var(--muted); }
+.stat-value { font-family: var(--cute); font-size: 1.5rem; font-weight: 700; }
+.p1-box .stat-value { color: var(--p1); }
+.p2-box .stat-value { color: var(--p2); }
+
+.main-panel { display: flex; gap: 14px; align-items: flex-start; }
+.stage-column { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.canvas-wrapper {
+    position: relative; width: 100%; aspect-ratio: 16 / 9;
+    border-radius: 18px; overflow: hidden; border: 3px solid var(--border);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .45);
+    background: #9fd8ff;
+}
+#game-canvas { width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; outline: none; }
+
+.overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(32, 22, 54, .72); backdrop-filter: blur(4px); padding: 14px; overflow-y: auto;
+}
+.overlay.hidden, .overlay-content.hidden, .hidden { display: none !important; }
+.overlay-content { text-align: center; max-width: 520px; width: 100%; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.mascot-row { font-size: 2.2rem; }
+.overlay-content h2 { font-family: var(--cute); font-size: 1.9rem; color: var(--p1); text-shadow: 0 3px 0 rgba(0, 0, 0, .25); }
+.tagline { color: var(--muted); font-size: .92rem; line-height: 1.5; }
+.danger-text { color: var(--danger) !important; }
+.label { font-size: .78rem; color: var(--muted); }
+
+.bot-box, .room-info {
+    width: 100%; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px;
+    background: rgba(255, 255, 255, .06); border: 1px solid var(--border); border-radius: 14px;
+}
+.bot-buttons, .btn-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.invite-link-container { display: flex; gap: 6px; }
+.invite-link-container input {
+    flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border);
+    background: rgba(0, 0, 0, .25); color: var(--text); font-size: .8rem; user-select: text;
+}
+
+.btn {
+    font-family: var(--cute); font-weight: 600; font-size: 1rem; cursor: pointer;
+    padding: 9px 18px; border-radius: 999px; border: none; transition: transform .1s, filter .15s;
+}
+.btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .6; cursor: default; }
+.btn-primary { background: linear-gradient(135deg, #ff8fc0, #ffb36b); color: #3a1630; box-shadow: 0 4px 0 #c45a86; }
+.btn-secondary { background: #4d3f73; color: var(--text); }
+.btn-bot { background: linear-gradient(135deg, #7fe0ff, #b49bff); color: #1f1640; box-shadow: 0 3px 0 #6a58b8; }
+
+.connection-status { display: flex; align-items: center; gap: 8px; font-size: .82rem; color: var(--muted); }
+.spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, .2); border-top-color: var(--accent); animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.final-score-text { font-family: var(--cute); font-size: 1.1rem; }
+
+.side-panel { width: 290px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
+.panel-section { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+.panel-section h3 { font-family: var(--cute); font-size: .9rem; color: var(--accent); margin-bottom: 8px; letter-spacing: .05em; }
+.control-keys { display: flex; flex-direction: column; gap: 7px; font-size: .82rem; color: var(--muted); }
+kbd {
+    font-family: var(--font); font-size: .74rem; padding: 1px 6px; border-radius: 6px;
+    background: rgba(255, 255, 255, .1); border: 1px solid var(--border); color: var(--text);
+}
+.note-row { color: var(--text); line-height: 1.5; }
+.status-grid { display: flex; flex-direction: column; gap: 4px; font-size: .82rem; color: var(--muted); }
+.status-online { color: #8ff0b0; }
+.status-offline { color: var(--danger); }
+
+/* 触屏手柄：仅触屏设备显示 */
+.touch-controls { display: none; flex-direction: column; gap: 8px; }
+.two-hand-pad { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.one-hand-pad { display: none; justify-content: space-between; align-items: center; gap: 10px; }
+.touch-controls.one-hand .two-hand-pad { display: none; }
+.touch-controls.one-hand .one-hand-pad { display: flex; }
+.touch-controls.left-hand .one-hand-pad { flex-direction: row-reverse; }
+.touch-controls:not(.one-hand) .one-only { display: none; }
+.ctrl-bar { display: flex; gap: 6px; flex-wrap: wrap; }
+.ctrl-chip {
+    font: 600 .78rem var(--cute); color: var(--text); background: var(--panel);
+    border: 1px solid var(--border); border-radius: 999px; padding: 5px 11px;
+}
+.ctrl-chip.on { border-color: var(--p1); color: var(--p1); }
+.stick-zone {
+    position: relative; width: 168px; height: 168px; flex-shrink: 0; border-radius: 50%;
+    background: radial-gradient(circle, rgba(127,224,255,.16), rgba(53,42,82,.9) 70%);
+    border: 2px solid var(--border); touch-action: none;
+    display: flex; align-items: center; justify-content: center;
+}
+.stick-zone::before {
+    content: '▲'; position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    font-size: .8rem; color: var(--muted);
+}
+.stick-zone::after {
+    content: '▼'; position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    font-size: .8rem; color: var(--muted);
+}
+.stick-zone.active { border-color: var(--p1); }
+/* 单手锁定：左右 = 平移，用金色边框 + 左右箭头提示 */
+.stick-zone.strafe { border-color: #ffd36e; box-shadow: 0 0 0 3px rgba(255,211,110,.35); }
+.stick-zone.strafe .stick-knob::before, .stick-zone.strafe .stick-knob::after {
+    position: absolute; top: 50%; transform: translateY(-50%); font-size: .9rem; color: #ffd36e;
+}
+.stick-zone.strafe .stick-knob::before { content: '◀'; left: -22px; }
+.stick-zone.strafe .stick-knob::after { content: '▶'; right: -22px; }
+.stick-knob {
+    position: relative; width: 70px; height: 70px; border-radius: 50%; pointer-events: none;
+    background: linear-gradient(135deg, #ff8fc0, #7fe0ff); box-shadow: 0 4px 14px rgba(0,0,0,.35);
+    display: flex; align-items: center; justify-content: center; font-size: 1.8rem;
+}
+.touch-pad { display: grid; grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(2, 50px); gap: 6px; }
+.touch-actions { display: flex; gap: 8px; align-items: center; }
+.touch-hint { font-size: .72rem; color: var(--muted); text-align: center; }
+.touch-btn {
+    border: none; border-radius: 14px; background: var(--panel); color: var(--text);
+    font-size: 1.3rem; border: 2px solid var(--border); touch-action: none;
+}
+.touch-btn.active { background: #5b4a8c; }
+.turn-btn { width: 54px; height: 54px; }
+.fire-btn { width: 78px; height: 78px; border-radius: 50%; font-size: 2rem; background: linear-gradient(135deg, #ff8fc0, #7fe0ff); }
+
+@media (pointer: coarse) {
+    .touch-controls { display: flex; }
+}
+
+.game-footer { text-align: center; }
+.back-link { color: var(--muted); text-decoration: none; font-size: .85rem; }
+.back-link:hover { color: var(--text); }
+
+@media (max-width: 860px) {
+    .main-panel { flex-direction: column; }
+    .side-panel { width: 100%; }
+    body { padding: 8px; }
+    .overlay-content h2 { font-size: 1.4rem; }
+    .mascot-row { font-size: 1.6rem; }
+}
+
+/* ---- GameFit：横握手机时控件浮在画面上（FPS 常见做法） ---- */
+html.gf .touch-controls { gap: 6px; }
+html.gf-float-controls .touch-controls { top: 0; }
+html.gf-float-controls .touch-hint { display: none; }
+html.gf-float-controls .ctrl-bar {
+    position: absolute; left: 6px; top: 6px; flex-direction: column; gap: 4px; opacity: .85;
+}
+html.gf-float-controls .ctrl-chip { font-size: .7rem; padding: 3px 8px; }
+html.gf-float-controls .one-hand-pad, html.gf-float-controls .two-hand-pad {
+    position: absolute; left: 6px; right: 6px; bottom: 6px;
+}
+html.gf-float-controls .stick-zone { width: 140px; height: 140px; opacity: .85; }
+html.gf-float-controls .stick-knob { width: 58px; height: 58px; }
+@media (max-height: 760px) and (orientation: portrait) {
+    html.gf .stick-zone { width: 150px; height: 150px; }
+}
+html.gf-float-controls .one-hand-pad { justify-content: flex-end; } /* 右手在右；left-hand 的 row-reverse 会翻到左边 */

@@ -20,7 +20,11 @@ class VoiceStore {
 
     static DB_NAME = 'link-voice-messages';
     static STORE_NAME = 'audios';
-    static DB_VERSION = 1;
+    // v2 adds ChatHistoryStore.STORE_NAME ('messages') to this same database
+    // - see ChatHistoryStore below. Both stores live together because both
+    // are "client-only, never persisted server-side" data for the same
+    // per-peer chat thread.
+    static DB_VERSION = 2;
 
     static _dbPromise = null;
 
@@ -36,6 +40,10 @@ class VoiceStore {
                 const db = req.result;
                 if (!db.objectStoreNames.contains(VoiceStore.STORE_NAME)) {
                     db.createObjectStore(VoiceStore.STORE_NAME, { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains(ChatHistoryStore.STORE_NAME)) {
+                    const store = db.createObjectStore(ChatHistoryStore.STORE_NAME, { keyPath: 'id' });
+                    store.createIndex('peerId', 'peerId', { unique: false });
                 }
             };
             req.onsuccess = () => resolve(req.result);
@@ -119,4 +127,116 @@ class VoiceStore {
     }
 }
 
+/**
+ * IndexedDB-backed store for per-peer chat history (text + voice message
+ * *metadata* - voice audio bytes themselves stay in VoiceStore.audios,
+ * keyed by the same id, so a history row never duplicates the blob).
+ *
+ * Shares VoiceStore's database (see DB_VERSION above) rather than opening
+ * a second connection - both stores answer to the same constraint from the
+ * design discussion: this is client-local convenience data, not something
+ * the signaling/relay server ever sees or stores.
+ *
+ * Known limitation (accepted as "path A", see chat history): peerId is a
+ * server-issued session id with no stable identity across a browser
+ * restart (server hands out a fresh one once the signaling cookie is
+ * gone). History keyed by peerId survives page reloads/dialog reopens for
+ * as long as that session id stays valid, but a peer that restarts their
+ * browser shows up as a new, historyless peerId - there is no
+ * cross-restart "contact" concept in this app to reconcile against.
+ */
+class ChatHistoryStore {
+
+    static STORE_NAME = 'messages';
+
+    static _openDB() {
+        return VoiceStore._openDB();
+    }
+
+    /**
+     * Write-through upsert, called from ui.js SendTextDialog#_upsert on
+     * every message create/status transition (sending/delivered/failed).
+     * Last write wins per id, same as the in-memory thread it mirrors.
+     * @param {string} peerId
+     * @param {{id:string, type?:'text'|'voice', text?:string,
+     *   duration?:number, direction:'incoming'|'outgoing', status:string,
+     *   timestamp:number}} message
+     */
+    static async put(peerId, message) {
+        if (!peerId || !message || !message.id) return;
+        const db = await ChatHistoryStore._openDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(ChatHistoryStore.STORE_NAME, 'readwrite');
+            tx.objectStore(ChatHistoryStore.STORE_NAME).put({
+                id: message.id,
+                peerId,
+                type: message.type || 'text',
+                text: message.text,
+                duration: message.duration,
+                direction: message.direction,
+                status: message.status,
+                timestamp: message.timestamp || Date.now()
+            });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    /**
+     * @param {string} peerId
+     * @returns {Promise<Array>} this peer's thread, oldest first. Resolves
+     *   to [] (never rejects) on any storage error - history is a nicety,
+     *   not something that should block opening the chat dialog.
+     */
+    static async getThread(peerId) {
+        let db;
+        try {
+            db = await ChatHistoryStore._openDB();
+        } catch (e) {
+            return [];
+        }
+        return new Promise((resolve) => {
+            const tx = db.transaction(ChatHistoryStore.STORE_NAME, 'readonly');
+            const index = tx.objectStore(ChatHistoryStore.STORE_NAME).index('peerId');
+            const req = index.getAll(peerId);
+            req.onsuccess = () => {
+                const rows = req.result || [];
+                rows.sort((a, b) => a.timestamp - b.timestamp);
+                resolve(rows);
+            };
+            req.onerror = () => resolve([]);
+        });
+    }
+
+    /**
+     * Mirrors VoiceStore.pruneOlderThan with the same default window, so
+     * text history and voice audio age out together instead of history
+     * outliving the audio it references (or vice versa). Called once at
+     * startup (see ui.js).
+     */
+    static async pruneOlderThan(maxAgeMs = 30 * 24 * 60 * 60 * 1000) {
+        let db;
+        try {
+            db = await ChatHistoryStore._openDB();
+        } catch (e) {
+            return;
+        }
+        const cutoff = Date.now() - maxAgeMs;
+        return new Promise((resolve) => {
+            const tx = db.transaction(ChatHistoryStore.STORE_NAME, 'readwrite');
+            const store = tx.objectStore(ChatHistoryStore.STORE_NAME);
+            const req = store.openCursor();
+            req.onsuccess = () => {
+                const cursor = req.result;
+                if (!cursor) return;
+                if (cursor.value.timestamp < cutoff) cursor.delete();
+                cursor.continue();
+            };
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+        });
+    }
+}
+
 window.VoiceStore = VoiceStore;
+window.ChatHistoryStore = ChatHistoryStore;
