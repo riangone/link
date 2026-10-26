@@ -22,8 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!location.hash || location.hash.length <= 1) {
         location.hash = 'room-' + Math.random().toString(36).substring(2, 9);
     }
+    const L = SpinI18n.t;              // (not `t`: that name is used for tops everywhere)
     const opponentName = new URLSearchParams(location.search).get('opponent') || '';
-    const waitingText = opponentName ? `WAITING FOR ${opponentName.toUpperCase()}` : 'WAITING FOR PEER';
+    const waitingText = opponentName ? L('waiting_for', { name: opponentName }) : L('waiting_peer');
     // Modes: pvp (default) · bot (?bot=) · tower (?bot=hard&tower=N) · tutorial (?bot=easy&tutorial=1)
     const MODE = GameBot.enabled ? SpinPanels.mode : 'pvp';
     const FLOOR = MODE === 'tower' ? SpinProgress.TOWER[SpinPanels.floor - 1] : null;
@@ -53,8 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
     copyBtn.addEventListener('click', () => {
         inviteUrlInput.select();
         document.execCommand('copy');
-        copyBtn.textContent = 'COPIED!';
-        setTimeout(() => { copyBtn.textContent = 'COPY'; }, 2000);
+        copyBtn.textContent = L('copied');
+        setTimeout(() => { copyBtn.textContent = L('copy'); }, 2000);
     });
 
     // ==========================================================
@@ -79,38 +80,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const TYPES = BASE_TYPES.concat('dragon');     // dragon: unlocked by clearing the tower
     // type triangle: key beats value (damage ×ADV_MUL)
     const ADV = { attack: 'stamina', stamina: 'defense', defense: 'attack' };
-    const ADV_MUL = 1.2;
+    const ADV_MUL = 1.3;                // 1.2 left attack-vs-stamina under 40% in sims
     const BEYS = {
         attack: {
-            name: 'STORM STRIKER', short: 'STRIKER', label: '⚔️ 攻击', spec: 'METEOR RUSH',
+            name: 'STORM STRIKER', short: 'STRIKER', label: SpinPanels.typeLabel('attack'), spec: 'METEOR RUSH',
             c1: '#ff3b5c', c2: '#ffb02e', r: 34, mass: 1.0, accel: 0.40, vmax: 9.6, drain: 0.050,
             atk: 1.35, def: 0.85, bres: 0.9, dash: 8.6, blades: 3,
             shape: [[0.42, -0.62], [0.98, -0.2], [1.04, 0.04], [0.8, 0.13], [0.62, 0.42]],
             stats: [5, 2, 2, 5]
         },
         defense: {
-            name: 'IRON FORTRESS', short: 'FORTRESS', label: '🛡️ 防御', spec: 'AEGIS WALL',
+            name: 'IRON FORTRESS', short: 'FORTRESS', label: SpinPanels.typeLabel('defense'), spec: 'AEGIS WALL',
             c1: '#3d8bff', c2: '#a9dcff', r: 37, mass: 1.55, accel: 0.27, vmax: 7.0, drain: 0.042,
             atk: 0.95, def: 1.4, bres: 1.45, dash: 6.4, blades: 6,
             shape: [[0.55, -0.48], [0.96, -0.4], [1.02, 0], [0.96, 0.4], [0.55, 0.48]],
             stats: [2, 5, 3, 2]
         },
         stamina: {
-            name: 'ZEPHYR WING', short: 'ZEPHYR', label: '🌀 持久', spec: 'ETERNAL GALE',
+            name: 'ZEPHYR WING', short: 'ZEPHYR', label: SpinPanels.typeLabel('stamina'), spec: 'ETERNAL GALE',
             c1: '#22e39b', c2: '#d4fff0', r: 33, mass: 0.9, accel: 0.33, vmax: 8.2, drain: 0.030,
             atk: 0.85, def: 1.0, bres: 1.0, dash: 7.4, blades: 4,
             shape: [[0.38, -0.25], [0.82, -0.32], [1.04, -0.12], [0.98, 0.06], [0.46, 0.34]],
             stats: [2, 3, 5, 3]
         },
         balance: {
-            name: 'PHOENIX FLARE', short: 'PHOENIX', label: '🔥 平衡', spec: 'RISING FLARE',
+            name: 'PHOENIX FLARE', short: 'PHOENIX', label: SpinPanels.typeLabel('balance'), spec: 'RISING FLARE',
             c1: '#ffb300', c2: '#fff1a8', r: 35, mass: 1.12, accel: 0.34, vmax: 8.4, drain: 0.040,
             atk: 1.12, def: 1.12, bres: 1.15, dash: 7.8, blades: 5,
             shape: [[0.5, -0.42], [0.88, -0.32], [1.05, -0.02], [0.84, 0.08], [0.95, 0.3], [0.55, 0.42]],
             stats: [4, 3, 3, 4]
         },
         dragon: {
-            name: 'VOID DRAGON', short: 'DRAGON', label: '🐉 龙王', spec: 'DRAGON STORM',
+            name: 'VOID DRAGON', short: 'DRAGON', label: SpinPanels.typeLabel('dragon'), spec: 'DRAGON STORM',
             c1: '#9b5cff', c2: '#00f0ff', r: 35, mass: 1.2, accel: 0.37, vmax: 9.0, drain: 0.036,
             atk: 1.25, def: 1.12, bres: 1.2, dash: 8.2, blades: 3,
             shape: [[0.3, -0.7], [0.9, -0.45], [1.08, -0.08], [0.7, 0.05], [0.95, 0.38], [0.5, 0.5]],
@@ -340,9 +341,10 @@ document.addEventListener('DOMContentLoaded', () => {
             pickCanvases.push({ cv, t, locked });
             btn.appendChild(cv);
             btn.insertAdjacentHTML('beforeend',
-                `<span class="pk-name">${locked ? '???' : b.short}</span><span class="pk-type">${locked ? '🔒 擂台通关' : b.label}</span>` +
+                `<span class="pk-rec">${L('rec_badge')}</span>` +
+                `<span class="pk-name">${locked ? '???' : b.short}</span><span class="pk-type">${locked ? L('pick_locked') : b.label}</span>` +
                 `<span class="pk-stats">${b.stats.map((v) => `<span class="pk-bar"><i style="width:${locked ? 0 : v * 20}%"></i></span>`).join('')}</span>`);
-            btn.title = locked ? '通关擂台 8F 解锁 VOID DRAGON' : `${b.name} — ATK / DEF / STA / SPD · 必杀: ${b.spec}`;
+            btn.title = locked ? L('pick_locked_title') : L('pick_title', { name: b.name, spec: b.spec });
             btn.addEventListener('click', () => {
                 if (locked) { SpinPanels.open('tower'); return; }
                 myPick = t;
@@ -354,16 +356,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         refreshPicker();
     }
-    function counterOf(t) { return Object.keys(ADV).find((k) => ADV[k] === t); }
+    /** Recommended pick against the opponent's type (see SpinPanels.REC). */
+    function recFor(opp) {
+        const r = SpinPanels.REC[opp];
+        return r === 'dragon' && !dragonOk() ? null : r;
+    }
     function refreshPicker() {
-        pickerEl.querySelectorAll('.pick').forEach((b) => b.classList.toggle('on', b.dataset.type === myPick));
-        if (!oppPick) { oppPickEl.innerHTML = '对手：选择中…'; return; }
-        let h = `对手：${BEYS[oppPick].label} ${BEYS[oppPick].name}`;
-        if (ADV[myPick] === oppPick) h += '<br><span class="mu good">✓ 你克制对手：伤害 ×1.2</span>';
-        else if (ADV[oppPick] === myPick) {
-            const c = counterOf(oppPick);
-            h += `<br><span class="mu bad">✗ 对手克制你${c ? `——试试 ${BEYS[c].label}` : ''}</span>`;
-        }
+        const rec = oppPick ? recFor(oppPick) : null;
+        pickerEl.querySelectorAll('.pick').forEach((b) => {
+            b.classList.toggle('on', b.dataset.type === myPick);
+            b.classList.toggle('rec', b.dataset.type === rec && !b.classList.contains('locked'));
+        });
+        if (!oppPick) { oppPickEl.innerHTML = L('opp_choosing'); return; }
+        let h = L('opp_is', { label: BEYS[oppPick].label, name: BEYS[oppPick].name });
+        if (ADV[myPick] === oppPick) h += `<br><span class="mu good">${L('mu_good')}</span>`;
+        else if (ADV[oppPick] === myPick) h += `<br><span class="mu bad">${L('mu_bad')}</span>`;
+        else if (myPick === oppPick) h += `<br><span class="mu bad">${L('mu_same')}</span>`;
+        if (rec && rec !== myPick) h += `<br><span class="mu rec">${L('rec_line', { label: BEYS[rec].label, why: L('rec_vs_' + oppPick) })}</span>`;
+        h += `<br><span class="mu style">${L('style_' + myPick)}</span>`;
         oppPickEl.innerHTML = h;
     }
     buildPicker();
@@ -620,21 +630,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const I = approach + spinRepel * 0.6;
         if (!fresh || I < 1.4) return;
         a.hitCd = b.hitCd = 8;
+        // Both hits resolve simultaneously from the pre-collision state; resolving
+        // a→b first and then b→a with b's already-reduced spin favoured P0 (the host).
+        const pre = new Map([[a, { spin: a.spin, st: a.st }], [b, { spin: b.spin, st: b.st }]]);
         const pair = [[a, A, b, B], [b, B, a, A]];
         let crit = false;
         for (const [att, AT, def, DF] of pair) {
-            if (att.st !== 0 && def.st !== 0) continue;
+            const pa = pre.get(att), pd = pre.get(def);
+            if (pa.st !== 0 && pd.st !== 0) continue;
             let atk = AT.atk * (att.dash > 0 ? 1.45 : 1);
             if (att.sp > 0 && att.type === 'attack') atk *= 1.8;
             if (att.sp > 0 && att.type === 'balance') atk *= 1.4;
-            if (att.st !== 0) atk *= 0.3;
+            if (pa.st !== 0) atk *= 0.3;
             if (ADV[att.type] === def.type) atk *= ADV_MUL;
             atk *= S.buf[S.tops.indexOf(att)];
             const dv = DF.def * (def.sp > 0 && def.type === 'defense' ? 2 : 1) * S.buf[S.tops.indexOf(def)];
             if (def.st === 0) {
                 def.spin -= I * 0.72 * atk / dv;
                 if (I > 4 && !(def.sp > 0 && def.type === 'defense')) {
-                    const lowSpin = 1.5 - Math.min(1, Math.max(0, def.spin) / 100);
+                    const lowSpin = 1.5 - Math.min(1, Math.max(0, pd.spin) / 100);
                     const add = Math.pow(I - 4, 1.3) * 2.0 * atk / DF.bres * lowSpin * (0.75 + Math.random() * 0.5);
                     def.bg += add;
                     if (add > 22) crit = true;
@@ -697,12 +711,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================
     // Bot (?bot=easy|normal|hard) — plays the client side (index 1)
     // ==========================================================
+    // Tuned with offline sims of this physics vs a "human-level" brain
+    // (react 12 frames, steering noise 0.35, launch lock 0.55–0.95):
+    //   easy   mirror ~90%  · best pick ~95%
+    //   normal mirror ~60%  · best pick ~80%
+    //   hard   mirror ~30%  · best pick ~80%  (pick the counter!)
+    // The old hard bot (react 3 ≈ 50 ms, ~60% PERFECT launches) beat that
+    // player ~99% in mirror matches. Tower floors keep their own tuning.
     const BOT = FLOOR ? Object.assign({}, FLOOR.ai) : {
-        react: GameBot.pick({ easy: 18, normal: 9, hard: 3 }),
-        noise: GameBot.pick({ easy: 0.55, normal: 0.28, hard: 0.08 }),
-        dashP: GameBot.pick({ easy: 0.012, normal: 0.04, hard: 0.12 }),
-        lock: GameBot.pick({ easy: [0.4, 0.85], normal: [0.72, 0.97], hard: [0.9, 1.0] }),
-        specDelay: GameBot.pick({ easy: 120, normal: 40, hard: 5 })
+        react: GameBot.pick({ easy: 18, normal: 12, hard: 8 }),
+        noise: GameBot.pick({ easy: 0.55, normal: 0.38, hard: 0.3 }),
+        dashP: GameBot.pick({ easy: 0.012, normal: 0.03, hard: 0.05 }),
+        lock: GameBot.pick({ easy: [0.4, 0.85], normal: [0.52, 0.92], hard: [0.6, 0.95] }),
+        specDelay: GameBot.pick({ easy: 120, normal: 70, hard: 40 })
     };
     const bot = { timer: 0, x: 0, y: 0, a: 0, s: 0, lockTarget: null, specWait: 0, sent: false };
     if (GameBot.enabled) picks[1] = MODE === 'tower' ? FLOOR.type : MODE === 'tutorial' ? 'defense'
@@ -785,17 +806,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (MODE === 'tutorial') {
             winLossTitle.textContent = 'TUTORIAL CLEAR!';
             winLossTitle.className = 'neon-text';
-            nextBtn.textContent = '🏯 挑战擂台 1F';
+            nextBtn.textContent = L('tut_clear_btn');
             nextBtn.dataset.href = SpinPanels.modeUrl('tower', 1);
             nextBtn.classList.remove('hidden');
         } else if (MODE === 'tower' && won && FLOOR_N < SpinProgress.TOWER.length) {
-            nextBtn.textContent = `▶ 下一层 ${FLOOR_N + 1}F`;
+            nextBtn.textContent = L('next_floor', { n: FLOOR_N + 1 });
             nextBtn.dataset.href = SpinPanels.modeUrl('tower', FLOOR_N + 1);
             nextBtn.classList.remove('hidden');
         } else if (MODE === 'tower' && won) {
             winLossTitle.textContent = 'TOWER CLEARED!';
         }
-        restartBtn.textContent = MODE === 'tower' ? (won ? '再战本层' : '再次挑战') : MODE === 'tutorial' ? '再练一次' : 'REMATCH';
+        restartBtn.textContent = L(MODE === 'tower' ? (won ? 'retry_floor_win' : 'retry_floor') : MODE === 'tutorial' ? 'retry_tut' : 'rematch');
     }
 
     // ==========================================================
@@ -803,19 +824,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================
     const Tut = {
         step: 0, targets: [], ti: 0, dashAt: -999, msg: '', praise: '', praiseT: 0,
-        STEPS: GameFit.isTouch ? [
-            '① 发射：倒数时<b>点屏幕</b>，力量条停在<b>金色区</b> = PERFECT',
-            '② 移动：用<b>左下摇杆</b>把陀螺开进<b>闪光的圈</b>',
-            '③ 冲撞：靠近陪练，按 <b>💥</b> 猛撞它（朝白色箭头冲）',
-            '④ 必杀：能量已充满！按 <b>⚡</b> 发动 LIMIT BREAK',
-            '⑤ 终结：把陪练推进左右<b>红色 OVER 口</b>，或连撞把它<b>打爆</b>！'
-        ] : [
-            '① 发射：倒数时按 SPACE / 点击，力量条停在<b>金色区</b> = PERFECT（转速满格）',
-            '② 移动：用 WASD / 方向键 / 按住鼠标，把陀螺开进<b>闪光的圈</b>',
-            '③ 冲撞：靠近陪练，按 SPACE <b>猛撞</b>它（会朝白色箭头方向冲）',
-            '④ 必杀：能量已经帮你充满！按 E 发动 <b>LIMIT BREAK</b>',
-            '⑤ 终结：把陪练推进左右的<b>红色 OVER 口</b>，或连续冲撞把它<b>打爆</b>！'
-        ],
+        STEPS: [0, 1, 2, 3, 4].map((n) => L((GameFit.isTouch ? 'tut_t' : 'tut_k') + n)),
         start() {
             this.step = 0; this.ti = 0; this.dashAt = -999; this.praise = '';
             this.targets = [{ x: CX - 130, y: CY + 60 }, { x: CX + 140, y: CY + 10 }, { x: CX - 20, y: CY - 120 }];
@@ -831,13 +840,13 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         onEvent(ev) {
             if (ev.k === 'launch' && ev.p === 0 && this.step === 0) {
-                this.go(1, ev.pf ? 'PERFECT!! 完美发射' : `力量 ${Math.round(S.lk[0] * 100)}% —— 下次试试停在金色区`);
+                this.go(1, ev.pf ? L('tut_perfect') : L('tut_power', { n: Math.round(S.lk[0] * 100) }));
             } else if (ev.k === 'dash' && ev.p === 0) {
                 this.dashAt = frame;
             } else if (ev.k === 'hit' && this.step === 2 && frame - this.dashAt < 50) {
-                this.go(3, '漂亮的冲撞！撞击会给双方充能 ⚡');
+                this.go(3, L('tut_dash_ok'));
             } else if (ev.k === 'spec' && ev.p === 0 && this.step === 3) {
-                this.go(4, `${BEYS[S.tops[0].type].spec}！必杀持续 3 秒`);
+                this.go(4, L('tut_spec', { spec: BEYS[S.tops[0].type].spec }));
             }
         },
         /** Runs every battle frame before checkFinish: keeps the lesson going. */
@@ -846,7 +855,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (me.st !== 0) {                      // fell out / burst: respawn
                 Object.assign(me, mkTop(0, me.type), { spin: 80 });
                 emit({ k: 'launch', p: 0, pf: 0, x: me.x, y: me.y });
-                this.praise = '出局了也没关系——教学里会自动复活。远离红色缺口！';
+                this.praise = L('tut_respawn');
                 this.praiseT = frame;
             }
             me.spin = Math.max(me.spin, 60);
@@ -861,7 +870,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     this.ti++;
                     sparks(tg.x, tg.y, 24, ['#9bffcf', '#fff'], 5);
                     Sfx.beep(false);
-                    if (this.ti >= this.targets.length) this.go(2, '操控很稳！陀螺有惯性，提前转向');
+                    if (this.ti >= this.targets.length) this.go(2, L('tut_move_ok'));
                 }
             }
         },
@@ -894,14 +903,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const me = tops[myIdx], op = tops[1 - myIdx];
         if (!me || me.st !== 0 || d.ph !== 'battle') return null;
         const mb = BEYS[me.type];
-        if (pocketDanger(me, 85)) return ['pocket', '⚠ 太靠近 OVER 口了！往中心拉', 'warn'];
-        if (op.sp > 0 && op.st === 0) return ['opsp', `⚠ 对手发动 ${BEYS[op.type].spec}！先拉开距离`, 'warn'];
-        if (me.bg > 70) return ['burst', '💔 爆裂槽快满了！避开正面重击', 'warn'];
-        if (me.sg >= 100 && me.sp <= 0) return ['spec', `⚡ 必杀就绪！按 ${GameFit.isTouch ? '⚡' : 'E'} 发动 ${mb.spec}`, 'good'];
-        if (op.st === 0 && pocketDanger(op, 115) && me.cd <= 0) return ['push', `💥 机会！对手在缺口边——${GameFit.isTouch ? '💥' : 'SPACE'} 冲撞推它出去`, 'good'];
-        if (me.spin < 30 && op.spin > me.spin + 10) return ['lowspin', '🔋 转速低！少冲撞、少撞墙，绕着对手跑', 'warn'];
-        if (d.bt > 25 * 60 && me.spin > op.spin + 15 && op.st === 0) return ['outlast', '⏱ 你转得更久——拉开距离，拖到它停转', 'good'];
-        if (d.bt < 360 && d.rd === 1) return ['start', `移动追上对手，按 ${GameFit.isTouch ? '💥' : 'SPACE'} 冲撞`, ''];
+        const dashKey = GameFit.isTouch ? '💥' : 'SPACE', specKey = GameFit.isTouch ? '⚡' : 'E';
+        if (pocketDanger(me, 85)) return ['pocket', L('hint_pocket'), 'warn'];
+        if (op.sp > 0 && op.st === 0) return ['opsp', L('hint_opsp', { spec: BEYS[op.type].spec }), 'warn'];
+        if (me.bg > 70) return ['burst', L('hint_burst'), 'warn'];
+        if (me.sg >= 100 && me.sp <= 0) return ['spec', L('hint_spec', { key: specKey, spec: mb.spec }), 'good'];
+        if (op.st === 0 && pocketDanger(op, 115) && me.cd <= 0 && me.type !== 'stamina') return ['push', L('hint_push', { key: dashKey }), 'good'];
+        if (me.spin < 30 && op.spin > me.spin + 10) return ['lowspin', L('hint_lowspin'), 'warn'];
+        if (d.bt > 25 * 60 && me.spin > op.spin + 15 && op.st === 0) return ['outlast', L('hint_outlast'), 'good'];
+        // stamina wins by NOT ramming (sims: 81% → 22% vs defense when it rams)
+        if (me.type === 'stamina' && (me.dash > 0 || d.bt < 360)) return ['style', L('hint_style_stamina'), me.dash > 0 ? 'warn' : ''];
+        if (me.type === 'defense' && d.bt < 360) return ['style', L('hint_style_defense'), ''];
+        if (d.bt < 360 && d.rd === 1) return ['start', L('hint_start', { key: dashKey }), ''];
         return null;
     }
     function updateCoach(d, tops) {
@@ -931,7 +944,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================
     // Network
     // ==========================================================
-    connectionStateText.textContent = '正在连接信号服务器...';
+    connectionStateText.textContent = L('conn_signal');
     let channelOpen = false;
 
     const session = GameBot.session({
@@ -941,22 +954,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (status === 'open') {
                 statusText.textContent = waitingText;
                 statusText.className = 'status-online';
-                connectionStateText.textContent = '已连接信令服务，等待对手通过链接加入...';
+                connectionStateText.textContent = L('conn_open');
             } else if (status === 'closed') {
-                statusText.textContent = 'OFFLINE';
+                statusText.textContent = L('st_offline');
                 statusText.className = 'status-offline';
-                connectionStateText.textContent = '信令连接已断开，正在重连...';
+                connectionStateText.textContent = L('conn_closed');
             }
         },
         onRole(role) {
             myRole = role;
             myIdx = role === 'host' ? 0 : 1;
             roleStatusText.textContent = role.toUpperCase();
-            p1Label.textContent = role === 'host' ? 'P1 (YOU)' : 'P1 (HOST)';
-            p2Label.textContent = role === 'host' ? 'P2 (OPPONENT)' : 'P2 (YOU)';
-            roleText.innerHTML = role === 'host'
-                ? '选择你的陀螺，准备好就 <strong>LET IT RIP!</strong>'
-                : '选择你的陀螺，等待 Host 开始对局…';
+            p1Label.textContent = L(role === 'host' ? 'p1_you' : 'p1_host');
+            p2Label.textContent = L(role === 'host' ? 'p2_opp' : 'p2_you');
+            roleText.innerHTML = L(role === 'host' ? 'role_host' : 'role_client');
         },
         onChannelOpen() {
             channelOpen = true;
@@ -967,11 +978,11 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(decorateMode, 0);
         },
         onPeerConnected() {
-            statusText.textContent = 'P2P ESTABLISHED';
+            statusText.textContent = L('st_p2p');
             statusText.className = 'status-online';
         },
         onPeerReconnecting() {
-            statusText.textContent = 'RECONNECTING…';
+            statusText.textContent = L('st_reconnect');
             statusText.className = 'status-offline';
         },
         onPeerDisconnected() {
@@ -991,18 +1002,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const h2 = readyScreen.querySelector('h2');
         if (MODE === 'tower') {
             const ti = SpinPanels.typeInfo[FLOOR.type];
-            h2.textContent = `擂台 ${FLOOR_N}F`;
-            roleText.innerHTML = '选好克制它的陀螺，点 <strong>LET IT RIP!</strong>';
+            h2.textContent = L('tower_h2', { n: FLOOR_N });
+            roleText.innerHTML = L('tower_role');
             p2Label.textContent = `🏯 ${FLOOR.name}`;
             floorCard.innerHTML = `<div class="fc-top"><b>${FLOOR.name}</b> <span>${FLOOR.title}</span></div>` +
-                `<div class="fc-meta">${ti.icon} ${ti.name}型 · 强度 ×${FLOOR.buff} · 先得 ${FLOOR.ws} 分</div>` +
+                `<div class="fc-meta">${L('fc_meta', { icon: ti.icon, type: ti.name, buff: FLOOR.buff, ws: FLOOR.ws })}</div>` +
                 `<div class="fc-tip">💡 ${FLOOR.tip}</div>`;
             floorCard.classList.remove('hidden');
         } else if (MODE === 'tutorial') {
-            h2.textContent = '新手教学';
-            roleText.innerHTML = '跟着屏幕下方的提示一步步来，大约 1 分钟。陪练不会还手。';
-            p2Label.textContent = '🎯 陪练';
-            floorCard.innerHTML = '<div class="fc-tip">学会：发射 → 移动 → 冲撞 → 必杀 → 终结</div>';
+            h2.textContent = L('tut_h2');
+            roleText.innerHTML = L('tut_role');
+            p2Label.textContent = L('tut_dummy');
+            floorCard.innerHTML = `<div class="fc-tip">${L('tut_card')}</div>`;
             floorCard.classList.remove('hidden');
         }
     }
@@ -1081,7 +1092,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el !== gameoverScreen) { rewardSlot.innerHTML = ''; nextBtn.classList.add('hidden'); }
         SpinPanels.refresh();
     }
-    function hideOverlay() { overlay.classList.add('hidden'); restartBtn.disabled = false; restartBtn.textContent = 'REMATCH'; }
+    function hideOverlay() { overlay.classList.add('hidden'); restartBtn.disabled = false; restartBtn.textContent = L('rematch'); }
     function inMatch() {
         const d = D();
         return !!d && d.ph !== 'gameover' && overlay.classList.contains('hidden');
@@ -1103,11 +1114,12 @@ document.addEventListener('DOMContentLoaded', () => {
     lobbyBtn.addEventListener('click', () => location.reload());
     nextBtn.addEventListener('click', () => { if (nextBtn.dataset.href) location.href = nextBtn.dataset.href; });
     coachBtn.textContent = coachOn ? '💡' : '💤';
+    coachBtn.title = L(coachOn ? 'coach_on' : 'coach_off');
     coachBtn.addEventListener('click', () => {
         coachOn = !coachOn;
         localStorage.setItem('spin-coach', coachOn ? '1' : '0');
         coachBtn.textContent = coachOn ? '💡' : '💤';
-        coachBtn.title = coachOn ? '实时提示：开' : '实时提示：关';
+        coachBtn.title = L(coachOn ? 'coach_on' : 'coach_off');
     });
     // rank bar + menus on every menu screen
     lobbyScreen.insertBefore(SpinPanels.rankBar(), lobbyScreen.querySelector('.room-info'));
@@ -1125,7 +1137,7 @@ document.addEventListener('DOMContentLoaded', () => {
             syncPick();
             session.send({ type: 'restart-request' });
             awaitingRestart = true;
-            restartBtn.textContent = 'AWAITING HOST...';
+            restartBtn.textContent = L('awaiting');
             restartBtn.disabled = true;
         }
     });
@@ -1742,7 +1754,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fillStyle = OWNER[myIdx];
             ctx.beginPath(); ctx.moveTo(v.x - 9, y0 - 8); ctx.lineTo(v.x + 9, y0 - 8); ctx.lineTo(v.x, y0 + 2); ctx.closePath(); ctx.fill();
             ctx.restore();
-            textC('YOU', v.x, y0 - 18, 12, '#fff', OWNER[myIdx], 4);
+            textC(L('c_you'), v.x, y0 - 18, 12, '#fff', OWNER[myIdx], 4);
         }
         if (ph !== 'battle' || me.st !== 0) return;
         // dash direction: steering input, or straight at the rival when idle (same rule as hostAction)
@@ -1775,10 +1787,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const WHY = {
-        over: ['被撞出场外——离红色缺口远一点，守在中心', '漂亮！把对手推出了场外'],
-        burst: ['被打爆了——爆裂槽满就会爆裂，转速低时更脆', 'BURST！连续重击打满了对手的爆裂槽'],
-        spin: ['转速先耗尽了——少乱冲撞，或换持久型', '对手先停转了——耐力胜利'],
-        draw: ['同时出局，不计分', '同时出局，不计分']
+        over: [L('why_over_l'), L('why_over_w')],
+        burst: [L('why_burst_l'), L('why_burst_w')],
+        spin: [L('why_spin_l'), L('why_spin_w')],
+        draw: [L('why_draw'), L('why_draw')]
     };
 
     function textC(str, x, y, size, fill, glow, stroke) {
@@ -1829,7 +1841,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.textAlign = 'left';
             ctx.font = 'italic 900 13px Orbitron, sans-serif';
             ctx.fillStyle = OWNER[i];
-            ctx.fillText(side === 0 ? 'YOU' : (GameBot.enabled ? 'CPU' : 'RIVAL'), 14, yy);
+            ctx.fillText(side === 0 ? L('c_you') : L(GameBot.enabled ? 'c_cpu' : 'c_rival'), 14, yy);
             ctx.fillStyle = b.c1;
             ctx.fillText(b.short, 14, y);
             ctx.font = 'italic 900 22px Orbitron, sans-serif';
@@ -1837,7 +1849,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fillText(String(Math.max(0, Math.round(t.spin))), 104, yy + 11);
             ctx.font = '700 9px Orbitron, sans-serif';
             ctx.fillStyle = 'rgba(255,255,255,0.55)';
-            ctx.fillText('SPIN', 104, yy - 9);
+            ctx.fillText(L('c_spin'), 104, yy - 9);
             ctx.restore();
 
             // limit-break gauge (right corner)
@@ -1860,7 +1872,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fillText('⚡', gx, gy);
             if (side === 0 && ready && !GameFit.isTouch) {
                 ctx.font = 'italic 900 10px Orbitron, sans-serif';
-                ctx.fillText('PRESS E', gx - 4, gy - 34);
+                ctx.fillText(L('c_press_e'), gx - 4, gy - 34);
             }
             ctx.restore();
         }
@@ -1876,7 +1888,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.scale(s, s);
             textC(String(3 - step), 0, 0, 84, '#fff', '#ff3fb4', 8);
             ctx.restore();
-            textC('READY…', CX, CY + 58, 16, 'rgba(255,255,255,0.7)');
+            textC(L('c_ready'), CX, CY + 58, 16, 'rgba(255,255,255,0.7)');
 
             const myLk = d.lk[myIdx], opLk = d.lk[1 - myIdx];
             const m = myLk >= 0 ? myLk : meter(pt);
@@ -1895,12 +1907,12 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.font = 'italic 900 12px Orbitron, sans-serif';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillStyle = '#fff';
-            const lbl = myLk >= 0 ? (myLk >= PERFECT ? 'PERFECT!!  READY TO RIP' : `LOCKED  ${Math.round(myLk * 100)}%`)
-                : (GameFit.isTouch ? 'TAP TO SHOOT — 满格 = PERFECT' : 'SPACE / CLICK TO SHOOT — 满格 = PERFECT');
+            const lbl = myLk >= 0 ? (myLk >= PERFECT ? L('lock_perfect') : L('lock_locked', { n: Math.round(myLk * 100) }))
+                : L(GameFit.isTouch ? 'lock_tap' : 'lock_key');
             ctx.fillStyle = myLk >= PERFECT ? '#ffd34d' : '#fff';
             ctx.fillText(lbl, CX, by - 12);
             ctx.restore();
-            textC(opLk >= 0 ? 'RIVAL READY ✓' : 'RIVAL CHARGING…', CX, 96, 13, opLk >= 0 ? '#9bffcf' : 'rgba(255,255,255,0.6)');
+            textC(L(opLk >= 0 ? 'rival_ready' : 'rival_charging'), CX, 96, 13, opLk >= 0 ? '#9bffcf' : 'rgba(255,255,255,0.6)');
         }
 
         if (ph === 'battle' && bt < 55) {
@@ -1924,7 +1936,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.restore();
         }
         if (ph === 'battle' && d.sd && Math.sin(tGlobal * 0.15) > -0.3) {
-            textC('⚠ SUDDEN DEATH ⚠', CX, 74, 15, '#ff6060', '#ff0000', 4);
+            textC(L('sudden'), CX, 74, 15, '#ff6060', '#ff0000', 4);
         }
 
         if (ph === 'finish' && d.fin) drawFinish(d.fin, ft);
@@ -1964,8 +1976,8 @@ document.addEventListener('DOMContentLoaded', () => {
         tg.addColorStop(0, '#ffffff'); tg.addColorStop(1, info.col);
         textC(info.text, 0, -6, fin.k === 'burst' ? 46 : 50, tg, info.col, 8);
         ctx.restore();
-        let sub = 'NO POINTS';
-        if (fin.w >= 0) sub = (fin.w === myIdx ? 'YOU WIN THE ROUND' : 'RIVAL WINS THE ROUND') + `  +${fin.p} PT${fin.p > 1 ? 'S' : ''}`;
+        let sub = L('no_points');
+        if (fin.w >= 0) sub = L(fin.w === myIdx ? 'round_win' : 'round_lose', { p: fin.p });
         textC(sub, 0, 34, 14, fin.w === myIdx ? '#9bffcf' : fin.w >= 0 ? '#ff9b9b' : '#ddd');
         ctx.restore();
         if (ft > 30) {          // the "why" line, below the band

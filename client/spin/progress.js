@@ -23,16 +23,17 @@
     'use strict';
 
     var KEY = 'spin-profile';
+    var t = window.SpinI18n.t;
 
     var TIERS = [
-        { min: 0, name: '新手', en: 'ROOKIE', icon: '🔰', col: '#9aa4c7' },
-        { min: 100, name: '青铜', en: 'BRONZE', icon: '🥉', col: '#d08a52' },
-        { min: 300, name: '白银', en: 'SILVER', icon: '🥈', col: '#c9d4e8' },
-        { min: 600, name: '黄金', en: 'GOLD', icon: '🥇', col: '#ffd34d' },
-        { min: 1000, name: '白金', en: 'PLATINUM', icon: '💠', col: '#7fffe0' },
-        { min: 1600, name: '钻石', en: 'DIAMOND', icon: '💎', col: '#62b8ff' },
-        { min: 2400, name: '大师', en: 'MASTER', icon: '👑', col: '#ff6ad5' },
-        { min: 3500, name: '传说', en: 'LEGEND', icon: '🐉', col: '#b07bff' }
+        { min: 0, name: t('tier_0'), en: 'ROOKIE', icon: '🔰', col: '#9aa4c7' },
+        { min: 100, name: t('tier_1'), en: 'BRONZE', icon: '🥉', col: '#d08a52' },
+        { min: 300, name: t('tier_2'), en: 'SILVER', icon: '🥈', col: '#c9d4e8' },
+        { min: 600, name: t('tier_3'), en: 'GOLD', icon: '🥇', col: '#ffd34d' },
+        { min: 1000, name: t('tier_4'), en: 'PLATINUM', icon: '💠', col: '#7fffe0' },
+        { min: 1600, name: t('tier_5'), en: 'DIAMOND', icon: '💎', col: '#62b8ff' },
+        { min: 2400, name: t('tier_6'), en: 'MASTER', icon: '👑', col: '#ff6ad5' },
+        { min: 3500, name: t('tier_7'), en: 'LEGEND', icon: '🐉', col: '#b07bff' }
     ];
 
     /**
@@ -42,30 +43,30 @@
      * floor card — this is where players learn matchups).
      */
     var TOWER = [
-        { name: '小旋', title: 'ROOKIE TOP', type: 'stamina', buff: 0.85, ws: 3,
+        { name: t('tw1_name'), title: 'ROOKIE TOP', type: 'stamina', buff: 0.85, ws: 3,
             ai: { react: 20, noise: 0.6, dashP: 0.008, lock: [0.35, 0.7], specDelay: 200 },
-            tip: '热身关。它几乎不会进攻——练习把它撞向左右两个红色 OVER 口。' },
-        { name: '铁壁阿岩', title: 'IRON GUARD', type: 'defense', buff: 0.95, ws: 3,
+            tip: t('tw1_tip') },
+        { name: t('tw2_name'), title: 'IRON GUARD', type: 'defense', buff: 0.95, ws: 3,
             ai: { react: 14, noise: 0.45, dashP: 0.015, lock: [0.5, 0.85], specDelay: 120 },
-            tip: '防御型又重又硬，正面撞不飞。选 🌀持久型：躲开它，比它转得久（持久克防御）。' },
-        { name: '疾风', title: 'GALE RUNNER', type: 'stamina', buff: 1.0, ws: 3,
+            tip: t('tw2_tip') },
+        { name: t('tw3_name'), title: 'GALE RUNNER', type: 'stamina', buff: 1.0, ws: 3,
             ai: { react: 10, noise: 0.32, dashP: 0.02, lock: [0.7, 0.95], specDelay: 60 },
-            tip: '持久型会一直躲，拖到你停转。选 ⚔️攻击型（攻击克持久），用冲撞把它逼到边缘。' },
-        { name: '猎手', title: 'HUNTER', type: 'attack', buff: 1.0, ws: 4,
+            tip: t('tw3_tip') },
+        { name: t('tw4_name'), title: 'HUNTER', type: 'attack', buff: 1.0, ws: 4,
             ai: { react: 8, noise: 0.26, dashP: 0.05, lock: [0.75, 0.97], specDelay: 40 },
-            tip: '攻击型会疯狂冲你。选 🛡️防御型（防御克攻击）守在中心，它撞你会自己耗转。' },
-        { name: '凤凰', title: 'PHOENIX', type: 'balance', buff: 1.05, ws: 4,
+            tip: t('tw4_tip') },
+        { name: t('tw5_name'), title: 'PHOENIX', type: 'balance', buff: 1.05, ws: 4,
             ai: { react: 6, noise: 0.2, dashP: 0.07, lock: [0.8, 0.98], specDelay: 25 },
-            tip: '平衡型必杀能回血、降爆裂槽。看到它 LIMIT BREAK 时先拉开距离，等效果结束再打。' },
-        { name: '堡垒王', title: 'FORTRESS KING', type: 'defense', buff: 1.12, ws: 4,
+            tip: t('tw5_tip') },
+        { name: t('tw6_name'), title: 'FORTRESS KING', type: 'defense', buff: 1.12, ws: 4,
             ai: { react: 5, noise: 0.14, dashP: 0.08, lock: [0.85, 1.0], specDelay: 12 },
-            tip: '必杀 AEGIS WALL 期间它质量 ×3、不会爆裂——那 3 秒千万别撞，绕圈拖时间。' },
-        { name: '风暴', title: 'STORM LORD', type: 'attack', buff: 1.18, ws: 4,
+            tip: t('tw6_tip') },
+        { name: t('tw7_name'), title: 'STORM LORD', type: 'attack', buff: 1.18, ws: 4,
             ai: { react: 3, noise: 0.08, dashP: 0.12, lock: [0.9, 1.0], specDelay: 5 },
-            tip: 'METEOR RUSH 会追踪你。它冲过来时往侧面闪，让它自己冲向 OVER 口。' },
-        { name: '龙王', title: 'DRAGON EMPEROR', type: 'dragon', buff: 1.22, ws: 4,
+            tip: t('tw7_tip') },
+        { name: t('tw8_name'), title: 'DRAGON EMPEROR', type: 'dragon', buff: 1.1, ws: 4,
             ai: { react: 2, noise: 0.05, dashP: 0.14, lock: [0.93, 1.0], specDelay: 3 },
-            tip: '最终头目。DRAGON STORM 会把你吹向场边：贴近中心、PERFECT 发射、留好必杀反击。通关解锁 🐉 龙王陀螺！' }
+            tip: t('tw8_tip') }
     ];
 
     var BOT_WIN = { easy: 10, normal: 20, hard: 35 };
@@ -105,29 +106,29 @@
         var unlocked = null;
 
         if (r.mode === 'tutorial') {
-            if (!p.tut) { gain += 50; lines.push(['完成新手教学', 50]); }
+            if (!p.tut) { gain += 50; lines.push([t('rl_tut'), 50]); }
             p.tut = true;
         } else {
             if (r.won) p.w++; else p.l++;
             if (r.mode === 'pvp') {
-                if (r.won) { gain += 30; lines.push(['在线对战胜利', 30]); }
-                else { gain -= 10; lines.push(['在线对战失利', -10]); }
+                if (r.won) { gain += 30; lines.push([t('rl_pvp_w'), 30]); }
+                else { gain -= 10; lines.push([t('rl_pvp_l'), -10]); }
             } else if (r.mode === 'tower') {
                 var f = r.floor;
                 if (r.won) {
                     if (f > p.tw) {
                         var g = 40 + 10 * f;
-                        gain += g; lines.push(['擂台第 ' + f + ' 层 首次突破', g]);
+                        gain += g; lines.push([t('rl_tw_first', { f: f }), g]);
                         p.tw = f;
                         if (f === TOWER.length) unlocked = 'dragon';
-                    } else { gain += 10; lines.push(['擂台第 ' + f + ' 层 再次胜利', 10]); }
-                } else { gain += 2; lines.push(['挑战失败（经验）', 2]); }
+                    } else { gain += 10; lines.push([t('rl_tw_again', { f: f }), 10]); }
+                } else { gain += 2; lines.push([t('rl_tw_fail'), 2]); }
             } else {
-                if (r.won) { var b = BOT_WIN[r.level] || 20; gain += b; lines.push(['人机胜利（' + (r.level || 'normal') + '）', b]); }
-                else { gain += 2; lines.push(['人机失利（经验）', 2]); }
+                if (r.won) { var b = BOT_WIN[r.level] || 20; gain += b; lines.push([t('rl_bot_w', { lv: t('lv_' + (r.level || 'normal')) }), b]); }
+                else { gain += 2; lines.push([t('rl_bot_l'), 2]); }
             }
-            if (r.bursts) { gain += 3 * r.bursts; lines.push(['BURST ×' + r.bursts, 3 * r.bursts]); }
-            if (r.perfects) { gain += r.perfects; lines.push(['PERFECT 发射 ×' + r.perfects, r.perfects]); }
+            if (r.bursts) { gain += 3 * r.bursts; lines.push([t('rl_burst', { n: r.bursts }), 3 * r.bursts]); }
+            if (r.perfects) { gain += r.perfects; lines.push([t('rl_perfect', { n: r.perfects }), r.perfects]); }
             p.bursts += r.bursts || 0;
             p.overs += r.overs || 0;
             p.perfects += r.perfects || 0;

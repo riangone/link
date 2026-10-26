@@ -9,6 +9,8 @@ const { startDevServer } = require('./dev-server.js');
  * tests don't depend on physics luck.
  */
 test.describe('Spin progression', () => {
+    // the assertions below use the Chinese strings (client/spin/i18n.js)
+    test.use({ locale: 'zh-CN' });
     /** @type {Awaited<ReturnType<typeof startDevServer>>} */
     let dev;
     test.beforeAll(async () => { dev = await startDevServer(); });

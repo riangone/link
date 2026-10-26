@@ -14,10 +14,18 @@
 
     var GAME = 'spin';
     var P = window.SpinProgress;
-    var TYPE_INFO = {
-        attack: { icon: '⚔️', name: '攻击' }, defense: { icon: '🛡️', name: '防御' },
-        stamina: { icon: '🌀', name: '持久' }, balance: { icon: '🔥', name: '平衡' }, dragon: { icon: '🐉', name: '龙王' }
-    };
+    var t = window.SpinI18n.t;
+    var TYPE_INFO = {};
+    [['attack', '⚔️'], ['defense', '🛡️'], ['stamina', '🌀'], ['balance', '🔥'], ['dragon', '🐉']].forEach(function (x) {
+        TYPE_INFO[x[0]] = { icon: x[1], name: t('ty_' + x[0]) };
+    });
+    function typeLabel(k) { return TYPE_INFO[k].icon + ' ' + TYPE_INFO[k].name; }
+    /**
+     * Best pick against each opponent type, from offline sims of the real
+     * physics + bot (human-level play vs the hard bot): the type triangle, plus
+     * stamina vs balance and defense vs dragon. Reasons: rec_vs_<opponent>.
+     */
+    var REC = { attack: 'defense', defense: 'stamina', stamina: 'attack', balance: 'stamina', dragon: 'defense' };
 
     var qs = new URLSearchParams(location.search);
     var mode = qs.get('tutorial') ? 'tutorial' : qs.get('tower') ? 'tower' : qs.get('bot') ? 'bot' : 'pvp';
@@ -57,9 +65,9 @@
             '<b class="rk-name"></b><span class="rk-rp"></span></span>' +
             '<span class="rk-track"><i></i></span></div>' +
             '<div class="meta-btns">' +
-            '<button type="button" class="meta-btn" data-open="guide">📖 玩法</button>' +
-            '<button type="button" class="meta-btn" data-open="tower">🏯 擂台</button>' +
-            '<button type="button" class="meta-btn" data-open="board">🏆 排行</button>' +
+            '<button type="button" class="meta-btn" data-open="guide">' + t('btn_guide') + '</button>' +
+            '<button type="button" class="meta-btn" data-open="tower">' + t('btn_tower') + '</button>' +
+            '<button type="button" class="meta-btn" data-open="board">' + t('btn_board') + '</button>' +
             '</div>';
         wrap.addEventListener('click', function (e) {
             var b = e.target.closest('[data-open]');
@@ -70,16 +78,16 @@
         return wrap;
     }
     function refreshBars() {
-        var p = P.load(), t = P.tierOf(p.rp);
+        var p = P.load(), tr = P.tierOf(p.rp);
         bars.forEach(function (w) {
-            w.style.setProperty('--rk', t.tier.col);
-            w.querySelector('.rk-icon').textContent = t.tier.icon;
-            w.querySelector('.rk-name').textContent = t.tier.name + ' ' + t.tier.en;
-            w.querySelector('.rk-rp').textContent = p.rp + ' RP' + (t.next ? ' / ' + t.next.min : '');
-            w.querySelector('.rk-track i').style.width = Math.round(t.frac * 100) + '%';
+            w.style.setProperty('--rk', tr.tier.col);
+            w.querySelector('.rk-icon').textContent = tr.tier.icon;
+            w.querySelector('.rk-name').textContent = tr.tier.name;
+            w.querySelector('.rk-rp').textContent = p.rp + ' RP' + (tr.next ? ' / ' + tr.next.min : '');
+            w.querySelector('.rk-track i').style.width = Math.round(tr.frac * 100) + '%';
             var g = w.querySelector('[data-open="guide"]');
             g.classList.toggle('glow', !p.tut);
-            g.textContent = p.tut ? '📖 玩法' : '📖 新手教学';
+            g.textContent = p.tut ? t('btn_guide') : t('btn_tut');
         });
     }
 
@@ -119,47 +127,42 @@
         if (prev) prev.classList.remove('hidden');
         prev = null;
     }
-    function title(t) { screen.querySelector('.panel-title').textContent = t; }
+    function title(s) { screen.querySelector('.panel-title').textContent = s; }
 
     // ------------------------------------------------------------------
     // 玩法指南
     // ------------------------------------------------------------------
     function guidePanel() {
-        title('HOW TO WIN');
+        title(t('g_title'));
         var p = P.load();
+        var pickRows = ['attack', 'defense', 'stamina', 'balance', 'dragon'].map(function (o) {
+            return '<li>' + t('g_pick_row', { opp: typeLabel(o), rec: typeLabel(REC[o]), why: t('rec_vs_' + o) }) + '</li>';
+        }).join('');
         body.innerHTML =
-            '<button type="button" class="btn btn-primary" id="tut-go">▶ ' + (p.tut ? '重玩' : '开始') + '互动教学（1 分钟）</button>' +
-            '<h4>三种胜利方式</h4>' +
+            '<button type="button" class="btn btn-primary" id="tut-go">' + t(p.tut ? 'g_tut_again' : 'g_tut_new') + '</button>' +
+            '<h4>' + t('g_ways_h') + '</h4>' +
             '<div class="win-ways">' +
-            '<div class="ww ww-over"><b>OVER</b><span>+2 分</span><small>把对手撞出左右两个<b>红色缺口</b></small></div>' +
-            '<div class="ww ww-burst"><b>BURST</b><span>+2 分</span><small>连续重击，打满对手的<b>爆裂槽</b></small></div>' +
-            '<div class="ww ww-spin"><b>SPIN</b><span>+1 分</span><small>对手<b>先停转</b>，你还在转</small></div>' +
+            '<div class="ww ww-over"><b>OVER</b><span>' + t('pts2') + '</span><small>' + t('ww_over') + '</small></div>' +
+            '<div class="ww ww-burst"><b>BURST</b><span>' + t('pts2') + '</span><small>' + t('ww_burst') + '</small></div>' +
+            '<div class="ww ww-spin"><b>SPIN</b><span>' + t('pts1') + '</span><small>' + t('ww_spin') + '</small></div>' +
             '</div>' +
-            '<p class="g-note">先拿到 4 分的一方赢下整场（擂台前三层 3 分）。</p>' +
-            '<h4>操作</h4>' +
+            '<p class="g-note">' + t('g_ws_note') + '</p>' +
+            '<h4>' + t('g_pick_h') + '</h4>' +
+            '<p class="g-note">' + t('g_pick_note') + '</p>' +
+            '<ul class="g-list picks">' + pickRows + '</ul>' +
+            '<h4>' + t('g_ctrl_h') + '</h4>' +
             '<ul class="g-list">' +
-            '<li><b>发射</b>：3-2-1 倒数时按 <kbd>SPACE</kbd> / 点屏幕锁定力量条。<b>金色区 = PERFECT</b>，开局转速满格。</li>' +
-            '<li><b>移动</b>：<kbd>WASD</kbd> / 方向键 / 按住鼠标 / 左下摇杆。陀螺有惯性，提前转向。</li>' +
-            '<li><b>冲撞</b>：<kbd>SPACE</kbd> / 💥。朝<b>白色箭头</b>方向猛冲（没推摇杆就自动瞄准对手）。耗 5 转速，冷却约 1.7 秒。</li>' +
-            '<li><b>必杀</b>：<kbd>E</kbd> / ⚡。撞击会充能，能量条满了才能用，持续 3 秒。</li>' +
+            ['g_ctrl_launch', 'g_ctrl_move', 'g_ctrl_dash', 'g_ctrl_spec'].map(function (k) { return '<li>' + t(k) + '</li>'; }).join('') +
             '</ul>' +
-            '<h4>类型克制（伤害 ×1.2）</h4>' +
-            '<div class="tri">⚔️ 攻击 <i>克</i> 🌀 持久 <i>克</i> 🛡️ 防御 <i>克</i> ⚔️ 攻击<br><small>🔥 平衡型不克也不被克，适合新手</small></div>' +
-            '<h4>必杀技</h4>' +
+            '<h4>' + t('g_tri_h') + '</h4>' +
+            '<div class="tri">' + t('g_tri') + '</div>' +
+            '<h4>' + t('g_spec_h') + '</h4>' +
             '<ul class="g-list">' +
-            '<li>⚔️ <b>METEOR RUSH</b>：加速并自动追踪对手，伤害 ×1.8</li>' +
-            '<li>🛡️ <b>AEGIS WALL</b>：质量 ×3、免疫爆裂，并清掉一截爆裂槽</li>' +
-            '<li>🌀 <b>ETERNAL GALE</b>：转速不降反升——拖时间神技</li>' +
-            '<li>🔥 <b>RISING FLARE</b>：回复转速、降爆裂槽、伤害 ×1.4</li>' +
-            '<li>🐉 <b>DRAGON STORM</b>：龙卷风把附近的对手吹向场边（通关擂台解锁）</li>' +
+            ['attack', 'defense', 'stamina', 'balance', 'dragon'].map(function (k) { return '<li>' + t('spec_' + k) + '</li>'; }).join('') +
             '</ul>' +
-            '<h4>赢的诀窍</h4>' +
+            '<h4>' + t('g_tips_h') + '</h4>' +
             '<ul class="g-list tips">' +
-            '<li>🎯 <b>站中心</b>：场地是碗形，中心最安全；离红色缺口近时会闪红光，赶紧往回拉。</li>' +
-            '<li>💥 <b>侧面推</b>：从对手<b>远离缺口的一侧</b>冲撞，把它往缺口方向推。</li>' +
-            '<li>🔋 <b>看转速</b>：场边弧条——粗的是转速，细的是爆裂槽（你的在下方）。冲撞和撞墙都会掉转，别乱冲。</li>' +
-            '<li>💔 <b>爆裂槽 70% 以上</b>就危险了：避免正面重击，或用防御/平衡必杀清槽。</li>' +
-            '<li>⏱ 45 秒后进入<b>SUDDEN DEATH</b>，转速掉得飞快——持久型最赚。</li>' +
+            ['tip1', 'tip2', 'tip3', 'tip4', 'tip5'].map(function (k) { return '<li>' + t(k) + '</li>'; }).join('') +
             '</ul>';
         body.querySelector('#tut-go').addEventListener('click', function () { location.href = modeUrl('tutorial'); });
     }
@@ -168,10 +171,10 @@
     // 擂台 tower
     // ------------------------------------------------------------------
     function towerPanel() {
-        title('擂台 TOWER');
+        title(t('t_title'));
         var p = P.load(), max = P.maxFloor();
         var list = el('div', 'tower');
-        list.appendChild(el('p', 'g-note', '击败每层擂主解锁下一层。首次突破 +RP，通关第 8 层解锁 🐉 <b>龙王陀螺</b>。'));
+        list.appendChild(el('p', 'g-note', t('t_note')));
         for (var i = P.TOWER.length - 1; i >= 0; i--) {
             var f = P.TOWER[i], n = i + 1;
             var state = n <= p.tw ? 'cleared' : n === max ? 'current' : n < max ? 'cleared' : 'locked';
@@ -181,8 +184,8 @@
             row.disabled = state === 'locked';
             row.innerHTML = '<span class="fl-n">' + n + 'F</span>' +
                 '<span class="fl-who"><b>' + (state === 'locked' ? '???' : esc(f.name)) + '</b>' +
-                '<small>' + (state === 'locked' ? '未解锁' : ti.icon + ' ' + ti.name + '型 · ' + f.title) + '</small></span>' +
-                '<span class="fl-st">' + (state === 'cleared' ? '✅' : state === 'current' ? '⚔️ 挑战' : '🔒') + '</span>';
+                '<small>' + (state === 'locked' ? t('t_locked') : t('t_type', { icon: ti.icon, type: ti.name, title: f.title })) + '</small></span>' +
+                '<span class="fl-st">' + (state === 'cleared' ? '✅' : state === 'current' ? t('t_go') : '🔒') + '</span>';
             row.dataset.floor = String(n);
             row.addEventListener('click', function () { location.href = modeUrl('tower', this.dataset.floor); });
             list.appendChild(row);
@@ -197,11 +200,11 @@
         return P.playerName() || ('Blader-' + GameBoard.pid().slice(0, 4).toUpperCase());
     }
     function boardPanel() {
-        title('排行榜 RANKING');
+        title(t('b_title'));
         var me = P.load();
         var nameRow = el('form', 'lb-name');
-        nameRow.innerHTML = '<label>我的名字</label><input maxlength="16" required>' +
-            '<button class="btn btn-secondary" type="submit">保存</button>';
+        nameRow.innerHTML = '<label>' + t('b_name') + '</label><input maxlength="16" required>' +
+            '<button class="btn btn-secondary" type="submit">' + t('b_save') + '</button>';
         var input = nameRow.querySelector('input');
         input.value = defaultName();
         nameRow.addEventListener('submit', function (e) {
@@ -210,29 +213,28 @@
             sync().then(load);
         });
         body.appendChild(nameRow);
-        var t = P.tierOf(me.rp);
-        body.appendChild(el('p', 'g-note', '我的战绩：' + t.tier.icon + ' ' + t.tier.name + ' · ' + me.rp + ' RP · ' +
-            me.w + ' 胜 ' + me.l + ' 负 · 擂台 ' + me.tw + 'F'));
-        var table = el('div', 'lb-table', '<div class="lb-msg">加载中…</div>');
+        var mt = P.tierOf(me.rp).tier;
+        body.appendChild(el('p', 'g-note', t('b_me', { tier: mt.icon + ' ' + mt.name, rp: me.rp, w: me.w, l: me.l, tw: me.tw })));
+        var table = el('div', 'lb-table', '<div class="lb-msg">' + t('b_loading') + '</div>');
         body.appendChild(table);
 
         function load() {
             GameBoard.get(GAME).then(function (res) {
                 var rows = res.top.slice();
                 if (res.me) rows.push(null, res.me);
-                if (!rows.length) { table.innerHTML = '<div class="lb-msg">还没有人上榜——打一场就是第一名！</div>'; return; }
+                if (!rows.length) { table.innerHTML = '<div class="lb-msg">' + t('b_empty') + '</div>'; return; }
                 table.innerHTML = rows.map(function (r) {
                     if (!r) return '<div class="lb-gap">⋯</div>';
                     var tt = P.tierOf(r.rp).tier;
                     var medal = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : '#' + r.rank;
                     return '<div class="lb-row' + (r.me ? ' me' : '') + '"><span class="lb-rk">' + medal + '</span>' +
-                        '<span class="lb-nm">' + esc(r.name) + (r.me ? ' <em>(我)</em>' : '') + '</span>' +
+                        '<span class="lb-nm">' + esc(r.name) + (r.me ? ' <em>' + t('b_me_tag') + '</em>' : '') + '</span>' +
                         '<span class="lb-tier" style="color:' + tt.col + '">' + tt.icon + ' ' + tt.name + '</span>' +
                         '<span class="lb-rp">' + r.rp + '<small>RP</small></span>' +
                         '<span class="lb-tw">' + r.tw + 'F</span></div>';
-                }).join('') + '<div class="lb-foot">共 ' + res.total + ' 名玩家 · 按 RP 排序</div>';
+                }).join('') + '<div class="lb-foot">' + t('b_foot', { n: res.total }) + '</div>';
             }).catch(function () {
-                table.innerHTML = '<div class="lb-msg">⚠ 连接不到排行榜服务器，稍后再试。</div>';
+                table.innerHTML = '<div class="lb-msg">' + t('b_err') + '</div>';
             });
         }
         sync().then(load);
@@ -258,11 +260,11 @@
         html += '<div class="rw-lines">' + res.lines.map(function (l) {
             return '<span>' + esc(l[0]) + '</span><b>' + (l[1] >= 0 ? '+' : '') + l[1] + '</b>';
         }).join('') + '</div>';
-        if (res.rankUp) html += '<div class="rw-rank">▲ 段位提升：' + a.tier.icon + ' ' + a.tier.name + ' ' + a.tier.en + '</div>';
-        if (res.rankDown) html += '<div class="rw-rank down">▼ 段位下降：' + a.tier.icon + ' ' + a.tier.name + '</div>';
-        if (res.unlocked === 'dragon') html += '<div class="rw-rank unlock">🐉 解锁新陀螺：VOID DRAGON！</div>';
+        if (res.rankUp) html += '<div class="rw-rank">' + t('rw_up', { t: a.tier.icon + ' ' + a.tier.name }) + '</div>';
+        if (res.rankDown) html += '<div class="rw-rank down">' + t('rw_down', { t: a.tier.icon + ' ' + a.tier.name }) + '</div>';
+        if (res.unlocked === 'dragon') html += '<div class="rw-rank unlock">' + t('rw_unlock') + '</div>';
         html += '<div class="rw-bar" style="--rk:' + a.tier.col + '"><i style="width:' + Math.round(a.frac * 100) + '%"></i></div>' +
-            '<div class="rw-next">' + (a.next ? '距离 ' + a.next.icon + ' ' + a.next.name + ' 还差 ' + (a.next.min - res.profile.rp) + ' RP' : '已达最高段位！') + '</div>';
+            '<div class="rw-next">' + (a.next ? t('rw_next', { t: a.next.icon + ' ' + a.next.name, n: a.next.min - res.profile.rp }) : t('rw_max')) + '</div>';
         card.innerHTML = html;
         container.appendChild(card);
         refreshBars();
@@ -279,6 +281,8 @@
         close: close,
         rewards: rewards,
         sync: sync,
-        typeInfo: TYPE_INFO
+        typeInfo: TYPE_INFO,
+        typeLabel: typeLabel,
+        REC: REC
     };
 })();

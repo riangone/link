@@ -656,3 +656,25 @@ html.spin-special #gb-ready, html.spin-special #gameover-screen .gb-row { displa
     .pick .pk-name { font-size: 8px; letter-spacing: 0; }
     .pick .pk-type { font-size: 9px; }
 }
+
+/* --- language select · recommended pick · matchup advice ------------- */
+.gf-btn.lang-select {
+    appearance: none; -webkit-appearance: none;
+    width: auto; min-width: 58px; padding: 0 6px; font: 700 12px var(--font-family);
+    color: inherit; cursor: pointer; text-align: center;
+}
+.lang-select option { color: #111; }
+.pick { position: relative; }
+.pick .pk-rec {
+    display: none; position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+    padding: 1px 7px; border-radius: 9px; white-space: nowrap;
+    font: 800 10px/1.5 system-ui, sans-serif; color: #10301f; background: #9bffcf;
+    box-shadow: 0 0 10px rgba(155,255,207,.7);
+}
+.pick.rec .pk-rec { display: block; animation: recBob 1.2s ease-in-out infinite; }
+.pick.rec:not(.on) { border-color: rgba(155,255,207,.7); }
+@keyframes recBob { 50% { transform: translateX(-50%) translateY(-2px); } }
+.opp-pick { line-height: 1.7; }
+.mu.rec { color: #9bffcf; font-weight: 700; }
+.mu.style { color: #ffe9a8; font-weight: 600; }
+.g-list.picks li { margin-bottom: 4px; }
