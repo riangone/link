@@ -1,13 +1,17 @@
 var process = require('process')
 // Handle SIGINT
+// (exit handlers flush the leaderboard file first; see Leaderboard.flush)
+const onExit = [];
 process.on('SIGINT', () => {
   console.info("SIGINT Received, exiting...")
+  onExit.forEach(fn => fn());
   process.exit(0)
 })
 
 // Handle SIGTERM
 process.on('SIGTERM', () => {
   console.info("SIGTERM Received, exiting...")
+  onExit.forEach(fn => fn());
   process.exit(0)
 })
 
@@ -16,6 +20,15 @@ const { uniqueNamesGenerator, animals, colors } = require('unique-names-generato
 const url = require('url');
 const crypto = require('crypto');
 const { Matchmaker } = require('./matchmaker');
+const { Leaderboard } = require('./leaderboard');
+const path = require('path');
+
+// Leaderboard storage. LEADERBOARD_FILE='' forces memory-only. When this
+// file is require()d (unit / e2e tests) and nothing is configured, the board
+// is memory-only too, so tests never touch the real file.
+const LEADERBOARD_FILE = process.env.LEADERBOARD_FILE !== undefined
+    ? (process.env.LEADERBOARD_FILE || null)
+    : (require.main === module ? path.join(__dirname, 'data', 'leaderboard.json') : null);
 
 const TURN_SECRET = process.env.TURN_SECRET || 'snapdrop-static-auth-secret-12345';
 const TURN_URLS = [
@@ -130,6 +143,9 @@ class SnapdropServer {
         // 对战大厅 matchmaking (see matchmaker.js)
         this._matchmaker = new Matchmaker((peer, msg) => this._send(peer, msg));
         this._wss.on('headers', (headers, response) => this._onHeaders(headers, response));
+        // per-game score tables (see leaderboard.js)
+        this._leaderboard = new Leaderboard(Matchmaker.GAMES, LEADERBOARD_FILE);
+        onExit.push(() => this._leaderboard.flush());
 
         this._rooms = {};
 
@@ -237,6 +253,7 @@ class SnapdropServer {
         }
 
         if (this._matchmaker.handle(sender, message)) return;
+        if (this._leaderboard.handle(sender, message, (p, m) => this._send(p, m))) return;
 
         switch (message.type) {
             case 'disconnect':

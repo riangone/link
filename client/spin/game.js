@@ -24,6 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const opponentName = new URLSearchParams(location.search).get('opponent') || '';
     const waitingText = opponentName ? `WAITING FOR ${opponentName.toUpperCase()}` : 'WAITING FOR PEER';
+    // Modes: pvp (default) · bot (?bot=) · tower (?bot=hard&tower=N) · tutorial (?bot=easy&tutorial=1)
+    const MODE = GameBot.enabled ? SpinPanels.mode : 'pvp';
+    const FLOOR = MODE === 'tower' ? SpinProgress.TOWER[SpinPanels.floor - 1] : null;
+    const FLOOR_N = SpinPanels.floor;
 
     const $ = (id) => document.getElementById(id);
     const canvas = $('game-canvas');
@@ -41,6 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusText = $('status-text'), pingText = $('ping-text'), roleStatusText = $('role-status-text');
     const pickerEl = $('picker'), pickerSlot = $('picker-slot'), pickerSlot2 = $('picker-slot-2'), oppPickEl = $('opp-pick');
     const muteBtn = $('mute-btn'), specialBtn = $('special-btn');
+    const coachEl = $('coach'), coachBtn = $('coach-btn');
+    const rewardSlot = $('reward-slot'), nextBtn = $('next-btn'), floorCard = $('floor-card');
+    const panelScreen = () => $('panel-screen');
 
     inviteUrlInput.value = location.href;
     copyBtn.addEventListener('click', () => {
@@ -60,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const BOWL_K = 0.00042;             // pull toward the centre (the stadium slope)
     const ORBIT_K = 0.034;              // spinning tops naturally swirl around the bowl
     const FRICTION = 0.988;
-    const WIN_SCORE = 4;
+    const WIN_SCORE = FLOOR ? FLOOR.ws : 4;
     const GO_T = 180;                   // launch countdown frames (3 s)
     const FINISH_T = 170;               // finish banner frames
     const SUDDEN_T = 45 * 60;           // battle frames before sudden death
@@ -68,7 +75,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const PERFECT = 0.93;
     const START_DY = 160;
 
-    const TYPES = ['attack', 'defense', 'stamina', 'balance'];
+    const BASE_TYPES = ['attack', 'defense', 'stamina', 'balance'];
+    const TYPES = BASE_TYPES.concat('dragon');     // dragon: unlocked by clearing the tower
+    // type triangle: key beats value (damage ×ADV_MUL)
+    const ADV = { attack: 'stamina', stamina: 'defense', defense: 'attack' };
+    const ADV_MUL = 1.2;
     const BEYS = {
         attack: {
             name: 'STORM STRIKER', short: 'STRIKER', label: '⚔️ 攻击', spec: 'METEOR RUSH',
@@ -97,6 +108,13 @@ document.addEventListener('DOMContentLoaded', () => {
             atk: 1.12, def: 1.12, bres: 1.15, dash: 7.8, blades: 5,
             shape: [[0.5, -0.42], [0.88, -0.32], [1.05, -0.02], [0.84, 0.08], [0.95, 0.3], [0.55, 0.42]],
             stats: [4, 3, 3, 4]
+        },
+        dragon: {
+            name: 'VOID DRAGON', short: 'DRAGON', label: '🐉 龙王', spec: 'DRAGON STORM',
+            c1: '#9b5cff', c2: '#00f0ff', r: 35, mass: 1.2, accel: 0.37, vmax: 9.0, drain: 0.036,
+            atk: 1.25, def: 1.12, bres: 1.2, dash: 8.2, blades: 3,
+            shape: [[0.3, -0.7], [0.9, -0.45], [1.08, -0.08], [0.7, 0.05], [0.95, 0.38], [0.5, 0.5]],
+            stats: [5, 3, 4, 4]
         }
     };
     const OWNER = ['#ff3fb4', '#2de2ff'];          // P1 magenta / P2 cyan ring
@@ -278,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, { slide: false });
 
     /** Current steering direction in canonical coordinates, |v| ≤ 1. */
-    function localDir() {
+    function localDir(meTop) {
         let x = 0, y = 0;
         if (keys.arrowup || keys.w) y -= 1;
         if (keys.arrowdown || keys.s) y += 1;
@@ -286,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (keys.arrowright || keys.d) x += 1;
         if (touchStick.on) { x += touchStick.x; y += touchStick.y; }
         if (mouseSteer) {
-            const me = drawTops()[myIdx];
+            const me = meTop || drawTops()[myIdx];
             if (me) {
                 const p = toView(me.x, me.y);
                 const dx = mouseSteer.x - p.x, dy = mouseSteer.y - p.y, d = Math.hypot(dx, dy);
@@ -301,37 +319,54 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================
     // Picker (choose your bey)
     // ==========================================================
-    let myPick = TYPES.includes(localStorage.getItem('spin-pick')) ? localStorage.getItem('spin-pick') : 'attack';
+    const dragonOk = () => SpinProgress.dragonUnlocked();
+    let myPick = localStorage.getItem('spin-pick');
+    if (!TYPES.includes(myPick) || (myPick === 'dragon' && !dragonOk())) myPick = 'attack';
     let oppPick = null;
     const pickCanvases = [];
-    TYPES.forEach((t) => {
-        const b = BEYS[t];
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'pick';
-        btn.dataset.type = t;
-        btn.style.setProperty('--c', b.c1);
-        const cv = document.createElement('canvas');
-        cv.width = cv.height = 112;
-        pickCanvases.push({ cv, t });
-        btn.appendChild(cv);
-        btn.insertAdjacentHTML('beforeend',
-            `<span class="pk-name">${b.short}</span><span class="pk-type">${b.label}</span>` +
-            `<span class="pk-stats">${b.stats.map((s) => `<span class="pk-bar"><i style="width:${s * 20}%"></i></span>`).join('')}</span>`);
-        btn.title = `${b.name} — ATK / DEF / STA / SPD · 必杀: ${b.spec}`;
-        btn.addEventListener('click', () => {
-            myPick = t;
-            localStorage.setItem('spin-pick', t);
-            refreshPicker();
-            syncPick();
+    function buildPicker() {
+        pickerEl.innerHTML = '';
+        pickCanvases.length = 0;
+        TYPES.forEach((t) => {
+            const b = BEYS[t];
+            const locked = t === 'dragon' && !dragonOk();
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'pick' + (locked ? ' locked' : '');
+            btn.dataset.type = t;
+            btn.style.setProperty('--c', b.c1);
+            const cv = document.createElement('canvas');
+            cv.width = cv.height = 112;
+            pickCanvases.push({ cv, t, locked });
+            btn.appendChild(cv);
+            btn.insertAdjacentHTML('beforeend',
+                `<span class="pk-name">${locked ? '???' : b.short}</span><span class="pk-type">${locked ? '🔒 擂台通关' : b.label}</span>` +
+                `<span class="pk-stats">${b.stats.map((v) => `<span class="pk-bar"><i style="width:${locked ? 0 : v * 20}%"></i></span>`).join('')}</span>`);
+            btn.title = locked ? '通关擂台 8F 解锁 VOID DRAGON' : `${b.name} — ATK / DEF / STA / SPD · 必杀: ${b.spec}`;
+            btn.addEventListener('click', () => {
+                if (locked) { SpinPanels.open('tower'); return; }
+                myPick = t;
+                localStorage.setItem('spin-pick', t);
+                refreshPicker();
+                syncPick();
+            });
+            pickerEl.appendChild(btn);
         });
-        pickerEl.appendChild(btn);
-    });
+        refreshPicker();
+    }
+    function counterOf(t) { return Object.keys(ADV).find((k) => ADV[k] === t); }
     function refreshPicker() {
         pickerEl.querySelectorAll('.pick').forEach((b) => b.classList.toggle('on', b.dataset.type === myPick));
-        oppPickEl.textContent = oppPick ? `对手：${BEYS[oppPick].label} ${BEYS[oppPick].name}` : '对手：选择中…';
+        if (!oppPick) { oppPickEl.innerHTML = '对手：选择中…'; return; }
+        let h = `对手：${BEYS[oppPick].label} ${BEYS[oppPick].name}`;
+        if (ADV[myPick] === oppPick) h += '<br><span class="mu good">✓ 你克制对手：伤害 ×1.2</span>';
+        else if (ADV[oppPick] === myPick) {
+            const c = counterOf(oppPick);
+            h += `<br><span class="mu bad">✗ 对手克制你${c ? `——试试 ${BEYS[c].label}` : ''}</span>`;
+        }
+        oppPickEl.innerHTML = h;
     }
-    refreshPicker();
+    buildPicker();
 
     // ==========================================================
     // Host simulation state
@@ -356,9 +391,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function startMatch() {
         S = {
-            ph: 'launch', pt: 0, bt: 0, ft: 0, rd: 0, sd: 0, hitstop: 0,
-            sc: [0, 0], tp: [picks[0], picks[1]], lk: [-1, -1], fin: null, tops: null, events: []
+            ph: 'launch', pt: 0, bt: 0, ft: 0, rd: 0, sd: 0, hitstop: 0, ws: WIN_SCORE,
+            sc: [0, 0], tp: [picks[0], picks[1]], lk: [-1, -1], fin: null, tops: null, events: [],
+            buf: [1, FLOOR ? FLOOR.buff : 1]
         };
+        resetMatchStats();
+        if (MODE === 'tutorial') Tut.start();
         if (GameBot.enabled) bot.lockTarget = null;
         startRound();
         hideOverlay();
@@ -380,6 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ev.f = frame;
         S.events.push(ev);
         if (S.events.length > 24) S.events.shift();
+        if (MODE === 'tutorial') Tut.onEvent(ev);
         fx(ev);
     }
 
@@ -421,7 +460,8 @@ document.addEventListener('DOMContentLoaded', () => {
             else simStep(S.ph === 'finish' && S.ft < 70 ? 0.33 : 1);
             if (S.ph === 'battle') {
                 S.bt++;
-                if (S.bt > SUDDEN_T) S.sd = 1;
+                if (S.bt > SUDDEN_T && MODE !== 'tutorial') S.sd = 1;
+                if (MODE === 'tutorial') Tut.guard();
                 checkFinish();
             } else if (S.ph === 'finish') {
                 S.ft++;
@@ -468,6 +508,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const a = b.accel * (0.35 + 0.65 * Math.min(1, spinF)) * (atkSp ? 1.6 : 1);
                 t.vx += inputs[i].x * a * dt;
                 t.vy += inputs[i].y * a * dt;
+                if (t.sp > 0 && t.type === 'dragon' && o.st === 0) {   // Dragon Storm blows rivals to the rim
+                    const ox = o.x - CX, oy = o.y - CY, od = Math.hypot(ox, oy) || 1;
+                    const near = Math.hypot(o.x - t.x, o.y - t.y);
+                    if (near < 190) {
+                        const k = 0.22 * (1 - near / 190) * dt;
+                        o.vx += (ox / od * 0.6 - oy / od * 0.8) * k;
+                        o.vy += (oy / od * 0.6 + ox / od * 0.8) * k;
+                    }
+                }
                 if (atkSp && o.st === 0) {                  // Meteor Rush homes in
                     const hx = o.x - t.x, hy = o.y - t.y, hm = Math.hypot(hx, hy) || 1;
                     t.vx += hx / hm * 0.3 * dt; t.vy += hy / hm * 0.3 * dt;
@@ -520,8 +569,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (alive) {
                 const spd = Math.hypot(t.vx, t.vy);
-                let drain = b.drain * (1 + spd / 14) * (S.sd ? 3 : 1);
+                let drain = b.drain * (1 + spd / 14) * (S.sd ? 3 : 1) / S.buf[i];
                 if (t.sp > 0) {
+                    if (t.type === 'dragon') drain -= 0.05;
                     if (t.type === 'stamina') drain = -0.18;
                     if (t.type === 'balance') { drain -= 0.07; t.bg = Math.max(0, t.bg - 0.3 * dt); }
                 }
@@ -578,7 +628,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (att.sp > 0 && att.type === 'attack') atk *= 1.8;
             if (att.sp > 0 && att.type === 'balance') atk *= 1.4;
             if (att.st !== 0) atk *= 0.3;
-            const dv = DF.def * (def.sp > 0 && def.type === 'defense' ? 2 : 1);
+            if (ADV[att.type] === def.type) atk *= ADV_MUL;
+            atk *= S.buf[S.tops.indexOf(att)];
+            const dv = DF.def * (def.sp > 0 && def.type === 'defense' ? 2 : 1) * S.buf[S.tops.indexOf(def)];
             if (def.st === 0) {
                 def.spin -= I * 0.72 * atk / dv;
                 if (I > 4 && !(def.sp > 0 && def.type === 'defense')) {
@@ -622,7 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function nextRound() {
-        if (S.sc[0] >= WIN_SCORE || S.sc[1] >= WIN_SCORE) {
+        if (S.sc[0] >= S.ws || S.sc[1] >= S.ws) {
             S.ph = 'gameover';
             broadcast();
             showGameOver(S.sc);
@@ -635,7 +687,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function broadcast() {
         if (!S) return;
         session.send({
-            type: 'state', ph: S.ph, pt: S.pt, bt: S.bt, ft: S.ft, rd: S.rd, sd: S.sd,
+            type: 'state', ph: S.ph, pt: S.pt, bt: S.bt, ft: S.ft, rd: S.rd, sd: S.sd, ws: S.ws,
             sc: S.sc, tp: S.tp, lk: S.lk.map(r1), fin: S.fin,
             tops: S.tops.map((t) => [r1(t.x), r1(t.y), r1(t.vx), r1(t.vy), r1(t.spin), r1(t.bg), r1(t.sg), Math.round(t.sp), Math.round(t.dash), Math.round(t.cd), t.st]),
             ev: S.events.filter((e) => frame - e.f < 24)
@@ -645,7 +697,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================
     // Bot (?bot=easy|normal|hard) — plays the client side (index 1)
     // ==========================================================
-    const BOT = {
+    const BOT = FLOOR ? Object.assign({}, FLOOR.ai) : {
         react: GameBot.pick({ easy: 18, normal: 9, hard: 3 }),
         noise: GameBot.pick({ easy: 0.55, normal: 0.28, hard: 0.08 }),
         dashP: GameBot.pick({ easy: 0.012, normal: 0.04, hard: 0.12 }),
@@ -653,10 +705,12 @@ document.addEventListener('DOMContentLoaded', () => {
         specDelay: GameBot.pick({ easy: 120, normal: 40, hard: 5 })
     };
     const bot = { timer: 0, x: 0, y: 0, a: 0, s: 0, lockTarget: null, specWait: 0, sent: false };
-    if (GameBot.enabled) picks[1] = TYPES[Math.floor(Math.random() * TYPES.length)];
+    if (GameBot.enabled) picks[1] = MODE === 'tower' ? FLOOR.type : MODE === 'tutorial' ? 'defense'
+        : BASE_TYPES[Math.floor(Math.random() * BASE_TYPES.length)];
 
     function botStep() {
         const me = S.tops[1], op = S.tops[0];
+        if (MODE === 'tutorial') { Tut.dummy(me); return; }
         if (S.ph === 'launch') {
             if (bot.lockTarget === null) bot.lockTarget = GameBot.rand(BOT.lock[0], BOT.lock[1]);
             const m = meter(S.pt);
@@ -705,7 +759,174 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         GameBot.deliver({ type: 'input', x: bot.x, y: bot.y, a: bot.a, s: bot.s });
     }
-    GameBot.expose({ state: () => S });
+    GameBot.expose({ state: () => S, tut: () => Tut });
+
+    // ==========================================================
+    // Match stats → progression (SpinProgress / SpinPanels)
+    // ==========================================================
+    const mstat = { bursts: 0, overs: 0, perfects: 0, recorded: false };
+    function resetMatchStats() { mstat.bursts = mstat.overs = mstat.perfects = 0; mstat.recorded = false; }
+    function countEvent(ev) {
+        if (ev.k === 'burst' && ev.p !== myIdx) mstat.bursts++;
+        if (ev.k === 'over' && ev.p !== myIdx) mstat.overs++;
+        if (ev.k === 'launch' && ev.pf && ev.p === myIdx) mstat.perfects++;
+    }
+    function recordMatch(won) {
+        if (mstat.recorded) return;
+        mstat.recorded = true;
+        const res = SpinProgress.record({
+            mode: MODE, level: GameBot.level, floor: FLOOR_N, won,
+            bursts: mstat.bursts, overs: mstat.overs, perfects: mstat.perfects
+        });
+        SpinPanels.rewards(rewardSlot, res);
+        if (res.unlocked === 'dragon') buildPicker();
+        // mode-specific "what next" button
+        nextBtn.classList.add('hidden');
+        if (MODE === 'tutorial') {
+            winLossTitle.textContent = 'TUTORIAL CLEAR!';
+            winLossTitle.className = 'neon-text';
+            nextBtn.textContent = '🏯 挑战擂台 1F';
+            nextBtn.dataset.href = SpinPanels.modeUrl('tower', 1);
+            nextBtn.classList.remove('hidden');
+        } else if (MODE === 'tower' && won && FLOOR_N < SpinProgress.TOWER.length) {
+            nextBtn.textContent = `▶ 下一层 ${FLOOR_N + 1}F`;
+            nextBtn.dataset.href = SpinPanels.modeUrl('tower', FLOOR_N + 1);
+            nextBtn.classList.remove('hidden');
+        } else if (MODE === 'tower' && won) {
+            winLossTitle.textContent = 'TOWER CLEARED!';
+        }
+        restartBtn.textContent = MODE === 'tower' ? (won ? '再战本层' : '再次挑战') : MODE === 'tutorial' ? '再练一次' : 'REMATCH';
+    }
+
+    // ==========================================================
+    // Tutorial (?tutorial=1): scripted steps against a passive dummy
+    // ==========================================================
+    const Tut = {
+        step: 0, targets: [], ti: 0, dashAt: -999, msg: '', praise: '', praiseT: 0,
+        STEPS: GameFit.isTouch ? [
+            '① 发射：倒数时<b>点屏幕</b>，力量条停在<b>金色区</b> = PERFECT',
+            '② 移动：用<b>左下摇杆</b>把陀螺开进<b>闪光的圈</b>',
+            '③ 冲撞：靠近陪练，按 <b>💥</b> 猛撞它（朝白色箭头冲）',
+            '④ 必杀：能量已充满！按 <b>⚡</b> 发动 LIMIT BREAK',
+            '⑤ 终结：把陪练推进左右<b>红色 OVER 口</b>，或连撞把它<b>打爆</b>！'
+        ] : [
+            '① 发射：倒数时按 SPACE / 点击，力量条停在<b>金色区</b> = PERFECT（转速满格）',
+            '② 移动：用 WASD / 方向键 / 按住鼠标，把陀螺开进<b>闪光的圈</b>',
+            '③ 冲撞：靠近陪练，按 SPACE <b>猛撞</b>它（会朝白色箭头方向冲）',
+            '④ 必杀：能量已经帮你充满！按 E 发动 <b>LIMIT BREAK</b>',
+            '⑤ 终结：把陪练推进左右的<b>红色 OVER 口</b>，或连续冲撞把它<b>打爆</b>！'
+        ],
+        start() {
+            this.step = 0; this.ti = 0; this.dashAt = -999; this.praise = '';
+            this.targets = [{ x: CX - 130, y: CY + 60 }, { x: CX + 140, y: CY + 10 }, { x: CX - 20, y: CY - 120 }];
+            S.ws = 2;
+        },
+        go(n, praise) {
+            this.step = n;
+            this.praise = praise || '';
+            this.praiseT = frame;
+            Sfx.beep(true);
+            if (n === 3) S.tops[0].sg = 100;
+            if (n === 4) S.buf[1] = 0.55;           // the dummy gets fragile for the finale
+        },
+        onEvent(ev) {
+            if (ev.k === 'launch' && ev.p === 0 && this.step === 0) {
+                this.go(1, ev.pf ? 'PERFECT!! 完美发射' : `力量 ${Math.round(S.lk[0] * 100)}% —— 下次试试停在金色区`);
+            } else if (ev.k === 'dash' && ev.p === 0) {
+                this.dashAt = frame;
+            } else if (ev.k === 'hit' && this.step === 2 && frame - this.dashAt < 50) {
+                this.go(3, '漂亮的冲撞！撞击会给双方充能 ⚡');
+            } else if (ev.k === 'spec' && ev.p === 0 && this.step === 3) {
+                this.go(4, `${BEYS[S.tops[0].type].spec}！必杀持续 3 秒`);
+            }
+        },
+        /** Runs every battle frame before checkFinish: keeps the lesson going. */
+        guard() {
+            const me = S.tops[0], du = S.tops[1];
+            if (me.st !== 0) {                      // fell out / burst: respawn
+                Object.assign(me, mkTop(0, me.type), { spin: 80 });
+                emit({ k: 'launch', p: 0, pf: 0, x: me.x, y: me.y });
+                this.praise = '出局了也没关系——教学里会自动复活。远离红色缺口！';
+                this.praiseT = frame;
+            }
+            me.spin = Math.max(me.spin, 60);
+            if (this.step < 4) {
+                if (du.st !== 0) { Object.assign(du, mkTop(1, du.type), { spin: 90 }); }
+                du.bg = Math.min(du.bg, 80);
+            }
+            du.spin = Math.max(du.spin, 70);
+            if (this.step === 1) {
+                const tg = this.targets[this.ti];
+                if (Math.hypot(me.x - tg.x, me.y - tg.y) < 38) {
+                    this.ti++;
+                    sparks(tg.x, tg.y, 24, ['#9bffcf', '#fff'], 5);
+                    Sfx.beep(false);
+                    if (this.ti >= this.targets.length) this.go(2, '操控很稳！陀螺有惯性，提前转向');
+                }
+            }
+        },
+        target() { return MODE === 'tutorial' && S && this.step === 1 && S.ph === 'battle' ? this.targets[this.ti] : null; },
+        dummy(me) {
+            // the dummy only drifts toward the centre so it stays reachable
+            const dx = CX - me.x, dy = CY - me.y, d = Math.hypot(dx, dy);
+            const k = d > 90 ? 0.5 : 0;
+            GameBot.deliver({ type: 'input', x: dx / (d || 1) * k, y: dy / (d || 1) * k, a: bot.a, s: bot.s });
+        },
+        text() {
+            let h = `<div class="tut-step">${this.STEPS[this.step]}` +
+                (this.step === 1 ? ` <span class="tut-n">${this.ti}/3</span>` : '') + '</div>';
+            if (this.praise && frame - this.praiseT < 200) h = `<div class="tut-praise">${this.praise}</div>` + h;
+            return h;
+        }
+    };
+
+    // ==========================================================
+    // Coach: short contextual hints during battle (💡 toggles)
+    // ==========================================================
+    let coachOn = localStorage.getItem('spin-coach') !== '0';
+    const coach = { cur: null, since: 0, last: {} };
+    function pocketDanger(t, margin) {
+        const ex = t.x - CX, ey = t.y - CY, ed = Math.hypot(ex, ey);
+        const a = Math.abs(Math.atan2(ey, ex)), da = Math.min(a, Math.PI - a);
+        return ed > ARENA_R - margin && da < 0.55;
+    }
+    function pickHint(d, tops) {
+        const me = tops[myIdx], op = tops[1 - myIdx];
+        if (!me || me.st !== 0 || d.ph !== 'battle') return null;
+        const mb = BEYS[me.type];
+        if (pocketDanger(me, 85)) return ['pocket', '⚠ 太靠近 OVER 口了！往中心拉', 'warn'];
+        if (op.sp > 0 && op.st === 0) return ['opsp', `⚠ 对手发动 ${BEYS[op.type].spec}！先拉开距离`, 'warn'];
+        if (me.bg > 70) return ['burst', '💔 爆裂槽快满了！避开正面重击', 'warn'];
+        if (me.sg >= 100 && me.sp <= 0) return ['spec', `⚡ 必杀就绪！按 ${GameFit.isTouch ? '⚡' : 'E'} 发动 ${mb.spec}`, 'good'];
+        if (op.st === 0 && pocketDanger(op, 115) && me.cd <= 0) return ['push', `💥 机会！对手在缺口边——${GameFit.isTouch ? '💥' : 'SPACE'} 冲撞推它出去`, 'good'];
+        if (me.spin < 30 && op.spin > me.spin + 10) return ['lowspin', '🔋 转速低！少冲撞、少撞墙，绕着对手跑', 'warn'];
+        if (d.bt > 25 * 60 && me.spin > op.spin + 15 && op.st === 0) return ['outlast', '⏱ 你转得更久——拉开距离，拖到它停转', 'good'];
+        if (d.bt < 360 && d.rd === 1) return ['start', `移动追上对手，按 ${GameFit.isTouch ? '💥' : 'SPACE'} 冲撞`, ''];
+        return null;
+    }
+    function updateCoach(d, tops) {
+        let html = '', cls = '';
+        if (MODE === 'tutorial' && myRole === 'host' && S && S.ph !== 'gameover') {
+            html = Tut.text(); cls = 'tut';
+        } else if (coachOn && d && tops.length === 2) {
+            const now = tGlobal;
+            const h = pickHint(d, tops);
+            const keep = coach.cur && now - coach.since < 100;          // show each hint ≥ ~1.7 s
+            if (!keep) {
+                if (h && (!coach.last[h[0]] || now - coach.last[h[0]] > 420 || (coach.cur && coach.cur[0] === h[0]))) {
+                    if (!coach.cur || coach.cur[0] !== h[0]) coach.since = now;
+                    coach.cur = h;
+                    coach.last[h[0]] = now;
+                } else coach.cur = null;
+            }
+            if (coach.cur) { html = coach.cur[1]; cls = coach.cur[2]; }
+        }
+        if (coachEl.dataset.html !== html) {
+            coachEl.dataset.html = html;
+            coachEl.innerHTML = html;
+        }
+        coachEl.className = 'coach' + (html ? ' show' : '') + (cls ? ' ' + cls : '');
+    }
 
     // ==========================================================
     // Network
@@ -743,6 +964,7 @@ document.addEventListener('DOMContentLoaded', () => {
             startBtn.classList.toggle('hidden', myRole !== 'host');
             if (GameBot.enabled) { oppPick = picks[1]; refreshPicker(); }
             syncPick();
+            setTimeout(decorateMode, 0);
         },
         onPeerConnected() {
             statusText.textContent = 'P2P ESTABLISHED';
@@ -765,6 +987,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function syncPick() { session.send({ type: 'pick', t: myPick }); }
+    function decorateMode() {
+        const h2 = readyScreen.querySelector('h2');
+        if (MODE === 'tower') {
+            const ti = SpinPanels.typeInfo[FLOOR.type];
+            h2.textContent = `擂台 ${FLOOR_N}F`;
+            roleText.innerHTML = '选好克制它的陀螺，点 <strong>LET IT RIP!</strong>';
+            p2Label.textContent = `🏯 ${FLOOR.name}`;
+            floorCard.innerHTML = `<div class="fc-top"><b>${FLOOR.name}</b> <span>${FLOOR.title}</span></div>` +
+                `<div class="fc-meta">${ti.icon} ${ti.name}型 · 强度 ×${FLOOR.buff} · 先得 ${FLOOR.ws} 分</div>` +
+                `<div class="fc-tip">💡 ${FLOOR.tip}</div>`;
+            floorCard.classList.remove('hidden');
+        } else if (MODE === 'tutorial') {
+            h2.textContent = '新手教学';
+            roleText.innerHTML = '跟着屏幕下方的提示一步步来，大约 1 分钟。陪练不会还手。';
+            p2Label.textContent = '🎯 陪练';
+            floorCard.innerHTML = '<div class="fc-tip">学会：发射 → 移动 → 冲撞 → 必杀 → 终结</div>';
+            floorCard.classList.remove('hidden');
+        }
+    }
     // The channel is unreliable: keep re-sending the few "must arrive" things.
     let awaitingRestart = false;
     setInterval(() => {
@@ -808,6 +1049,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (msg.type === 'state') {
             if (myRole !== 'client') return;
             const first = !net || net.rd !== msg.rd;
+            if (!net || msg.rd < net.rd || (net.ph === 'gameover' && msg.ph !== 'gameover')) resetMatchStats();
             net = msg;
             netAt = performance.now();
             if (first) trails[0].length = trails[1].length = 0;
@@ -833,9 +1075,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================
     function showScreen(el) {
         overlay.classList.remove('hidden');
-        [lobbyScreen, readyScreen, gameoverScreen, disconnectScreen].forEach((s) => s.classList.toggle('hidden', s !== el));
+        [lobbyScreen, readyScreen, gameoverScreen, disconnectScreen, panelScreen()].forEach((s) => s && s.classList.toggle('hidden', s !== el));
         if (el === readyScreen) readyScreen.insertBefore(pickerSlot, startBtn);
         if (el === gameoverScreen) pickerSlot2.appendChild(pickerSlot);
+        if (el !== gameoverScreen) { rewardSlot.innerHTML = ''; nextBtn.classList.add('hidden'); }
+        SpinPanels.refresh();
     }
     function hideOverlay() { overlay.classList.add('hidden'); restartBtn.disabled = false; restartBtn.textContent = 'REMATCH'; }
     function inMatch() {
@@ -849,13 +1093,27 @@ document.addEventListener('DOMContentLoaded', () => {
         if (myRole === 'host') clearInterval(hostLoop);
         showScreen(gameoverScreen);
         finalScore.textContent = `${sc[0]} - ${sc[1]}`;
-        const iWon = sc[myIdx] >= WIN_SCORE;
+        const iWon = sc[myIdx] > sc[1 - myIdx];
         winLossTitle.textContent = iWon ? 'VICTORY!' : 'DEFEAT';
         winLossTitle.className = iWon ? 'neon-text' : 'danger-text';
         if (iWon) Sfx.win();
+        recordMatch(iWon);
     }
 
     lobbyBtn.addEventListener('click', () => location.reload());
+    nextBtn.addEventListener('click', () => { if (nextBtn.dataset.href) location.href = nextBtn.dataset.href; });
+    coachBtn.textContent = coachOn ? '💡' : '💤';
+    coachBtn.addEventListener('click', () => {
+        coachOn = !coachOn;
+        localStorage.setItem('spin-coach', coachOn ? '1' : '0');
+        coachBtn.textContent = coachOn ? '💡' : '💤';
+        coachBtn.title = coachOn ? '实时提示：开' : '实时提示：关';
+    });
+    // rank bar + menus on every menu screen
+    lobbyScreen.insertBefore(SpinPanels.rankBar(), lobbyScreen.querySelector('.room-info'));
+    readyScreen.insertBefore(SpinPanels.rankBar(), readyScreen.firstChild);
+    gameoverScreen.appendChild(SpinPanels.rankBar());
+    if (MODE === 'tower' || MODE === 'tutorial') document.documentElement.classList.add('spin-special');
     startBtn.addEventListener('click', () => {
         Sfx.init();
         if (myRole === 'host' && (!S || S.ph === 'gameover')) { picks[0] = myPick; startMatch(); }
@@ -921,6 +1179,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function floater(x, y, text, c, size) { floaters.push({ x, y, text, c, size: size || 22, life: 0, max: 60 }); }
 
     function fx(ev) {
+        countEvent(ev);
         const p = toView(ev.x, ev.y);
         const myTop = ev.p === myIdx;
         switch (ev.k) {
@@ -1377,6 +1636,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+        drawGuides(tops, ph, bt);
+
         // particles
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -1452,9 +1713,73 @@ document.addEventListener('DOMContentLoaded', () => {
         const me = tops[myIdx];
         specialBtn.classList.toggle('ready', !!me && me.sg >= 100 && me.sp <= 0 && ph === 'battle');
 
+        updateCoach(d, tops);
         if (!overlay.classList.contains('hidden')) renderPicker(dtf);
         requestAnimationFrame(render);
     }
+
+    /** Aim arrow + dash cooldown ring + YOU marker (+ tutorial target). */
+    function drawGuides(tops, ph, bt) {
+        const me = tops[myIdx], op = tops[1 - myIdx];
+        if (!me) return;
+        const b = BEYS[me.type];
+        const v = toView(me.x, me.y);
+        // tutorial target ring + pointer
+        const tg = Tut.target();
+        if (tg) {
+            const pulse = 1 + 0.12 * Math.sin(tGlobal * 0.2);
+            ctx.save();
+            ctx.strokeStyle = '#9bffcf'; ctx.lineWidth = 4; ctx.shadowColor = '#9bffcf'; ctx.shadowBlur = 16;
+            ctx.beginPath(); ctx.arc(tg.x, tg.y, 38 * pulse, 0, Math.PI * 2); ctx.stroke();
+            ctx.setLineDash([4, 8]); ctx.lineWidth = 2; ctx.globalAlpha = 0.6;
+            ctx.beginPath(); ctx.moveTo(v.x, v.y); ctx.lineTo(tg.x, tg.y); ctx.stroke();
+            ctx.restore();
+        }
+        if (ph === 'launch' || (ph === 'battle' && bt < 150)) {
+            const bob = Math.sin(tGlobal * 0.25) * 4;
+            const y0 = v.y - b.r - 22 + bob;
+            ctx.save();
+            ctx.fillStyle = OWNER[myIdx];
+            ctx.beginPath(); ctx.moveTo(v.x - 9, y0 - 8); ctx.lineTo(v.x + 9, y0 - 8); ctx.lineTo(v.x, y0 + 2); ctx.closePath(); ctx.fill();
+            ctx.restore();
+            textC('YOU', v.x, y0 - 18, 12, '#fff', OWNER[myIdx], 4);
+        }
+        if (ph !== 'battle' || me.st !== 0) return;
+        // dash direction: steering input, or straight at the rival when idle (same rule as hostAction)
+        const dir = localDir(me);
+        let dx = dir.x, dy = dir.y;
+        if (Math.hypot(dx, dy) < 0.25 && op) { dx = op.x - me.x; dy = op.y - me.y; }
+        const m = Math.hypot(dx, dy) || 1;
+        let vx = dx / m, vy = dy / m;
+        if (myRole === 'client') { vx = -vx; vy = -vy; }
+        const ready = me.cd <= 0 && me.spin > 8;
+        const r0 = b.r + 8, r1 = b.r + (ready ? 40 : 26);
+        ctx.save();
+        ctx.globalAlpha = ready ? 0.9 : 0.3;
+        ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+        if (ready) { ctx.shadowColor = OWNER[myIdx]; ctx.shadowBlur = 10; }
+        ctx.beginPath(); ctx.moveTo(v.x + vx * r0, v.y + vy * r0); ctx.lineTo(v.x + vx * r1, v.y + vy * r1); ctx.stroke();
+        const hx = v.x + vx * (r1 + 8), hy = v.y + vy * (r1 + 8);
+        ctx.beginPath();
+        ctx.moveTo(hx, hy);
+        ctx.lineTo(hx - vx * 11 - vy * 7, hy - vy * 11 + vx * 7);
+        ctx.lineTo(hx - vx * 11 + vy * 7, hy - vy * 11 - vx * 7);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+        if (!ready && me.cd > 0) {          // cooldown ring
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(v.x, v.y, b.r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - me.cd / 100)); ctx.stroke();
+            ctx.restore();
+        }
+    }
+
+    const WHY = {
+        over: ['被撞出场外——离红色缺口远一点，守在中心', '漂亮！把对手推出了场外'],
+        burst: ['被打爆了——爆裂槽满就会爆裂，转速低时更脆', 'BURST！连续重击打满了对手的爆裂槽'],
+        spin: ['转速先耗尽了——少乱冲撞，或换持久型', '对手先停转了——耐力胜利'],
+        draw: ['同时出局，不计分', '同时出局，不计分']
+    };
 
     function textC(str, x, y, size, fill, glow, stroke) {
         ctx.font = `italic 900 ${size}px Orbitron, sans-serif`;
@@ -1643,6 +1968,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (fin.w >= 0) sub = (fin.w === myIdx ? 'YOU WIN THE ROUND' : 'RIVAL WINS THE ROUND') + `  +${fin.p} PT${fin.p > 1 ? 'S' : ''}`;
         textC(sub, 0, 34, 14, fin.w === myIdx ? '#9bffcf' : fin.w >= 0 ? '#ff9b9b' : '#ddd');
         ctx.restore();
+        if (ft > 30) {          // the "why" line, below the band
+            const why = (WHY[fin.k] || WHY.draw)[fin.w === myIdx ? 1 : 0];
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, out) * Math.min(1, (ft - 30) / 15);
+            ctx.font = '700 15px "Plus Jakarta Sans", system-ui, sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            const w = ctx.measureText(why).width + 28;
+            ctx.fillStyle = 'rgba(8,2,20,0.82)';
+            roundRect(CX - w / 2, CY + 74, w, 30, 15); ctx.fill();
+            ctx.fillStyle = fin.w === myIdx ? '#9bffcf' : '#ffd0d0';
+            ctx.fillText(why, CX, CY + 89);
+            ctx.restore();
+        }
     }
 
     function roundRect(x, y, w, h, r) {

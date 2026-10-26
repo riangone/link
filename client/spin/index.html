@@ -18,6 +18,7 @@
                 <span class="logo-spin">SPIN</span>
             </div>
             <div class="header-actions">
+                <button id="coach-btn" class="gf-btn" type="button" title="实时提示">💡</button>
                 <button id="mute-btn" class="gf-btn" type="button" title="声音">🔊</button>
                 <div class="stats">
                     <div class="stat-box">
@@ -36,6 +37,7 @@
             <div class="stage-column">
                 <div class="canvas-wrapper">
                     <canvas id="game-canvas" width="640" height="640"></canvas>
+                    <div id="coach" class="coach" aria-live="polite"></div>
 
                     <div id="overlay" class="overlay">
                         <div class="overlay-content" id="lobby-screen">
@@ -57,6 +59,7 @@
                         <div class="overlay-content hidden" id="ready-screen">
                             <h2>OPPONENT CONNECTED</h2>
                             <p class="tagline" id="role-text">选择你的陀螺</p>
+                            <div id="floor-card" class="floor-card hidden"></div>
                             <div id="picker-slot">
                                 <div class="picker" id="picker"></div>
                                 <p class="opp-pick" id="opp-pick">对手：选择中…</p>
@@ -67,6 +70,8 @@
                         <div class="overlay-content hidden" id="gameover-screen">
                             <h2 id="win-loss-title" class="neon-text">MATCH COMPLETE</h2>
                             <p class="final-score-text">FINAL SCORE: <span id="final-score">0 - 0</span></p>
+                            <div id="reward-slot"></div>
+                            <button id="next-btn" class="btn btn-primary hidden" type="button">NEXT</button>
                             <div id="picker-slot-2"></div>
                             <button id="restart-btn" class="btn btn-primary">REMATCH</button>
                         </div>
@@ -91,12 +96,13 @@
                 <div class="panel-section instructions">
                     <h3>HOW TO BATTLE</h3>
                     <div class="control-keys">
-                        <div class="key-row"><strong>发射</strong>：倒数时按 <kbd>SPACE</kbd> / 点击，力量条越满转速越高，满格 = PERFECT</div>
+                        <div class="key-row"><strong>发射</strong>：倒数时按 <kbd>SPACE</kbd> / 点击，停在金色区 = PERFECT</div>
                         <div class="key-row"><kbd>WASD</kbd> / <kbd>▲▼◀▶</kbd> / 按住鼠标：操控陀螺</div>
-                        <div class="key-row"><kbd>SPACE</kbd>：冲撞 DASH（消耗转速）</div>
-                        <div class="key-row"><kbd>E</kbd> / <kbd>SHIFT</kbd>：必杀技 LIMIT BREAK（能量满后）</div>
-                        <div class="key-row note-row">撞出左右 OVER 口 = 2 分 · 爆裂 BURST = 2 分 · 转得更久 SPIN = 1 分 · 先得 4 分获胜</div>
-                        <div class="key-row note-row">⚔️ 攻击：伤害高耗转快 · 🛡️ 防御：重、抗爆裂 · 🌀 持久：几乎不掉转 · 🔥 平衡：样样都会</div>
+                        <div class="key-row"><kbd>SPACE</kbd>：朝白色箭头冲撞 DASH（耗转速）</div>
+                        <div class="key-row"><kbd>E</kbd> / <kbd>SHIFT</kbd>：必杀技 LIMIT BREAK（⚡ 满后）</div>
+                        <div class="key-row note-row">OVER 撞出红色缺口 = 2 分 · BURST 打满爆裂槽 = 2 分 · SPIN 比对手转得久 = 1 分</div>
+                        <div class="key-row note-row">克制：⚔️ 攻击 › 🌀 持久 › 🛡️ 防御 › ⚔️ 攻击（伤害 ×1.2）</div>
+                        <div class="key-row note-row">场边弧条：粗 = 转速，细 = 爆裂槽 · 💡 按钮开关实时提示</div>
                     </div>
                 </div>
 
@@ -124,6 +130,9 @@
     <script src="../scripts/game-session.js"></script>
     <script src="../scripts/game-bot.js" data-lobby="../play/"></script>
     <script src="../scripts/game-fit.js"></script>
+    <script src="../scripts/game-board.js"></script>
+    <script src="progress.js"></script>
+    <script src="panels.js"></script>
     <script src="game.js"></script>
 </body>
 </html>

@@ -7,3 +7,6 @@ fqdn.env
 /test-results/
 /playwright-report/
 /blob-report/
+
+# runtime data (leaderboard.json)
+/server/data/
