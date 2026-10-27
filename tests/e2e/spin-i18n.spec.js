@@ -36,6 +36,8 @@ test.describe('Spin i18n', () => {
         // pick something else → the advice line names the recommendation
         const other = ['attack', 'defense', 'stamina', 'balance'].find((t) => t !== rec.want);
         await page.locator(`.pick[data-type="${other}"]`).click();
+        await expect(page.locator('#opp-pick .mu.rec')).toHaveCount(0); // folded by default
+        await page.locator('#opp-pick .tips-toggle').click();
         await expect(page.locator('#opp-pick .mu.rec')).toContainText('Best pick');
         await expect(page.locator('#opp-pick .mu.style')).toContainText('How to play');
 

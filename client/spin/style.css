@@ -677,6 +677,9 @@ html.spin-special #gb-ready, html.spin-special #gameover-screen .gb-row { displa
 .opp-pick { line-height: 1.7; }
 .mu.rec { color: #9bffcf; font-weight: 700; }
 .mu.style { color: #ffe9a8; font-weight: 600; }
+.tips-toggle { margin-top: 4px; padding: 2px 10px; border-radius: 999px; border: 1px solid rgba(255, 233, 168, .35);
+    background: transparent; color: #ffe9a8; font: inherit; font-size: 12px; cursor: pointer; }
+.tips-toggle:hover { background: rgba(255, 233, 168, .1); }
 .g-list.picks li { margin-bottom: 4px; }
 
 /* --- 改装工坊 (garage) · custom-part badges ------------------------------ */

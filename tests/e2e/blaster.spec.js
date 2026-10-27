@@ -182,7 +182,9 @@ test.describe('Blaster FPS', () => {
     test('auto-fire: the player shoots by itself when the crosshair sweeps over the bot', async ({ page }) => {
         test.setTimeout(60_000);
         await page.goto(dev.url + '/blaster/#autofire-room');
+        await page.locator('.gf-info').click(); // the option lives in the collapsed ⓘ panel
         await page.locator('#autofire-chk').check();
+        await page.locator('.gf-info').click();
         await page.locator('.btn-bot[data-level="normal"]').click();
         await page.waitForTimeout(2600);
         await page.keyboard.down('e'); // 只转圈，不按开火

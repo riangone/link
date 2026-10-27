@@ -117,7 +117,8 @@ html.gf .gf-box > .overlay {
 html.gf .gf-box > .overlay.hidden { pointer-events: none; }
 html.gf .gf-box > .overlay .overlay-content { max-height: none; margin: auto; }
 
-/* ---- side panel: right column on wide screens, drawer otherwise ---- */
+/* ---- side panel (how to play + status): collapsed by default everywhere,
+   ⓘ opens it — a right column on wide screens, a drawer otherwise ---- */
 html.gf .side-panel {
     flex: none;
     width: 270px !important;
@@ -125,8 +126,8 @@ html.gf .side-panel {
     min-height: 0;
     position: relative;
 }
+html.gf .side-panel:not(.gf-open) { display: none !important; }
 @media (max-width: 1099px), (max-height: 520px) {
-    html.gf .side-panel { display: none !important; }
     html.gf .side-panel.gf-open {
         display: flex !important;
         flex-direction: column;
@@ -140,10 +141,7 @@ html.gf .side-panel {
         box-shadow: 0 16px 50px rgba(0, 0, 0, .55);
         backdrop-filter: blur(8px);
     }
-    html.gf .side-panel.gf-open .gf-close { display: inline-flex; align-self: flex-end; }
-}
-@media (min-width: 1100px) and (min-height: 521px) {
-    .gf-info { display: none !important; }
+    html.gf .side-panel.gf-open .gf-close { display: inline-flex; align-self: flex-end; flex: none; }
 }
 
 /* ---- landscape-only games held upright ---- */

@@ -16,7 +16,9 @@
  *              aspect ratio that fits the space left by header + controls.
  *              The waiting/ready overlays cover the whole stage (not only the
  *              canvas) so they still fit when the canvas is a thin landscape
- *              strip. The side panel becomes a drawer (ⓘ) on narrow screens,
+ *              strip. The side panel (how to play / status) starts collapsed;
+ *              ⓘ opens it as a right column on wide screens (remembered) or a
+ *              drawer on narrow ones,
  *              the footer link becomes a ← in the header, and there is a
  *              fullscreen ⛶ button where the Fullscreen API exists.
  *   Canvas   — GameFit.view(canvas, {width, height}) keeps the game's
@@ -135,6 +137,16 @@
                 close.title = T.close;
                 close.addEventListener('click', function () { toggleInfo(false); });
                 sidePanel.insertBefore(close, sidePanel.firstChild);
+                // Wide screens remember whether the column was left open;
+                // the narrow-screen drawer always starts closed.
+                if (isWide() && localStorage.getItem(INFO_KEY) === '1') toggleInfo(true, true);
+                document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape' && sidePanel.classList.contains('gf-open')) toggleInfo(false);
+                });
+                document.addEventListener('pointerdown', function (e) {
+                    if (isWide() || !sidePanel.classList.contains('gf-open')) return;
+                    if (!sidePanel.contains(e.target) && !infoBtn.contains(e.target)) toggleInfo(false);
+                }, true);
             }
             var fsTarget = root;
             if (fsTarget.requestFullscreen || fsTarget.webkitRequestFullscreen) {
@@ -162,11 +174,19 @@
         fit();
     }
 
-    function toggleInfo(force) {
+    var INFO_KEY = 'gf-info-open';
+    function isWide() {
+        return window.matchMedia('(min-width: 1100px) and (min-height: 521px)').matches;
+    }
+    function toggleInfo(force, restoring) {
         if (!sidePanel) return;
         var open = typeof force === 'boolean' ? force : !sidePanel.classList.contains('gf-open');
         sidePanel.classList.toggle('gf-open', open);
         if (infoBtn) infoBtn.setAttribute('aria-expanded', String(open));
+        if (!restoring && isWide()) {
+            try { localStorage.setItem(INFO_KEY, open ? '1' : '0'); } catch (e) { /* ignore */ }
+        }
+        scheduleFit();
     }
 
     function toggleFullscreen() {

@@ -177,7 +177,8 @@
         injectCss();
         var lvName = t(level).replace(/^\S+\s/, '');
         var role = document.getElementById('role-text');
-        if (role) role.textContent = t('ready', { lv: lvName });
+        // "vs Computer" + the highlighted level button already say it all.
+        if (role) { role.textContent = t('ready', { lv: lvName }); role.hidden = true; }
         var h2 = document.querySelector('#ready-screen h2');
         if (h2) h2.textContent = t('vs');
         var st = document.getElementById('status-text');

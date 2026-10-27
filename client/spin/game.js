@@ -379,10 +379,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ADV[myPick] === oppPick) h += `<br><span class="mu good">${L('mu_good')}</span>`;
         else if (ADV[oppPick] === myPick) h += `<br><span class="mu bad">${L('mu_bad')}</span>`;
         else if (myPick === oppPick) h += `<br><span class="mu bad">${L('mu_same')}</span>`;
-        if (rec && rec !== myPick) h += `<br><span class="mu rec">${L('rec_line', { label: BEYS[rec].label, why: L('rec_vs_' + oppPick) })}</span>`;
-        h += `<br><span class="mu style">${L('style_' + myPick)}</span>`;
+        // Advice (best pick — also marked 👍 on its card — and how to play
+        // the chosen top) stays folded until asked for.
+        if (pickTipsOpen) {
+            if (rec && rec !== myPick) h += `<br><span class="mu rec">${L('rec_line', { label: BEYS[rec].label, why: L('rec_vs_' + oppPick) })}</span>`;
+            h += `<br><span class="mu style">${L('style_' + myPick)}</span>`;
+        }
+        h += `<br><button type="button" class="tips-toggle" aria-expanded="${pickTipsOpen}">${L(pickTipsOpen ? 'tips_less' : 'tips_more')}</button>`;
         oppPickEl.innerHTML = h;
     }
+    let pickTipsOpen = localStorage.getItem('spin-pick-tips') === '1';
+    oppPickEl.addEventListener('click', (e) => {
+        if (!e.target.closest('.tips-toggle')) return;
+        pickTipsOpen = !pickTipsOpen;
+        localStorage.setItem('spin-pick-tips', pickTipsOpen ? '1' : '0');
+        refreshPicker();
+    });
     buildPicker();
 
     // ==========================================================
