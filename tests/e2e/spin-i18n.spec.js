@@ -49,7 +49,7 @@ test.describe('Spin i18n', () => {
             return out.filter((s) => !/^(中文|日本語|한국어)$/.test(s));      // language names stay native
         }, CJK.source);
         expect(await leftovers()).toEqual([]);
-        for (const which of ['guide', 'tower', 'board']) {
+        for (const which of ['guide', 'tower', 'board', 'garage']) {
             await page.locator(`#ready-screen [data-open="${which}"]`).click();
             await expect(page.locator('#panel-screen')).toBeVisible();
             expect(await leftovers()).toEqual([]);

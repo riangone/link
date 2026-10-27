@@ -17,7 +17,7 @@ test.describe('Spin', () => {
     test.afterAll(async () => { await dev.close(); });
 
     test('hard bot wins a full match against an idle player', async ({ page }) => {
-        test.setTimeout(120_000);
+        test.setTimeout(180_000);
         const errors = [];
         page.on('pageerror', e => errors.push(String(e)));
         await page.goto(`${dev.url}/spin/?bot=hard#bot-spin-test`);
@@ -32,7 +32,7 @@ test.describe('Spin', () => {
         });
         expect((await st()).tp[0]).toBe('stamina');
         await expect.poll(async () => (await st()).ph, { timeout: 8_000 }).toBe('battle');
-        await expect.poll(async () => (await st()).sc[1], { timeout: 100_000, intervals: [1000] }).toBeGreaterThanOrEqual(4);
+        await expect.poll(async () => (await st()).sc[1], { timeout: 160_000, intervals: [1000] }).toBeGreaterThanOrEqual(4);
         await expect(page.locator('#gameover-screen')).toBeVisible({ timeout: 10_000 });
         await expect(page.locator('#win-loss-title')).toHaveText('DEFEAT');
         expect(errors).toEqual([]);

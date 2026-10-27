@@ -57,7 +57,7 @@ test.describe('Spin progression', () => {
     });
 
     test('clearing tower 8F unlocks the dragon and lands on the leaderboard', async ({ page }) => {
-        test.setTimeout(60_000);
+        test.setTimeout(120_000);
         const errors = [];
         page.on('pageerror', e => errors.push(String(e)));
         await page.goto(`${dev.url}/spin/`);
@@ -75,11 +75,21 @@ test.describe('Spin progression', () => {
 
         await page.locator('.pick[data-type="defense"]').click();
         await page.locator('#start-btn').click();
-        const ph = () => page.evaluate(() => window.__bot.state().ph);
-        for (let r = 0; r < 2; r++) {
-            await expect.poll(ph, { timeout: 8_000 }).toBe('battle');
-            await page.evaluate(() => { const s = window.__bot.state(); s.tops[1].bg = 100; s.tops[1].st = 2; });
-            await expect.poll(ph, { timeout: 8_000 }).not.toBe('battle');
+        // Force a BURST on the champion each round until we reach 4 points. The 8F
+        // champion can win a round by itself before the forced burst lands
+        // (that used to leave the test 2 points short, stuck waiting for
+        // 'battle'), so loop on the score instead of a fixed 2 rounds. Launch +
+        // finish banner ≈ 6 s of timers that headless Chromium may throttle,
+        // hence the 15 s polls.
+        const st = () => page.evaluate(() => { const s = window.__bot.state(); return { ph: s.ph, me: s.sc[0] }; });
+        for (let r = 0; r < 6 && (await st()).me < 4; r++) {
+            await expect.poll(async () => (await st()).ph, { timeout: 15_000 }).toMatch(/battle|gameover/);
+            if ((await st()).ph === 'gameover') break;
+            await page.evaluate(() => {
+                const s = window.__bot.state();
+                if (s.tops[0].st === 0) { s.tops[1].bg = 100; s.tops[1].st = 2; }
+            });
+            await expect.poll(async () => (await st()).ph, { timeout: 15_000 }).not.toBe('battle');
         }
         await expect(page.locator('#win-loss-title')).toHaveText('TOWER CLEARED!', { timeout: 10_000 });
         await expect(page.locator('#reward-slot')).toContainText('VOID DRAGON');

@@ -81,43 +81,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // type triangle: key beats value (damage ×ADV_MUL)
     const ADV = { attack: 'stamina', stamina: 'defense', defense: 'attack' };
     const ADV_MUL = 1.3;                // 1.2 left attack-vs-stamina under 40% in sims
-    const BEYS = {
-        attack: {
-            name: 'STORM STRIKER', short: 'STRIKER', label: SpinPanels.typeLabel('attack'), spec: 'METEOR RUSH',
-            c1: '#ff3b5c', c2: '#ffb02e', r: 34, mass: 1.0, accel: 0.40, vmax: 9.6, drain: 0.050,
-            atk: 1.35, def: 0.85, bres: 0.9, dash: 8.6, blades: 3,
-            shape: [[0.42, -0.62], [0.98, -0.2], [1.04, 0.04], [0.8, 0.13], [0.62, 0.42]],
-            stats: [5, 2, 2, 5]
-        },
-        defense: {
-            name: 'IRON FORTRESS', short: 'FORTRESS', label: SpinPanels.typeLabel('defense'), spec: 'AEGIS WALL',
-            c1: '#3d8bff', c2: '#a9dcff', r: 37, mass: 1.55, accel: 0.27, vmax: 7.0, drain: 0.042,
-            atk: 0.95, def: 1.4, bres: 1.45, dash: 6.4, blades: 6,
-            shape: [[0.55, -0.48], [0.96, -0.4], [1.02, 0], [0.96, 0.4], [0.55, 0.48]],
-            stats: [2, 5, 3, 2]
-        },
-        stamina: {
-            name: 'ZEPHYR WING', short: 'ZEPHYR', label: SpinPanels.typeLabel('stamina'), spec: 'ETERNAL GALE',
-            c1: '#22e39b', c2: '#d4fff0', r: 33, mass: 0.9, accel: 0.33, vmax: 8.2, drain: 0.030,
-            atk: 0.85, def: 1.0, bres: 1.0, dash: 7.4, blades: 4,
-            shape: [[0.38, -0.25], [0.82, -0.32], [1.04, -0.12], [0.98, 0.06], [0.46, 0.34]],
-            stats: [2, 3, 5, 3]
-        },
-        balance: {
-            name: 'PHOENIX FLARE', short: 'PHOENIX', label: SpinPanels.typeLabel('balance'), spec: 'RISING FLARE',
-            c1: '#ffb300', c2: '#fff1a8', r: 35, mass: 1.12, accel: 0.34, vmax: 8.4, drain: 0.040,
-            atk: 1.12, def: 1.12, bres: 1.15, dash: 7.8, blades: 5,
-            shape: [[0.5, -0.42], [0.88, -0.32], [1.05, -0.02], [0.84, 0.08], [0.95, 0.3], [0.55, 0.42]],
-            stats: [4, 3, 3, 4]
-        },
-        dragon: {
-            name: 'VOID DRAGON', short: 'DRAGON', label: SpinPanels.typeLabel('dragon'), spec: 'DRAGON STORM',
-            c1: '#9b5cff', c2: '#00f0ff', r: 35, mass: 1.2, accel: 0.37, vmax: 9.0, drain: 0.036,
-            atk: 1.25, def: 1.12, bres: 1.2, dash: 8.2, blades: 3,
-            shape: [[0.3, -0.7], [0.9, -0.45], [1.08, -0.08], [0.7, 0.05], [0.95, 0.38], [0.5, 0.5]],
-            stats: [5, 3, 4, 4]
-        }
-    };
+    // Stock cores live in parts.js; a top's real stats come from its cfg
+    // (core + ring + disk + tip) via SpinParts.build() and ride along as top.b.
+    const BEYS = SpinParts.CORES;
+    TYPES.forEach((k) => { BEYS[k].label = SpinPanels.typeLabel(k); });
+    const bcache = new Map();
+    /** Memoised SpinParts.build (the client rebuilds from cfgs every frame). */
+    function built(cfg) {
+        const k = JSON.stringify(cfg || {});
+        let b = bcache.get(k);
+        if (!b) { b = SpinParts.build(cfg); if (bcache.size > 64) bcache.clear(); bcache.set(k, b); }
+        return b;
+    }
     const OWNER = ['#ff3fb4', '#2de2ff'];          // P1 magenta / P2 cyan ring
     const FIN_INFO = {
         over: { text: 'OVER FINISH!', col: '#ff4d4d' },
@@ -323,13 +298,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const dragonOk = () => SpinProgress.dragonUnlocked();
     let myPick = localStorage.getItem('spin-pick');
     if (!TYPES.includes(myPick) || (myPick === 'dragon' && !dragonOk())) myPick = 'attack';
-    let oppPick = null;
+    let oppPick = null, oppCfg = null;
     const pickCanvases = [];
+    /** My saved build for a core (改装工坊 edits it; default = all standard parts). */
+    const myCfg = (core) => SpinParts.buildFor(core || myPick);
+    const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    /** "🗡️🪨📍" — the non-standard parts of a cfg, for one-line summaries. */
+    const partIcons = (cfg) => SpinParts.SLOTS.map((sl) => { const p = SpinParts.find(sl, cfg[sl]); return p && p.id !== 'std' ? p.icon : ''; }).join('');
     function buildPicker() {
         pickerEl.innerHTML = '';
         pickCanvases.length = 0;
         TYPES.forEach((t) => {
-            const b = BEYS[t];
+            const b = built(myCfg(t));
             const locked = t === 'dragon' && !dragonOk();
             const btn = document.createElement('button');
             btn.type = 'button';
@@ -340,10 +320,12 @@ document.addEventListener('DOMContentLoaded', () => {
             cv.width = cv.height = 112;
             pickCanvases.push({ cv, t, locked });
             btn.appendChild(cv);
+            const icons = partIcons(b.cfg);
             btn.insertAdjacentHTML('beforeend',
                 `<span class="pk-rec">${L('rec_badge')}</span>` +
-                `<span class="pk-name">${locked ? '???' : b.short}</span><span class="pk-type">${locked ? L('pick_locked') : b.label}</span>` +
-                `<span class="pk-stats">${b.stats.map((v) => `<span class="pk-bar"><i style="width:${locked ? 0 : v * 20}%"></i></span>`).join('')}</span>`);
+                (icons && !locked ? `<span class="pk-mod" title="${esc(L('pk_mod_title'))}">🔧${icons}</span>` : '') +
+                `<span class="pk-name">${locked ? '???' : esc(b.nick || b.short)}</span><span class="pk-type">${locked ? L('pick_locked') : b.label}</span>` +
+                `<span class="pk-stats">${SpinParts.bars(b).map((v) => `<span class="pk-bar"><i style="width:${locked ? 0 : Math.round(v / 6 * 100)}%"></i></span>`).join('')}</span>`);
             btn.title = locked ? L('pick_locked_title') : L('pick_title', { name: b.name, spec: b.spec });
             btn.addEventListener('click', () => {
                 if (locked) { SpinPanels.open('tower'); return; }
@@ -354,8 +336,25 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             pickerEl.appendChild(btn);
         });
+        if (!garageBtn.isConnected) pickerEl.after(garageBtn);
         refreshPicker();
     }
+    // 🔧 opens the 改装工坊 on the picked core; saving rebuilds the picker and re-syncs
+    const garageBtn = document.createElement('button');
+    garageBtn.type = 'button';
+    garageBtn.id = 'garage-btn';
+    garageBtn.className = 'btn btn-secondary garage-btn';
+    garageBtn.addEventListener('click', () => SpinPanels.open('garage', { core: myPick }));
+    SpinGarage.init({
+        drawBey: (g, x, y, b, ang, opt) => drawBey(g, x, y, b, ang, Object.assign({ owner: OWNER[myIdx || 0] }, opt)),
+        built,
+        dragonOk,
+        onSave(cfg) {
+            if (cfg.core !== 'dragon' || dragonOk()) { myPick = cfg.core; localStorage.setItem('spin-pick', myPick); }
+            buildPicker();
+            if (channelOpen) syncPick();
+        }
+    });
     /** Recommended pick against the opponent's type (see SpinPanels.REC). */
     function recFor(opp) {
         const r = SpinPanels.REC[opp];
@@ -367,8 +366,12 @@ document.addEventListener('DOMContentLoaded', () => {
             b.classList.toggle('on', b.dataset.type === myPick);
             b.classList.toggle('rec', b.dataset.type === rec && !b.classList.contains('locked'));
         });
-        if (!oppPick) { oppPickEl.innerHTML = L('opp_choosing'); return; }
-        let h = L('opp_is', { label: BEYS[oppPick].label, name: BEYS[oppPick].name });
+        if (!oppPick) { garageBtn.innerHTML = L('garage_btn', { name: esc(built(myCfg()).nick || BEYS[myPick].short) }); oppPickEl.innerHTML = L('opp_choosing'); return; }
+        garageBtn.innerHTML = L('garage_btn', { name: esc(built(myCfg()).nick || BEYS[myPick].short) });
+        const ob = oppCfg ? built(oppCfg) : BEYS[oppPick];
+        let h = L('opp_is', { label: BEYS[oppPick].label, name: ob.nick ? `${esc(ob.nick)} (${ob.name})` : ob.name });
+        const oi = oppCfg ? partIcons(oppCfg) : '';
+        if (oi) h += ` <span class="mu mod">🔧${oi}</span>`;
         if (ADV[myPick] === oppPick) h += `<br><span class="mu good">${L('mu_good')}</span>`;
         else if (ADV[oppPick] === myPick) h += `<br><span class="mu bad">${L('mu_bad')}</span>`;
         else if (myPick === oppPick) h += `<br><span class="mu bad">${L('mu_same')}</span>`;
@@ -384,17 +387,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let S = null;              // host authoritative state
     let net = null;            // client: last received state
     let netAt = 0;
-    const picks = ['attack', 'attack'];
+    const picks = [SpinParts.defaultCfg('attack'), SpinParts.defaultCfg('attack')];   // cfgs (see parts.js)
     const inputs = [{ x: 0, y: 0 }, { x: 0, y: 0 }];
     const lastSeq = [{ a: null, s: null }, { a: null, s: null }];
     let evId = 0;
     let frame = 0;
     let hostLoop = null;
 
-    function mkTop(i, type) {
+    function mkTop(i, cfg) {
         const sg = i === 0 ? 1 : -1;
+        const b = SpinParts.build(cfg);
         return {
-            type, x: CX, y: CY + sg * START_DY, vx: 0, vy: 0,
+            type: b.type, b, x: CX, y: CY + sg * START_DY, vx: 0, vy: 0,
             spin: 0, bg: 0, sg: 0, sp: 0, dash: 0, cd: 0, st: 0, hitCd: 0, wallCd: 0
         };
     }
@@ -402,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function startMatch() {
         S = {
             ph: 'launch', pt: 0, bt: 0, ft: 0, rd: 0, sd: 0, hitstop: 0, ws: WIN_SCORE,
-            sc: [0, 0], tp: [picks[0], picks[1]], lk: [-1, -1], fin: null, tops: null, events: [],
+            sc: [0, 0], cf: [picks[0], picks[1]], tp: [picks[0].core, picks[1].core], lk: [-1, -1], fin: null, tops: null, events: [],
             buf: [1, FLOOR ? FLOOR.buff : 1]
         };
         resetMatchStats();
@@ -419,7 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
         S.rd++;
         S.ph = 'launch'; S.pt = 0; S.bt = 0; S.ft = 0; S.sd = 0; S.hitstop = 0;
         S.lk = [-1, -1]; S.fin = null;
-        S.tops = [mkTop(0, S.tp[0]), mkTop(1, S.tp[1])];
+        S.tops = [mkTop(0, S.cf[0]), mkTop(1, S.cf[1])];
         bot.lockTarget = null;
     }
 
@@ -439,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (S.ph === 'launch') {
                 if (S.lk[i] < 0) S.lk[i] = clamp(typeof lv === 'number' ? lv : meter(S.pt), 0, 1);
             } else if ((S.ph === 'battle' || S.ph === 'finish') && t.st === 0 && t.cd <= 0 && t.spin > 8) {
-                const o = S.tops[1 - i], b = BEYS[t.type];
+                const o = S.tops[1 - i], b = t.b;
                 let dx = inputs[i].x, dy = inputs[i].y;
                 if (Math.hypot(dx, dy) < 0.25) { dx = o.x - t.x; dy = o.y - t.y; }
                 const m = Math.hypot(dx, dy) || 1;
@@ -500,7 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function simStep(dt) {
         const tops = S.tops;
         for (let i = 0; i < 2; i++) {
-            const t = tops[i], b = BEYS[t.type], o = tops[1 - i];
+            const t = tops[i], b = t.b, o = tops[1 - i];
             if (t.st === 2) continue;                       // burst: gone
             if (t.st === 1) {                               // over: falling out of the pocket
                 const d = Math.hypot(t.x - CX, t.y - CY) || 1;
@@ -604,7 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function collide(a, b) {
         if (a.st === 1 || a.st === 2 || b.st === 1 || b.st === 2) return;
-        const A = BEYS[a.type], B = BEYS[b.type];
+        const A = a.b, B = b.b;
         const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), R = A.r + B.r;
         if (d >= R || d < 1e-4) return;
         const nx = dx / d, ny = dy / d;
@@ -703,6 +707,7 @@ document.addEventListener('DOMContentLoaded', () => {
         session.send({
             type: 'state', ph: S.ph, pt: S.pt, bt: S.bt, ft: S.ft, rd: S.rd, sd: S.sd, ws: S.ws,
             sc: S.sc, tp: S.tp, lk: S.lk.map(r1), fin: S.fin,
+            cf: S.ph === 'launch' || S.ph === 'gameover' || frame % 30 === 0 ? S.cf : undefined,
             tops: S.tops.map((t) => [r1(t.x), r1(t.y), r1(t.vx), r1(t.vy), r1(t.spin), r1(t.bg), r1(t.sg), Math.round(t.sp), Math.round(t.dash), Math.round(t.cd), t.st]),
             ev: S.events.filter((e) => frame - e.f < 24)
         });
@@ -726,8 +731,10 @@ document.addEventListener('DOMContentLoaded', () => {
         specDelay: GameBot.pick({ easy: 120, normal: 70, hard: 40 })
     };
     const bot = { timer: 0, x: 0, y: 0, a: 0, s: 0, lockTarget: null, specWait: 0, sent: false };
-    if (GameBot.enabled) picks[1] = MODE === 'tower' ? FLOOR.type : MODE === 'tutorial' ? 'defense'
-        : BASE_TYPES[Math.floor(Math.random() * BASE_TYPES.length)];
+    if (GameBot.enabled) {
+        picks[1] = MODE === 'tower' ? SpinParts.sanitize(FLOOR.cfg || { core: FLOOR.type }).cfg
+            : SpinParts.defaultCfg(MODE === 'tutorial' ? 'defense' : BASE_TYPES[Math.floor(Math.random() * BASE_TYPES.length)]);
+    }
 
     function botStep() {
         const me = S.tops[1], op = S.tops[0];
@@ -743,7 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (me.st === 0 && op.st !== 2) {
             if (--bot.timer <= 0) {
                 bot.timer = BOT.react;
-                const b = BEYS[me.type];
+                const b = me.b;
                 const ox = op.x + op.vx * 6, oy = op.y + op.vy * 6;
                 let tx, ty;
                 const aggressive = op.st === 0 && (me.type === 'attack' || me.type === 'balance' ||
@@ -780,7 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         GameBot.deliver({ type: 'input', x: bot.x, y: bot.y, a: bot.a, s: bot.s });
     }
-    GameBot.expose({ state: () => S, tut: () => Tut });
+    GameBot.expose({ state: () => S, tut: () => Tut, view: () => [0, 1].map((i) => beyOf(i).cfg) });
 
     // ==========================================================
     // Match stats → progression (SpinProgress / SpinPanels)
@@ -853,14 +860,14 @@ document.addEventListener('DOMContentLoaded', () => {
         guard() {
             const me = S.tops[0], du = S.tops[1];
             if (me.st !== 0) {                      // fell out / burst: respawn
-                Object.assign(me, mkTop(0, me.type), { spin: 80 });
+                Object.assign(me, mkTop(0, S.cf[0]), { spin: 80 });
                 emit({ k: 'launch', p: 0, pf: 0, x: me.x, y: me.y });
                 this.praise = L('tut_respawn');
                 this.praiseT = frame;
             }
             me.spin = Math.max(me.spin, 60);
             if (this.step < 4) {
-                if (du.st !== 0) { Object.assign(du, mkTop(1, du.type), { spin: 90 }); }
+                if (du.st !== 0) { Object.assign(du, mkTop(1, S.cf[1]), { spin: 90 }); }
                 du.bg = Math.min(du.bg, 80);
             }
             du.spin = Math.max(du.spin, 70);
@@ -973,7 +980,7 @@ document.addEventListener('DOMContentLoaded', () => {
             channelOpen = true;
             showScreen(readyScreen);
             startBtn.classList.toggle('hidden', myRole !== 'host');
-            if (GameBot.enabled) { oppPick = picks[1]; refreshPicker(); }
+            if (GameBot.enabled) { oppCfg = picks[1]; oppPick = oppCfg.core; refreshPicker(); }
             syncPick();
             setTimeout(decorateMode, 0);
         },
@@ -997,7 +1004,8 @@ document.addEventListener('DOMContentLoaded', () => {
         onMessage: handleMessage
     });
 
-    function syncPick() { session.send({ type: 'pick', t: myPick }); }
+    // `t` alone is what older clients send/understand; `cfg` carries the parts.
+    function syncPick() { session.send({ type: 'pick', t: myPick, cfg: myCfg() }); }
     function decorateMode() {
         const h2 = readyScreen.querySelector('h2');
         if (MODE === 'tower') {
@@ -1007,6 +1015,7 @@ document.addEventListener('DOMContentLoaded', () => {
             p2Label.textContent = `🏯 ${FLOOR.name}`;
             floorCard.innerHTML = `<div class="fc-top"><b>${FLOOR.name}</b> <span>${FLOOR.title}</span></div>` +
                 `<div class="fc-meta">${L('fc_meta', { icon: ti.icon, type: ti.name, buff: FLOOR.buff, ws: FLOOR.ws })}</div>` +
+                (partIcons(picks[1]) ? `<div class="fc-meta">${L('fc_parts', { parts: SpinParts.SLOTS.filter((sl) => picks[1][sl] !== 'std').map((sl) => SpinParts.find(sl, picks[1][sl]).icon + ' ' + L('part_' + sl + '_' + picks[1][sl])).join(' · ') })}</div>` : '') +
                 `<div class="fc-tip">💡 ${FLOOR.tip}</div>`;
             floorCard.classList.remove('hidden');
         } else if (MODE === 'tutorial') {
@@ -1036,10 +1045,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleMessage(msg) {
         if (!msg || typeof msg !== 'object') return;
         if (msg.type === 'pick') {
-            if (TYPES.includes(msg.t)) {
-                oppPick = msg.t;
-                if (myRole === 'host') picks[1] = msg.t;
-                refreshPicker();
+            // The host is the referee: unknown parts or an over-budget build fall
+            // back to standard parts (SpinParts.sanitize), and that cfg is what
+            // gets simulated and broadcast to both screens.
+            const core = msg.cfg && TYPES.includes(msg.cfg.core) ? msg.cfg.core : msg.t;
+            if (TYPES.includes(core)) {
+                const cfg = SpinParts.sanitize(msg.cfg || { core }, core).cfg;
+                if (oppPick !== core || JSON.stringify(oppCfg) !== JSON.stringify(cfg)) {
+                    oppPick = core; oppCfg = cfg;
+                    refreshPicker();
+                }
+                if (myRole === 'host') picks[1] = cfg;
             }
         } else if (msg.type === 'input') {
             if (myRole !== 'host') return;
@@ -1063,6 +1079,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!net || msg.rd < net.rd || (net.ph === 'gameover' && msg.ph !== 'gameover')) resetMatchStats();
             net = msg;
             netAt = performance.now();
+            if (Array.isArray(msg.cf) && msg.cf.length === 2) netCf = msg.cf.map((c) => SpinParts.sanitize(c).cfg);
             if (first) trails[0].length = trails[1].length = 0;
             for (const ev of msg.ev || []) {
                 if (ev.id > lastEvId) { lastEvId = ev.id; fx(ev); }
@@ -1128,11 +1145,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (MODE === 'tower' || MODE === 'tutorial') document.documentElement.classList.add('spin-special');
     startBtn.addEventListener('click', () => {
         Sfx.init();
-        if (myRole === 'host' && (!S || S.ph === 'gameover')) { picks[0] = myPick; startMatch(); }
+        if (myRole === 'host' && (!S || S.ph === 'gameover')) { picks[0] = myCfg(); startMatch(); }
     });
     restartBtn.addEventListener('click', () => {
         Sfx.init();
-        if (myRole === 'host') { picks[0] = myPick; startMatch(); }
+        if (myRole === 'host') { picks[0] = myCfg(); startMatch(); }
         else {
             syncPick();
             session.send({ type: 'restart-request' });
@@ -1147,6 +1164,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================
     const disp = [null, null];
     function D() { return myRole === 'host' ? S : net; }
+    let netCf = null;          // client: last cfg pair the host broadcast
+    /** Built stats of top i for drawing (host: live top, client: from the host's cfgs). */
+    function beyOf(i) {
+        if (myRole === 'host') return S && S.tops ? S.tops[i].b : built(picks[i]);
+        if (netCf) return built(netCf[i]);
+        return built({ core: net && net.tp ? net.tp[i] : 'attack' });
+    }
     function since() { return net ? Math.min(8, (performance.now() - netAt) / (1000 / 60)) : 0; }
     function curPt() {
         const d = D();
@@ -1223,7 +1247,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             }
             case 'spec': {
-                const b = BEYS[(D() && D().tp ? D().tp[ev.p] : 'attack')];
+                const b = beyOf(ev.p);
                 ring(p.x, p.y, hexA(b.c1), 160, 34, 8);
                 ring(p.x, p.y, 'rgba(255,255,255,', 110, 24, 3);
                 sparks(p.x, p.y, 40, [b.c1, b.c2, '#fff'], 7);
@@ -1235,7 +1259,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             }
             case 'launch': {
-                const b = BEYS[(D() && D().tp ? D().tp[ev.p] : 'attack')];
+                const b = beyOf(ev.p);
                 sparks(p.x, p.y, 26, [b.c1, b.c2, '#fff'], 6);
                 ring(p.x, p.y, hexA(b.c1), 70, 20, 4);
                 if (ev.pf) floater(p.x, p.y + (myTop ? -60 : 60), 'PERFECT!!', '#ffd34d', 30);
@@ -1243,7 +1267,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             }
             case 'burst': {
-                const b = BEYS[(D() && D().tp ? D().tp[ev.p] : 'attack')];
+                const b = beyOf(ev.p);
                 for (let k = 0; k < 14; k++) {
                     const a = Math.random() * Math.PI * 2, s = 3 + Math.random() * 8;
                     addPart({ k: 'shard', x: p.x, y: p.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, rot: a, vr: (Math.random() - 0.5) * 0.6, life: 0, max: 70 + Math.random() * 30, c: k % 3 ? b.c1 : '#d9dce8', s: 7 + Math.random() * 9 });
@@ -1398,8 +1422,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function drawBey(g, x, y, type, ang, opt) {
-        const b = BEYS[type], r = b.r * (opt.scale || 1);
+    function drawBey(g, x, y, b, ang, opt) {
+        const r = b.r * (opt.scale || 1);
         const spinF = clamp(opt.spin / 100, 0, 1.1);
         g.save();
         g.globalAlpha = opt.alpha == null ? 1 : opt.alpha;
@@ -1459,16 +1483,31 @@ document.addEventListener('DOMContentLoaded', () => {
         bladePath(g, b, r);
         g.fill();
         g.lineWidth = 1.5; g.strokeStyle = 'rgba(10,6,20,0.8)'; g.stroke();
-        // metal disc
-        const mg = g.createRadialGradient(-r * 0.2, -r * 0.2, 2, 0, 0, r * 0.62);
-        mg.addColorStop(0, '#ffffff'); mg.addColorStop(0.4, '#b8bfd8'); mg.addColorStop(1, '#4a5070');
+        // metal disc (weight-disk part changes its look)
+        const dk = b.disc || 'std';
+        const dr = r * (dk === 'heavy' ? 0.68 : dk === 'light' ? 0.52 : 0.6);
+        const mg = g.createRadialGradient(-r * 0.2, -r * 0.2, 2, 0, 0, dr * 1.03);
+        mg.addColorStop(0, '#ffffff');
+        mg.addColorStop(0.4, dk === 'heavy' ? '#8d94ad' : dk === 'rim' ? '#ffe9a6' : '#b8bfd8');
+        mg.addColorStop(1, dk === 'heavy' ? '#2c3048' : dk === 'rim' ? '#a07a1e' : '#4a5070');
         g.fillStyle = mg;
-        g.beginPath(); g.arc(0, 0, r * 0.6, 0, Math.PI * 2); g.fill();
-        // disc cut-outs
+        g.beginPath(); g.arc(0, 0, dr, 0, Math.PI * 2); g.fill();
+        if (dk === 'rim') {
+            g.strokeStyle = '#ffd34d'; g.lineWidth = r * 0.09;
+            g.beginPath(); g.arc(0, 0, dr * 0.92, 0, Math.PI * 2); g.stroke();
+        } else if (dk === 'swirl') {
+            g.strokeStyle = 'rgba(40,40,70,0.7)'; g.lineWidth = 2;
+            for (let k = 0; k < 4; k++) {
+                const a = k / 4 * Math.PI * 2;
+                g.beginPath(); g.arc(Math.cos(a) * dr * 0.45, Math.sin(a) * dr * 0.45, dr * 0.45, a + 0.6, a + 2.4); g.stroke();
+            }
+        }
+        // disc cut-outs (the light disk has big ones)
         g.fillStyle = 'rgba(20,20,40,0.55)';
-        for (let k = 0; k < b.blades; k++) {
-            const a = (k + 0.5) / b.blades * Math.PI * 2;
-            g.beginPath(); g.arc(Math.cos(a) * r * 0.42, Math.sin(a) * r * 0.42, r * 0.08, 0, Math.PI * 2); g.fill();
+        const holes = dk === 'light' ? 6 : b.blades;
+        for (let k = 0; k < holes; k++) {
+            const a = (k + 0.5) / holes * Math.PI * 2;
+            g.beginPath(); g.arc(Math.cos(a) * dr * 0.7, Math.sin(a) * dr * 0.7, r * (dk === 'light' ? 0.1 : 0.08), 0, Math.PI * 2); g.fill();
         }
         g.restore();
         // owner ring
@@ -1482,7 +1521,7 @@ document.addEventListener('DOMContentLoaded', () => {
         g.rotate(ang * 0.5);
         g.fillStyle = '#120b1e';
         g.beginPath(); g.arc(0, 0, r * 0.3, 0, Math.PI * 2); g.fill();
-        g.strokeStyle = b.c1; g.lineWidth = 2;
+        g.strokeStyle = b.chip || b.c1; g.lineWidth = b.chip ? 3 : 2;
         g.beginPath();
         for (let k = 0; k < 3; k++) {
             const a = k / 3 * Math.PI * 2;
@@ -1601,7 +1640,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (tr.length > 18) tr.shift();
             } else if (tr.length) tr.shift();
             if (tr.length < 2) return;
-            const b = BEYS[t.type];
+            const b = beyOf(i);
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             ctx.lineCap = 'round';
@@ -1628,7 +1667,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (ph === 'launch') {
                 // launcher ready ring
-                const b = BEYS[t.type];
+                const b = beyOf(i);
                 ctx.save();
                 ctx.strokeStyle = hexA(OWNER[i]) + (0.4 + 0.3 * Math.sin(tGlobal * 0.2)) + ')';
                 ctx.lineWidth = 2;
@@ -1638,11 +1677,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.restore();
             }
             if (t.sp > 0 && t.st === 0 && Math.random() < 0.6 * dtf) {
-                const b = BEYS[t.type];
+                const b = beyOf(i);
                 const a = Math.random() * Math.PI * 2;
                 addPart({ k: 'ember', x: v.x + Math.cos(a) * b.r, y: v.y + Math.sin(a) * b.r, vx: Math.cos(a) * 0.6, vy: Math.sin(a) * 0.6 - 0.8, life: 0, max: 30, c: Math.random() < 0.5 ? b.c1 : b.c2, w: 2 + Math.random() * 3 });
             }
-            drawBey(ctx, v.x, v.y, t.type, angles[i], {
+            drawBey(ctx, v.x, v.y, beyOf(i), angles[i], {
                 spin: t.spin, live, stopped: t.st === 3, t: tGlobal, aura: t.sp > 0 && t.st === 0,
                 owner: OWNER[i], scale, alpha
             });
@@ -1734,7 +1773,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawGuides(tops, ph, bt) {
         const me = tops[myIdx], op = tops[1 - myIdx];
         if (!me) return;
-        const b = BEYS[me.type];
+        const b = beyOf(myIdx);
         const v = toView(me.x, me.y);
         // tutorial target ring + pointer
         const tg = Tut.target();
@@ -1807,7 +1846,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const deg = Math.PI / 180;
         for (const side of [0, 1]) {               // 0 = me (bottom), 1 = opponent (top)
             const i = side === 0 ? myIdx : 1 - myIdx;
-            const t = tops[i], b = BEYS[t.type];
+            const t = tops[i], b = beyOf(i);
             const a0 = side === 0 ? 150 * deg : 210 * deg;
             const dir = side === 0 ? -1 : 1;
             const span = 120 * deg;
@@ -1843,7 +1882,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fillStyle = OWNER[i];
             ctx.fillText(side === 0 ? L('c_you') : L(GameBot.enabled ? 'c_cpu' : 'c_rival'), 14, yy);
             ctx.fillStyle = b.c1;
-            ctx.fillText(b.short, 14, y);
+            ctx.fillText(b.nick || b.short, 14, y);
             ctx.font = 'italic 900 22px Orbitron, sans-serif';
             ctx.fillStyle = '#fff';
             ctx.fillText(String(Math.max(0, Math.round(t.spin))), 104, yy + 11);
@@ -2007,7 +2046,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.closePath();
     }
 
-    const pickAng = { attack: 0, defense: 0, stamina: 0, balance: 0 };
+    const pickAng = { attack: 0, defense: 0, stamina: 0, balance: 0, dragon: 0 };
     function renderPicker(dtf) {
         for (const { cv, t } of pickCanvases) {
             const g = cv.getContext('2d');
@@ -2015,9 +2054,10 @@ document.addEventListener('DOMContentLoaded', () => {
             g.clearRect(0, 0, cv.width, cv.height);
             const on = t === myPick;
             pickAng[t] += (on ? 0.45 : 0.05) * dtf;
-            const s = 56 / (BEYS[t].r * 1.45);
+            const b = built(myCfg(t));
+            const s = 56 / (b.r * 1.45);
             g.setTransform(s, 0, 0, s, 0, 0);
-            drawBey(g, 56 / s, 56 / s, t, pickAng[t], { spin: on ? 100 : 25, live: on, t: tGlobal, owner: OWNER[myIdx], scale: 1, aura: on });
+            drawBey(g, 56 / s, 56 / s, b, pickAng[t], { spin: on ? 100 : 25, live: on, t: tGlobal, owner: OWNER[myIdx], scale: 1, aura: on });
         }
     }
 

@@ -6,7 +6,8 @@
   "scripts": {
     "test:e2e": "playwright test",
     "test:server": "npm --prefix server test",
-    "test": "npm run test:server && npm run test:e2e"
+    "test": "npm run test:unit && npm run test:server && npm run test:e2e",
+    "test:unit": "node --test tests/unit/*.test.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.47.0"

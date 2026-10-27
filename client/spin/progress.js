@@ -40,7 +40,9 @@
      * The 擂台 (tower): beat each champion to unlock the next floor.
      * ai: bot brain tuning (see BOT in game.js) · buff: champion's stat
      * multiplier · ws: points to win · tip: how to beat them (shown on the
-     * floor card — this is where players learn matchups).
+     * floor card — this is where players learn matchups) · parts: the
+     * champion's custom build (改装 ideas for the player; sims show each
+     * floor's best-pick win rate stays within noise of the stock champion).
      */
     var TOWER = [
         { name: t('tw1_name'), title: 'ROOKIE TOP', type: 'stamina', buff: 0.85, ws: 3,
@@ -51,23 +53,25 @@
             tip: t('tw2_tip') },
         { name: t('tw3_name'), title: 'GALE RUNNER', type: 'stamina', buff: 1.0, ws: 3,
             ai: { react: 10, noise: 0.32, dashP: 0.02, lock: [0.7, 0.95], specDelay: 60 },
-            tip: t('tw3_tip') },
+            tip: t('tw3_tip'), parts: { ring: 'wide', tip: 'ball' } },
         { name: t('tw4_name'), title: 'HUNTER', type: 'attack', buff: 1.0, ws: 4,
             ai: { react: 8, noise: 0.26, dashP: 0.05, lock: [0.75, 0.97], specDelay: 40 },
-            tip: t('tw4_tip') },
+            tip: t('tw4_tip'), parts: { ring: 'spike', tip: 'rubber' } },
         { name: t('tw5_name'), title: 'PHOENIX', type: 'balance', buff: 1.05, ws: 4,
             ai: { react: 6, noise: 0.2, dashP: 0.07, lock: [0.8, 0.98], specDelay: 25 },
-            tip: t('tw5_tip') },
+            tip: t('tw5_tip'), parts: { ring: 'fang', disk: 'heavy' } },
         { name: t('tw6_name'), title: 'FORTRESS KING', type: 'defense', buff: 1.12, ws: 4,
             ai: { react: 5, noise: 0.14, dashP: 0.08, lock: [0.85, 1.0], specDelay: 12 },
-            tip: t('tw6_tip') },
+            tip: t('tw6_tip'), parts: { ring: 'guard', disk: 'heavy', tip: 'ball' } },
         { name: t('tw7_name'), title: 'STORM LORD', type: 'attack', buff: 1.18, ws: 4,
             ai: { react: 3, noise: 0.08, dashP: 0.12, lock: [0.9, 1.0], specDelay: 5 },
-            tip: t('tw7_tip') },
+            tip: t('tw7_tip'), parts: { ring: 'fang', tip: 'jet' } },
         { name: t('tw8_name'), title: 'DRAGON EMPEROR', type: 'dragon', buff: 1.1, ws: 4,
             ai: { react: 2, noise: 0.05, dashP: 0.14, lock: [0.93, 1.0], specDelay: 3 },
-            tip: t('tw8_tip') }
+            tip: t('tw8_tip'), parts: { ring: 'spike', disk: 'swirl' } }
     ];
+
+    TOWER.forEach(function (f) { f.cfg = Object.assign({ core: f.type }, f.parts || {}); });
 
     var BOT_WIN = { easy: 10, normal: 20, hard: 35 };
 

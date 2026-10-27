@@ -68,6 +68,7 @@
             '<button type="button" class="meta-btn" data-open="guide">' + t('btn_guide') + '</button>' +
             '<button type="button" class="meta-btn" data-open="tower">' + t('btn_tower') + '</button>' +
             '<button type="button" class="meta-btn" data-open="board">' + t('btn_board') + '</button>' +
+            '<button type="button" class="meta-btn" data-open="garage">' + t('btn_garage') + '</button>' +
             '</div>';
         wrap.addEventListener('click', function (e) {
             var b = e.target.closest('[data-open]');
@@ -105,7 +106,10 @@
         screen.querySelector('.panel-close').addEventListener('click', close);
         document.getElementById('overlay').appendChild(screen);
     }
-    function open(which) {
+    var PANELS = {};
+    /** Other files add panels here (garage.js → 'garage'). fn(body, arg) fills the body. */
+    function register(name, fn) { PANELS[name] = fn; }
+    function open(which, arg) {
         ensureScreen();
         var overlay = document.getElementById('overlay');
         if (screen.classList.contains('hidden')) {
@@ -119,7 +123,7 @@
         overlay.classList.remove('hidden');
         body.innerHTML = '';
         body.scrollTop = 0;
-        ({ guide: guidePanel, tower: towerPanel, board: boardPanel })[which]();
+        PANELS[which](body, arg);
     }
     function close() {
         if (!screen) return;
@@ -271,7 +275,17 @@
         sync();
     }
 
+    PANELS.guide = guidePanel;
+    PANELS.tower = towerPanel;
+    PANELS.board = boardPanel;
+    /** Is the panel screen showing (garage.js stops its preview loop when not)? */
+    function isOpen() { return !!screen && !screen.classList.contains('hidden'); }
+
     window.SpinPanels = {
+        register: register,
+        isOpen: isOpen,
+        setTitle: function (s) { ensureScreen(); title(s); },
+        esc: esc,
         mode: mode,
         floor: floor,
         modeUrl: modeUrl,
