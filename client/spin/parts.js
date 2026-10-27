@@ -25,26 +25,26 @@
     var CORES = {
         attack: {
             name: 'STORM STRIKER', short: 'STRIKER', spec: 'METEOR RUSH',
-            c1: '#ff3b5c', c2: '#ffb02e', r: 34, mass: 1.0, accel: 0.40, vmax: 9.6, drain: 0.050,
+            c1: '#ff3b5c', c2: '#ffb02e', r: 34, mass: 1.1, accel: 0.40, vmax: 9.6, drain: 0.040,
             atk: 1.35, def: 0.85, bres: 0.9, dash: 8.6, blades: 3,
             shape: [[0.42, -0.62], [0.98, -0.2], [1.04, 0.04], [0.8, 0.13], [0.62, 0.42]]
         },
         defense: {
             name: 'IRON FORTRESS', short: 'FORTRESS', spec: 'AEGIS WALL',
-            c1: '#3d8bff', c2: '#a9dcff', r: 37, mass: 1.55, accel: 0.27, vmax: 7.0, drain: 0.042,
-            atk: 0.95, def: 1.4, bres: 1.45, dash: 6.4, blades: 6,
+            c1: '#3d8bff', c2: '#a9dcff', r: 37, mass: 1.55, accel: 0.27, vmax: 7.0, drain: 0.0345,
+            atk: 0.86, def: 1.4, bres: 1.45, dash: 6.4, blades: 6,
             shape: [[0.55, -0.48], [0.96, -0.4], [1.02, 0], [0.96, 0.4], [0.55, 0.48]]
         },
         stamina: {
             name: 'ZEPHYR WING', short: 'ZEPHYR', spec: 'ETERNAL GALE',
-            c1: '#22e39b', c2: '#d4fff0', r: 33, mass: 0.9, accel: 0.33, vmax: 8.2, drain: 0.030,
+            c1: '#22e39b', c2: '#d4fff0', r: 33, mass: 0.9, accel: 0.264, vmax: 7.4, drain: 0.0375,
             atk: 0.85, def: 1.0, bres: 1.0, dash: 7.4, blades: 4,
             shape: [[0.38, -0.25], [0.82, -0.32], [1.04, -0.12], [0.98, 0.06], [0.46, 0.34]]
         },
         balance: {
             name: 'PHOENIX FLARE', short: 'PHOENIX', spec: 'RISING FLARE',
-            c1: '#ffb300', c2: '#fff1a8', r: 35, mass: 1.12, accel: 0.34, vmax: 8.4, drain: 0.040,
-            atk: 1.12, def: 1.12, bres: 1.15, dash: 7.8, blades: 5,
+            c1: '#ffb300', c2: '#fff1a8', r: 35, mass: 1.12, accel: 0.34, vmax: 8.4, drain: 0.0352,
+            atk: 1.15, def: 1.12, bres: 1.24, dash: 7.8, blades: 5,
             shape: [[0.5, -0.42], [0.88, -0.32], [1.05, -0.02], [0.84, 0.08], [0.95, 0.3], [0.55, 0.42]]
         },
         dragon: {

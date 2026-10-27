@@ -80,7 +80,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const TYPES = BASE_TYPES.concat('dragon');     // dragon: unlocked by clearing the tower
     // type triangle: key beats value (damage ×ADV_MUL)
     const ADV = { attack: 'stamina', stamina: 'defense', defense: 'attack' };
-    const ADV_MUL = 1.3;                // 1.2 left attack-vs-stamina under 40% in sims
+    const ADV_MUL = 1.1;                // with attack's armour pierce: counters ≈75% at human level
+    // Armour pierce: an attack-type hitter ignores the part of the target's def
+    // and bres above 1. Without it attack beat defense 0–3% whatever its stats
+    // (any atk high enough to dent defense flattened balance instead).
+    const PIERCE = 0;                   // 0 = full pierce, 1 = none
     // Stock cores live in parts.js; a top's real stats come from its cfg
     // (core + ring + disk + tip) via SpinParts.build() and ride along as top.b.
     const BEYS = SpinParts.CORES;
@@ -648,12 +652,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (pa.st !== 0) atk *= 0.3;
             if (ADV[att.type] === def.type) atk *= ADV_MUL;
             atk *= S.buf[S.tops.indexOf(att)];
-            const dv = DF.def * (def.sp > 0 && def.type === 'defense' ? 2 : 1) * S.buf[S.tops.indexOf(def)];
+            const prc = att.type === 'attack' ? PIERCE : 1;
+            const dv = (1 + (DF.def - 1) * prc) * (def.sp > 0 && def.type === 'defense' ? 2 : 1) * S.buf[S.tops.indexOf(def)];
             if (def.st === 0) {
                 def.spin -= I * 0.72 * atk / dv;
                 if (I > 4 && !(def.sp > 0 && def.type === 'defense')) {
                     const lowSpin = 1.5 - Math.min(1, Math.max(0, pd.spin) / 100);
-                    const add = Math.pow(I - 4, 1.3) * 2.0 * atk / DF.bres * lowSpin * (0.75 + Math.random() * 0.5);
+                    const add = Math.pow(I - 4, 1.3) * 2.0 * atk / (1 + (DF.bres - 1) * prc) * lowSpin * (0.75 + Math.random() * 0.5);
                     def.bg += add;
                     if (add > 22) crit = true;
                     if (def.bg >= 100 && def.st === 0) {
@@ -720,15 +725,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // (react 12 frames, steering noise 0.35, launch lock 0.55–0.95):
     //   easy   mirror ~90%  · best pick ~95%
     //   normal mirror ~60%  · best pick ~80%
-    //   hard   mirror ~30%  · best pick ~80%  (pick the counter!)
+    //   hard   mirror ~40–60% · best pick ~55–75%  (pick the counter!)
+    //          (retuned with the 2026-10 core rebalance + attack armour pierce)
     // The old hard bot (react 3 ≈ 50 ms, ~60% PERFECT launches) beat that
     // player ~99% in mirror matches. Tower floors keep their own tuning.
     const BOT = FLOOR ? Object.assign({}, FLOOR.ai) : {
-        react: GameBot.pick({ easy: 18, normal: 12, hard: 8 }),
-        noise: GameBot.pick({ easy: 0.55, normal: 0.38, hard: 0.3 }),
-        dashP: GameBot.pick({ easy: 0.012, normal: 0.03, hard: 0.05 }),
-        lock: GameBot.pick({ easy: [0.4, 0.85], normal: [0.52, 0.92], hard: [0.6, 0.95] }),
-        specDelay: GameBot.pick({ easy: 120, normal: 70, hard: 40 })
+        react: GameBot.pick({ easy: 18, normal: 12, hard: 9 }),
+        noise: GameBot.pick({ easy: 0.55, normal: 0.38, hard: 0.33 }),
+        dashP: GameBot.pick({ easy: 0.012, normal: 0.03, hard: 0.045 }),
+        lock: GameBot.pick({ easy: [0.4, 0.85], normal: [0.52, 0.92], hard: [0.55, 0.93] }),
+        specDelay: GameBot.pick({ easy: 120, normal: 70, hard: 50 })
     };
     const bot = { timer: 0, x: 0, y: 0, a: 0, s: 0, lockTarget: null, specWait: 0, sent: false };
     if (GameBot.enabled) {
