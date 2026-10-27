@@ -32,7 +32,12 @@ test.describe('game challenge from the device list', () => {
             pageA.on('filechooser', () => { chooserOpened = true; });
             await pageA.locator('x-peer .peer-game-btn').click();
             await expect(pageA.locator('#gamePickerDialog')).toHaveAttribute('show', '1');
-            await expect(pageA.locator('.game-picker-item')).toHaveCount(9);
+            // Count comes from the page's own game list (data-games), so adding a
+            // game doesn't break this test; the fixed checks below still guard the
+            // games this flow depends on.
+            const listed = await pageA.evaluate(() => window.LinkGames.list.length);
+            expect(listed).toBeGreaterThanOrEqual(9);
+            await expect(pageA.locator('.game-picker-item')).toHaveCount(listed);
             await expect(pageA.locator('.game-picker-item[data-game="blaster"]')).toBeVisible();
             await expect(pageA.locator('.game-picker-item[data-game="bombs"]')).toBeVisible();
             await pageA.locator('.game-picker-item[data-game="brawl"]').click();
