@@ -156,7 +156,7 @@
             '<ul class="g-list picks">' + pickRows + '</ul>' +
             '<h4>' + t('g_ctrl_h') + '</h4>' +
             '<ul class="g-list">' +
-            ['g_ctrl_launch', 'g_ctrl_move', 'g_ctrl_dash', 'g_ctrl_spec'].map(function (k) { return '<li>' + t(k) + '</li>'; }).join('') +
+            ['g_ctrl_launch', 'g_ctrl_move', 'g_ctrl_dash', 'g_ctrl_spec', 'g_ctrl_rail'].map(function (k) { return '<li>' + t(k) + '</li>'; }).join('') +
             '</ul>' +
             '<h4>' + t('g_tri_h') + '</h4>' +
             '<div class="tri">' + t('g_tri') + '</div>' +

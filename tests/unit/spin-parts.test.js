@@ -6,7 +6,7 @@ const P = require('../../client/spin/parts.js');
 test('default cfg builds to the stock core', () => {
     for (const c of P.CORE_IDS) {
         const b = P.build(P.defaultCfg(c));
-        for (const k of ['r', 'mass', 'accel', 'vmax', 'drain', 'atk', 'def', 'bres', 'dash']) assert.strictEqual(b[k], P.CORES[c][k], `${c}.${k}`);
+        for (const k of ['r', 'mass', 'accel', 'vmax', 'drain', 'atk', 'def', 'bres', 'dash', 'gear']) assert.strictEqual(b[k], P.CORES[c][k], `${c}.${k}`);
         assert.strictEqual(b.type, c);
         assert.strictEqual(b.cost, 0);
     }
@@ -87,4 +87,14 @@ test('stat bars stay in range for every legal build', () => {
             for (const v of P.bars(P.build(cfg))) assert.ok(v >= 0.3 && v <= 6);
         }
     }
+});
+
+test('gear (rail X-DASH): attack meshes hardest, needle never engages, cog is the gear tip', () => {
+    const g = (core, tip) => P.build({ core, tip }).gear;
+    for (const c of P.CORE_IDS) {
+        assert.ok(g(c, 'std') > 0 && g(c, 'std') <= 1, `${c} base gear`);
+        assert.strictEqual(g(c, 'needle'), 0);
+        for (const t of P.PARTS.tip) assert.ok(g(c, 'cog') >= g(c, t.id), `cog ≥ ${t.id}`);
+    }
+    assert.ok(g('attack', 'std') > g('balance', 'std') && g('balance', 'std') > g('stamina', 'std'));
 });

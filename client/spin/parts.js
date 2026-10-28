@@ -16,6 +16,9 @@
  * local progression thing only; the host can't check them, and doesn't need
  * to: unlocking never raises the budget.
  *
+ * gear: how hard the tip meshes with the stadium's gear rails (齿轨) → X-DASH
+ *   strength in game.js. 0 = smooth tip, never engages (needle).
+ *
  * Stat mods: `mul` multiplies, `add` adds. Tuned with offline sims of the real
  * physics (see git log / tests/unit/spin-parts.test.js for the guard rails).
  */
@@ -26,31 +29,31 @@
         attack: {
             name: 'STORM STRIKER', short: 'STRIKER', spec: 'METEOR RUSH',
             c1: '#ff3b5c', c2: '#ffb02e', r: 34, mass: 1.1, accel: 0.40, vmax: 9.6, drain: 0.040,
-            atk: 1.35, def: 0.85, bres: 0.9, dash: 8.6, blades: 3,
+            atk: 1.35, def: 0.85, bres: 0.9, dash: 8.6, gear: 1.0, blades: 3,
             shape: [[0.42, -0.62], [0.98, -0.2], [1.04, 0.04], [0.8, 0.13], [0.62, 0.42]]
         },
         defense: {
             name: 'IRON FORTRESS', short: 'FORTRESS', spec: 'AEGIS WALL',
             c1: '#3d8bff', c2: '#a9dcff', r: 37, mass: 1.55, accel: 0.27, vmax: 7.0, drain: 0.0345,
-            atk: 0.86, def: 1.4, bres: 1.45, dash: 6.4, blades: 6,
+            atk: 0.86, def: 1.4, bres: 1.45, dash: 6.4, gear: 0.5, blades: 6,
             shape: [[0.55, -0.48], [0.96, -0.4], [1.02, 0], [0.96, 0.4], [0.55, 0.48]]
         },
         stamina: {
             name: 'ZEPHYR WING', short: 'ZEPHYR', spec: 'ETERNAL GALE',
             c1: '#22e39b', c2: '#d4fff0', r: 33, mass: 0.9, accel: 0.264, vmax: 7.4, drain: 0.0375,
-            atk: 0.85, def: 1.0, bres: 1.0, dash: 7.4, blades: 4,
+            atk: 0.85, def: 1.0, bres: 1.0, dash: 7.4, gear: 0.3, blades: 4,
             shape: [[0.38, -0.25], [0.82, -0.32], [1.04, -0.12], [0.98, 0.06], [0.46, 0.34]]
         },
         balance: {
             name: 'PHOENIX FLARE', short: 'PHOENIX', spec: 'RISING FLARE',
             c1: '#ffb300', c2: '#fff1a8', r: 35, mass: 1.12, accel: 0.34, vmax: 8.4, drain: 0.0352,
-            atk: 1.15, def: 1.12, bres: 1.24, dash: 7.8, blades: 5,
+            atk: 1.15, def: 1.12, bres: 1.24, dash: 7.8, gear: 0.4, blades: 5,
             shape: [[0.5, -0.42], [0.88, -0.32], [1.05, -0.02], [0.84, 0.08], [0.95, 0.3], [0.55, 0.42]]
         },
         dragon: {
             name: 'VOID DRAGON', short: 'DRAGON', spec: 'DRAGON STORM',
             c1: '#9b5cff', c2: '#00f0ff', r: 35, mass: 1.2, accel: 0.37, vmax: 9.0, drain: 0.036,
-            atk: 1.25, def: 1.12, bres: 1.2, dash: 8.2, blades: 3,
+            atk: 1.25, def: 1.12, bres: 1.2, dash: 8.2, gear: 0.9, blades: 3,
             shape: [[0.3, -0.7], [0.9, -0.45], [1.08, -0.08], [0.7, 0.05], [0.95, 0.38], [0.5, 0.5]]
         }
     };
@@ -86,10 +89,11 @@
         ],
         tip: [
             { id: 'std', icon: '🔩', cost: 0, unlock: null },
-            { id: 'ball', icon: '⚪', cost: 1, unlock: null, mul: { def: 1.03, drain: 0.97, accel: 0.86, dash: 0.9 }, look: { chip: '#d9dce8' } },
-            { id: 'needle', icon: '📍', cost: 2, unlock: { rp: 300, tw: 3 }, mul: { drain: 0.9, mass: 0.9, accel: 0.86, dash: 0.85 }, look: { chip: '#22e39b' } },
-            { id: 'rubber', icon: '🛞', cost: 2, unlock: { rp: 300, tw: 4, bursts: 5 }, mul: { accel: 1.15, dash: 1.1, atk: 1.03, drain: 1.12 }, look: { chip: '#ff7a3d' } },
-            { id: 'jet', icon: '🚀', cost: 3, unlock: { rp: 1000, tw: 6 }, mul: { vmax: 1.1, dash: 1.2, accel: 1.08, atk: 1.04, drain: 1.04, bres: 0.97 }, look: { chip: '#ffd34d' } }
+            { id: 'ball', icon: '⚪', cost: 1, unlock: null, mul: { def: 1.03, drain: 0.97, accel: 0.86, dash: 0.9, gear: 0.6 }, look: { chip: '#d9dce8' } },
+            { id: 'needle', icon: '📍', cost: 2, unlock: { rp: 300, tw: 3 }, mul: { drain: 0.9, mass: 0.9, accel: 0.86, dash: 0.85, gear: 0 }, look: { chip: '#22e39b' } },
+            { id: 'rubber', icon: '🛞', cost: 2, unlock: { rp: 300, tw: 4, bursts: 5 }, mul: { accel: 1.15, dash: 1.1, atk: 1.03, drain: 1.09, gear: 1.25 }, look: { chip: '#ff7a3d' } },
+            { id: 'cog', icon: '⚡', cost: 2, unlock: { rp: 200, tw: 2 }, mul: { gear: 1.7, drain: 1.04, def: 0.97 }, look: { chip: '#ffe27a' } },
+            { id: 'jet', icon: '🚀', cost: 3, unlock: { rp: 1000, tw: 6 }, mul: { vmax: 1.1, dash: 1.2, accel: 1.08, atk: 1.04, drain: 1.04, bres: 0.97, gear: 1.1 }, look: { chip: '#ffd34d' } }
         ]
     };
 

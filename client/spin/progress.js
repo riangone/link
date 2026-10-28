@@ -38,7 +38,7 @@
 
     /**
      * The 擂台 (tower): beat each champion to unlock the next floor.
-     * ai: bot brain tuning (see BOT in game.js) · buff: champion's stat
+     * ai: bot brain tuning (see BOT in game.js; rail = chance to ride a gear rail) · buff: champion's stat
      * multiplier (<1 on the attack floors: a precise AI on the attack core
      * outclasses a human-level player even at equal stats) · ws: points to win · tip: how to beat them (shown on the
      * floor card — this is where players learn matchups) · parts: the
@@ -47,28 +47,28 @@
      */
     var TOWER = [
         { name: t('tw1_name'), title: 'ROOKIE TOP', type: 'stamina', buff: 0.85, ws: 3,
-            ai: { react: 20, noise: 0.6, dashP: 0.008, lock: [0.35, 0.7], specDelay: 200 },
+            ai: { react: 20, noise: 0.6, dashP: 0.008, lock: [0.35, 0.7], specDelay: 200, rail: 0 },
             tip: t('tw1_tip') },
         { name: t('tw2_name'), title: 'IRON GUARD', type: 'defense', buff: 0.95, ws: 3,
-            ai: { react: 14, noise: 0.45, dashP: 0.015, lock: [0.5, 0.85], specDelay: 120 },
+            ai: { react: 14, noise: 0.45, dashP: 0.015, lock: [0.5, 0.85], specDelay: 120, rail: 0 },
             tip: t('tw2_tip') },
         { name: t('tw3_name'), title: 'GALE RUNNER', type: 'stamina', buff: 1.0, ws: 3,
-            ai: { react: 10, noise: 0.32, dashP: 0.02, lock: [0.7, 0.95], specDelay: 60 },
+            ai: { react: 10, noise: 0.32, dashP: 0.02, lock: [0.7, 0.95], specDelay: 60, rail: 0.2 },
             tip: t('tw3_tip'), parts: { ring: 'wide', tip: 'ball' } },
         { name: t('tw4_name'), title: 'HUNTER', type: 'attack', buff: 0.85, ws: 4,
-            ai: { react: 8, noise: 0.26, dashP: 0.05, lock: [0.75, 0.97], specDelay: 40 },
+            ai: { react: 8, noise: 0.26, dashP: 0.05, lock: [0.75, 0.97], specDelay: 40, rail: 0.4 },
             tip: t('tw4_tip'), parts: { ring: 'spike', tip: 'rubber' } },
         { name: t('tw5_name'), title: 'PHOENIX', type: 'balance', buff: 1.02, ws: 4,
-            ai: { react: 6, noise: 0.2, dashP: 0.07, lock: [0.8, 0.98], specDelay: 25 },
+            ai: { react: 6, noise: 0.2, dashP: 0.07, lock: [0.8, 0.98], specDelay: 25, rail: 0.5 },
             tip: t('tw5_tip'), parts: { ring: 'fang', disk: 'heavy' } },
         { name: t('tw6_name'), title: 'FORTRESS KING', type: 'defense', buff: 1.12, ws: 4,
-            ai: { react: 5, noise: 0.14, dashP: 0.08, lock: [0.85, 1.0], specDelay: 12 },
+            ai: { react: 5, noise: 0.14, dashP: 0.08, lock: [0.85, 1.0], specDelay: 12, rail: 0.6 },
             tip: t('tw6_tip'), parts: { ring: 'guard', disk: 'heavy', tip: 'ball' } },
         { name: t('tw7_name'), title: 'STORM LORD', type: 'attack', buff: 0.85, ws: 4,
-            ai: { react: 7, noise: 0.22, dashP: 0.08, lock: [0.78, 0.97], specDelay: 20 },
+            ai: { react: 7, noise: 0.22, dashP: 0.08, lock: [0.78, 0.97], specDelay: 20, rail: 0.5 },
             tip: t('tw7_tip'), parts: { ring: 'fang', tip: 'jet' } },
         { name: t('tw8_name'), title: 'DRAGON EMPEROR', type: 'dragon', buff: 0.96, ws: 4,
-            ai: { react: 2, noise: 0.05, dashP: 0.14, lock: [0.93, 1.0], specDelay: 3 },
+            ai: { react: 2, noise: 0.05, dashP: 0.14, lock: [0.93, 1.0], specDelay: 3, rail: 0.8 },
             tip: t('tw8_tip'), parts: { ring: 'spike', disk: 'swirl' } }
     ];
 

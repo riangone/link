@@ -108,6 +108,7 @@
         hint_start: '追上对手，按 {key} 撞它！',
         hint_style_stamina: '🌀 持久型别去撞！在中间转圈，等它先停',
         hint_style_defense: '🛡️ 站在中间，让它来撞你',
+        hint_rail: '⚙️ 贴着<b>金色齿轨</b>顺着转的方向跑，就能 X-DASH 加速！',
 
         tut_clear_btn: '🏯 去挑战擂台 1F',
         next_floor: '▶ 下一层 {n}F',
@@ -142,6 +143,7 @@
         g_ctrl_move: '<b>移动</b>：<kbd>WASD</kbd> / 方向键 / 按住鼠标 / 左下角摇杆。陀螺停不下来，转弯要早一点。',
         g_ctrl_dash: '<b>冲撞</b>：<kbd>空格</kbd> / 💥。朝<b>白色箭头</b>冲过去（不按方向就自动冲向对手）。每次会少一点转速，要等一下才能再冲。',
         g_ctrl_spec: '<b>必杀</b>：<kbd>E</kbd> / ⚡。互相撞会攒能量，⚡ 满了才能用，能用 3 秒。',
+        g_ctrl_rail: '<b>齿轨 X-DASH</b>：场边上下各有一段<b>金色齿轨</b>。贴着它、顺着陀螺转的方向跑，轴心的齿轮会咬住齿轨：<b>猛地加速</b>、多转一点，这时撞人更痛。轴心齿轮越强（⚡ 齿轮轴最强），冲得越猛；针轴没有齿轮，不会冲。',
         g_tri_h: '谁赢谁（撞起来更痛）',
         g_tri: '⚔️ 攻击 <i>赢</i> 🌀 持久 <i>赢</i> 🛡️ 防御 <i>赢</i> ⚔️ 攻击<br><small>🔥 平衡型谁都不怕，也赢不了谁，适合新手</small>',
         g_spec_h: '必杀技',
@@ -275,6 +277,7 @@
         hint_start: 'Chase your rival and press {key} to hit it!',
         hint_style_stamina: '🌀 Stamina: don\'t hit! Circle the middle and wait',
         hint_style_defense: '🛡️ Stay in the middle and let it hit you',
+        hint_rail: '⚙️ Ride the <b>gold gear rail</b> the way you spin for an X-DASH!',
 
         tut_clear_btn: '🏯 Try tower 1F',
         next_floor: '▶ Next floor {n}F',
@@ -309,6 +312,7 @@
         g_ctrl_move: '<b>Move</b>: <kbd>WASD</kbd> / arrow keys / hold the mouse / the stick. Tops slide, so turn early.',
         g_ctrl_dash: '<b>Dash</b>: <kbd>SPACE</kbd> / 💥. Rush along the <b>white arrow</b> (or straight at your rival). Costs a little spin, then wait a moment.',
         g_ctrl_spec: '<b>Special</b>: <kbd>E</kbd> / ⚡. Hits fill your energy. When ⚡ is full you can use it for 3 seconds.',
+        g_ctrl_rail: '<b>Gear rail X-DASH</b>: the <b>gold teeth</b> at the top and bottom edge are gear rails. Roll along one the same way your top spins and your tip grabs it: a <b>big speed boost</b>, a bit of extra spin, and harder hits. Stronger tip gear (⚡ Cog tip is the best) = bigger dash. The needle tip has no gear.',
         g_tri_h: 'Who beats who (hits hurt more)',
         g_tri: '⚔️ Attack <i>beats</i> 🌀 Stamina <i>beats</i> 🛡️ Defense <i>beats</i> ⚔️ Attack<br><small>🔥 Balance has no strong or weak matchup. Good for beginners</small>',
         g_spec_h: 'Special moves',
@@ -442,6 +446,7 @@
         hint_start: 'あいてをおいかけて {key} でぶつかろう！',
         hint_style_stamina: '🌀 スタミナはぶつからないで！まんなかでまとう',
         hint_style_defense: '🛡️ まんなかにいて、あいてにぶつからせよう',
+        hint_rail: '⚙️ <b>金色のギアレール</b>を回るむきにはしると X-DASH！',
 
         tut_clear_btn: '🏯 タワー1かいへ',
         next_floor: '▶ つぎのかい {n}かい',
@@ -476,6 +481,7 @@
         g_ctrl_move: '<b>うごく</b>：<kbd>WASD</kbd> / 矢印キー / マウス / 左下スティック。すぐにはとまれないから、早めにまがろう。',
         g_ctrl_dash: '<b>ダッシュ</b>：<kbd>スペース</kbd> / 💥。<b>白い矢印</b>のほうへつっこむ（なにもおさないとあいてにむかう）。回転が少しへって、少しまたないとつかえない。',
         g_ctrl_spec: '<b>ひっさつ</b>：<kbd>E</kbd> / ⚡。ぶつかると ⚡ がたまる。いっぱいになったら3びょうつかえる。',
+        g_ctrl_rail: '<b>ギアレール X-DASH</b>：上と下のふちに<b>金色のギアレール</b>があるよ。コマが回るむきにそってはしると、じくのギアがかみあって<b>いっきに加速</b>！回転もすこしふえて、ぶつかるといたい。ギアがつよいじくほど（⚡ ギアじくがさいきょう）よくとぶ。ニードルじくはギアがないよ。',
         g_tri_h: 'どれがどれに強い？（ぶつかるといたい）',
         g_tri: '⚔️ アタック <i>＞</i> 🌀 スタミナ <i>＞</i> 🛡️ ディフェンス <i>＞</i> ⚔️ アタック<br><small>🔥 バランスはとくいもにがてもない。はじめての人におすすめ</small>',
         g_spec_h: 'ひっさつわざ',
@@ -609,6 +615,7 @@
         hint_start: '상대를 쫓아가서 {key} 로 부딪혀요!',
         hint_style_stamina: '🌀 지구력은 부딪히지 마요! 가운데에서 기다려요',
         hint_style_defense: '🛡️ 가운데에 있으면서 상대가 부딪히게 해요',
+        hint_rail: '⚙️ <b>금색 기어 레일</b>을 도는 방향으로 타면 X-DASH!',
 
         tut_clear_btn: '🏯 탑 1층 도전',
         next_floor: '▶ 다음 층 {n}층',
@@ -643,6 +650,7 @@
         g_ctrl_move: '<b>이동</b>: <kbd>WASD</kbd> / 방향키 / 마우스 / 왼쪽 아래 스틱. 바로 멈추지 못하니까 일찍 방향을 바꿔요.',
         g_ctrl_dash: '<b>돌진</b>: <kbd>스페이스</kbd> / 💥. <b>흰 화살표</b> 쪽으로 돌진 (방향을 안 누르면 상대에게). 회전이 조금 줄고, 잠깐 기다려야 다시 쓸 수 있어요.',
         g_ctrl_spec: '<b>필살기</b>: <kbd>E</kbd> / ⚡. 부딪히면 ⚡ 가 차요. 가득 차면 3초 동안 쓸 수 있어요.',
+        g_ctrl_rail: '<b>기어 레일 X-DASH</b>: 위아래 가장자리에 <b>금색 기어 레일</b>이 있어요. 팽이가 도는 방향으로 레일을 따라 달리면 축의 기어가 맞물려서 <b>확 빨라지고</b>, 회전도 조금 늘고, 더 세게 부딪혀요. 기어가 강한 축일수록 (⚡ 기어 축이 최고) 더 세게 달려요. 바늘 축은 기어가 없어요.',
         g_tri_h: '누가 누구에게 강할까? (부딪히면 더 아파요)',
         g_tri: '⚔️ 공격 <i>＞</i> 🌀 지구력 <i>＞</i> 🛡️ 방어 <i>＞</i> ⚔️ 공격<br><small>🔥 밸런스는 강한 상대도 약한 상대도 없어요. 처음 하는 사람에게 추천</small>',
         g_spec_h: '필살기',
@@ -709,10 +717,11 @@
         part_disk_heavy: '重盘', part_disk_heavy_g: '很难被撞飞', part_disk_heavy_b: '跑得慢，转得也短一点',
         part_disk_swirl: '旋风盘', part_disk_swirl_g: '跑得快，撞人更痛', part_disk_swirl_b: '被撞的时候更疼',
         part_disk_rim: '金边盘', part_disk_rim_g: '转得久一点，也更稳', part_disk_rim_b: '起步很慢，跑不快',
-        part_tip_ball: '球轴', part_tip_ball_g: '稳稳的，转得久一点', part_tip_ball_b: '转弯慢，冲撞弱一点',
-        part_tip_needle: '针轴', part_tip_needle_g: '转得更久', part_tip_needle_b: '变轻了，转弯慢，冲撞弱',
+        part_tip_ball: '球轴', part_tip_ball_g: '稳稳的，转得久一点', part_tip_ball_b: '转弯慢，冲撞弱一点，齿轮弱',
+        part_tip_needle: '针轴', part_tip_needle_g: '转得更久', part_tip_needle_b: '变轻了，转弯慢，冲撞弱，没有齿轮',
         part_tip_rubber: '橡胶轴', part_tip_rubber_g: '抓地强，冲撞超猛', part_tip_rubber_b: '转速掉得快',
         part_tip_jet: '喷射轴', part_tip_jet_g: '像火箭一样冲！', part_tip_jet_b: '转速掉得快一点',
+        part_tip_cog: '齿轮轴', part_tip_cog_g: '齿轨 X-DASH 超猛！', part_tip_cog_b: '转速掉得快一点，有点软',
         fc_parts: '它的改装：{parts}'
     });
     Object.assign(D.en, {
@@ -739,10 +748,11 @@
         part_disk_heavy: 'Heavy disk', part_disk_heavy_g: 'Hard to knock away', part_disk_heavy_b: 'Slow, spins a bit shorter',
         part_disk_swirl: 'Swirl disk', part_disk_swirl_g: 'Faster, hits harder', part_disk_swirl_b: 'Getting hit hurts more',
         part_disk_rim: 'Gold rim disk', part_disk_rim_g: 'Spins a bit longer, steadier', part_disk_rim_b: 'Slow to start, not fast',
-        part_tip_ball: 'Ball tip', part_tip_ball_g: 'Steady, spins a bit longer', part_tip_ball_b: 'Turns slowly, weaker dash',
-        part_tip_needle: 'Needle tip', part_tip_needle_g: 'Spins longer', part_tip_needle_b: 'Lighter, turns slowly, weak dash',
+        part_tip_ball: 'Ball tip', part_tip_ball_g: 'Steady, spins a bit longer', part_tip_ball_b: 'Turns slowly, weaker dash, weak gear',
+        part_tip_needle: 'Needle tip', part_tip_needle_g: 'Spins longer', part_tip_needle_b: 'Lighter, turns slowly, weak dash, no gear',
         part_tip_rubber: 'Rubber tip', part_tip_rubber_g: 'Great grip, huge dash', part_tip_rubber_b: 'Loses spin fast',
         part_tip_jet: 'Jet tip', part_tip_jet_g: 'Zooms like a rocket!', part_tip_jet_b: 'Loses spin a bit faster',
+        part_tip_cog: 'Cog tip', part_tip_cog_g: 'Huge gear-rail X-DASH!', part_tip_cog_b: 'Loses spin a bit faster, a bit softer',
         fc_parts: 'Their parts: {parts}'
     });
     Object.assign(D.ja, {
@@ -769,10 +779,11 @@
         part_disk_heavy: 'ヘビーディスク', part_disk_heavy_g: 'とばされにくい', part_disk_heavy_b: 'おそい、すこしみじかい',
         part_disk_swirl: 'スワールディスク', part_disk_swirl_g: 'はやくて、いたい', part_disk_swirl_b: 'ぶつけられるといたい',
         part_disk_rim: 'ゴールドリムディスク', part_disk_rim_g: 'すこしながくまわる、あんてい', part_disk_rim_b: 'うごきだしがおそい',
-        part_tip_ball: 'ボールじく', part_tip_ball_g: 'あんていして、すこしながい', part_tip_ball_b: 'まがるのがおそい',
-        part_tip_needle: 'ニードルじく', part_tip_needle_g: 'ながくまわる', part_tip_needle_b: 'かるくなる、ダッシュがよわい',
+        part_tip_ball: 'ボールじく', part_tip_ball_g: 'あんていして、すこしながい', part_tip_ball_b: 'まがるのがおそい、ギアがよわい',
+        part_tip_needle: 'ニードルじく', part_tip_needle_g: 'ながくまわる', part_tip_needle_b: 'かるくなる、ダッシュがよわい、ギアなし',
         part_tip_rubber: 'ラバーじく', part_tip_rubber_g: 'すべらない！ダッシュがすごい', part_tip_rubber_b: 'かいてんがすぐへる',
         part_tip_jet: 'ジェットじく', part_tip_jet_g: 'ロケットみたいにとぶ！', part_tip_jet_b: 'かいてんがすこしへりやすい',
+        part_tip_cog: 'ギアじく', part_tip_cog_g: 'ギアレールの X-DASH がすごい！', part_tip_cog_b: 'かいてんがすこしへりやすい、すこしやわらかい',
         fc_parts: 'あいてのかいぞう：{parts}'
     });
     Object.assign(D.ko, {
@@ -799,10 +810,11 @@
         part_disk_heavy: '무거운 디스크', part_disk_heavy_g: '잘 안 날아가요', part_disk_heavy_b: '느리고 조금 짧게 돌아요',
         part_disk_swirl: '회오리 디스크', part_disk_swirl_g: '빠르고 더 아프게 쳐요', part_disk_swirl_b: '맞으면 더 아파요',
         part_disk_rim: '금테 디스크', part_disk_rim_g: '조금 더 오래, 안정적', part_disk_rim_b: '출발이 느려요',
-        part_tip_ball: '볼 축', part_tip_ball_g: '안정적, 조금 더 오래', part_tip_ball_b: '방향 바꾸기가 느려요',
-        part_tip_needle: '바늘 축', part_tip_needle_g: '더 오래 돌아요', part_tip_needle_b: '가볍고 돌진이 약해요',
+        part_tip_ball: '볼 축', part_tip_ball_g: '안정적, 조금 더 오래', part_tip_ball_b: '방향 바꾸기가 느려요, 기어가 약해요',
+        part_tip_needle: '바늘 축', part_tip_needle_g: '더 오래 돌아요', part_tip_needle_b: '가볍고 돌진이 약해요, 기어 없음',
         part_tip_rubber: '고무 축', part_tip_rubber_g: '안 미끄러져요, 돌진이 세요', part_tip_rubber_b: '회전이 빨리 줄어요',
         part_tip_jet: '제트 축', part_tip_jet_g: '로켓처럼 날아가요!', part_tip_jet_b: '회전이 조금 빨리 줄어요',
+        part_tip_cog: '기어 축', part_tip_cog_g: '기어 레일 X-DASH 가 엄청 세요!', part_tip_cog_b: '회전이 조금 빨리 줄고, 조금 약해요',
         fc_parts: '상대의 개조: {parts}'
     });
 

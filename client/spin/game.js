@@ -75,6 +75,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const SPIN_MAX = 110;
     const PERFECT = 0.93;
     const START_DY = 160;
+    // Gear rails (齿轨, Beyblade-X "Xtreme line"): toothed arcs on the rim at
+    // the top and bottom. 180°-symmetric so neither seat is favoured, and well
+    // clear of the pockets (0 / π ± POCKET_HALF + 0.15). A live top whose tip
+    // has gear (b.gear > 0) that rides one *with* its spin gets an X-DASH.
+    const RAILS = [-Math.PI / 2, Math.PI / 2];
+    const RAIL_HALF = 0.5;              // rad
+    const XD_K = 5.2;                   // tangential kick per unit of gear
+    const XD_T = 40;                    // frames of X-DASH (speed cap ×1.6, hits ×1.35, no speed drain)
+    const XD_CD = 150;                  // cooldown frames
+    const XD_SPIN = 4;                  // spin gained per unit of gear
+    const XD_MIN_VT = 1.2;              // must already roll along the rail this fast
+    function onRail(ang) {
+        for (const c of RAILS) {
+            let d = Math.abs(ang - c) % (Math.PI * 2);
+            if (d > Math.PI) d = Math.PI * 2 - d;
+            if (d < RAIL_HALF) return true;
+        }
+        return false;
+    }
 
     const BASE_TYPES = ['attack', 'defense', 'stamina', 'balance'];
     const TYPES = BASE_TYPES.concat('dragon');     // dragon: unlocked by clearing the tower
@@ -415,7 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const b = SpinParts.build(cfg);
         return {
             type: b.type, b, x: CX, y: CY + sg * START_DY, vx: 0, vy: 0,
-            spin: 0, bg: 0, sg: 0, sp: 0, dash: 0, cd: 0, st: 0, hitCd: 0, wallCd: 0
+            spin: 0, bg: 0, sg: 0, sp: 0, dash: 0, cd: 0, st: 0, hitCd: 0, wallCd: 0, xd: 0, xcd: 0
         };
     }
 
@@ -440,7 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
         S.ph = 'launch'; S.pt = 0; S.bt = 0; S.ft = 0; S.sd = 0; S.hitstop = 0;
         S.lk = [-1, -1]; S.fin = null;
         S.tops = [mkTop(0, S.cf[0]), mkTop(1, S.cf[1])];
-        bot.lockTarget = null;
+        bot.lockTarget = null; bot.railT = 0;
     }
 
     function emit(ev) {
@@ -564,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // soft speed cap
             const sp = Math.hypot(t.vx, t.vy);
-            const cap = b.vmax * (t.dash > 0 ? 1.9 : 1) * (t.sp > 0 && t.type === 'attack' ? 1.3 : 1);
+            const cap = b.vmax * (t.dash > 0 ? 1.9 : t.xd > 0 ? 1.6 : 1) * (t.sp > 0 && t.type === 'attack' ? 1.3 : 1);
             if (sp > cap) {
                 const ns = cap + (sp - cap) * Math.pow(0.86, dt);
                 t.vx *= ns / sp; t.vy *= ns / sp;
@@ -586,6 +605,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     const nx = ex / ed, ny = ey / ed;
                     t.x = CX + nx * (ARENA_R - b.r); t.y = CY + ny * (ARENA_R - b.r);
                     const vn = t.vx * nx + t.vy * ny;
+                    // gear meshes with the rail → X-DASH along it (spin direction = the swirl, (-ny, nx))
+                    if (alive && b.gear > 0 && t.xcd <= 0 && t.spin > 20 && onRail(ang)) {
+                        const vt = -t.vx * ny + t.vy * nx;
+                        if (vt > XD_MIN_VT) {
+                            const k = XD_K * b.gear;
+                            t.vx += -ny * k - nx * k * 0.25; t.vy += nx * k - ny * k * 0.25;   // along the rail, slightly off it
+                            t.xd = XD_T; t.xcd = XD_CD;
+                            t.spin = Math.min(SPIN_MAX, t.spin + XD_SPIN * b.gear);   // the rail drives the gear
+                            t.sg = Math.min(100, t.sg + 8);
+                            emit({ k: 'xdash', p: i, x: Math.round(CX + nx * ARENA_R), y: Math.round(CY + ny * ARENA_R) });
+                        }
+                    }
                     if (vn > 0) {
                         t.vx -= 1.72 * vn * nx; t.vy -= 1.72 * vn * ny;
                         if (alive) t.spin -= vn * 0.3;
@@ -599,7 +630,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (alive) {
                 const spd = Math.hypot(t.vx, t.vy);
-                let drain = b.drain * (1 + spd / 14) * (S.sd ? 3 : 1) / S.buf[i];
+                let drain = b.drain * (1 + (t.xd > 0 ? 0 : spd / 14)) * (S.sd ? 3 : 1) / S.buf[i];   // rail speed is free
                 if (t.sp > 0) {
                     if (t.type === 'dragon') drain -= 0.05;
                     if (t.type === 'stamina') drain = -0.18;
@@ -614,6 +645,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             t.dash = Math.max(0, t.dash - dt);
+            t.xd = Math.max(0, t.xd - dt);
+            t.xcd = Math.max(0, t.xcd - dt);
             t.cd = Math.max(0, t.cd - dt);
             t.sp = Math.max(0, t.sp - dt);
             t.hitCd = Math.max(0, t.hitCd - dt);
@@ -658,7 +691,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const [att, AT, def, DF] of pair) {
             const pa = pre.get(att), pd = pre.get(def);
             if (pa.st !== 0 && pd.st !== 0) continue;
-            let atk = AT.atk * (att.dash > 0 ? 1.45 : 1);
+            let atk = AT.atk * (att.dash > 0 ? 1.45 : att.xd > 0 ? 1.35 : 1);
             if (att.sp > 0 && att.type === 'attack') atk *= 1.8;
             if (att.sp > 0 && att.type === 'balance') atk *= 1.4;
             if (pa.st !== 0) atk *= 0.3;
@@ -725,7 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'state', ph: S.ph, pt: S.pt, bt: S.bt, ft: S.ft, rd: S.rd, sd: S.sd, ws: S.ws,
             sc: S.sc, tp: S.tp, lk: S.lk.map(r1), fin: S.fin,
             cf: S.ph === 'launch' || S.ph === 'gameover' || frame % 30 === 0 ? S.cf : undefined,
-            tops: S.tops.map((t) => [r1(t.x), r1(t.y), r1(t.vx), r1(t.vy), r1(t.spin), r1(t.bg), r1(t.sg), Math.round(t.sp), Math.round(t.dash), Math.round(t.cd), t.st]),
+            tops: S.tops.map((t) => [r1(t.x), r1(t.y), r1(t.vx), r1(t.vy), r1(t.spin), r1(t.bg), r1(t.sg), Math.round(t.sp), Math.round(t.dash), Math.round(t.cd), t.st, Math.round(t.xd)]),
             ev: S.events.filter((e) => frame - e.f < 24)
         });
     }
@@ -746,9 +779,11 @@ document.addEventListener('DOMContentLoaded', () => {
         noise: GameBot.pick({ easy: 0.55, normal: 0.38, hard: 0.33 }),
         dashP: GameBot.pick({ easy: 0.012, normal: 0.03, hard: 0.045 }),
         lock: GameBot.pick({ easy: [0.4, 0.85], normal: [0.52, 0.92], hard: [0.55, 0.93] }),
-        specDelay: GameBot.pick({ easy: 120, normal: 70, hard: 50 })
+        specDelay: GameBot.pick({ easy: 120, normal: 70, hard: 50 }),
+        rail: GameBot.pick({ easy: 0, normal: 0.35, hard: 0.6 })     // chance to go ride a gear rail
     };
-    const bot = { timer: 0, x: 0, y: 0, a: 0, s: 0, lockTarget: null, specWait: 0, sent: false };
+    if (BOT.rail === undefined) BOT.rail = 0.5;
+    const bot = { timer: 0, x: 0, y: 0, a: 0, s: 0, lockTarget: null, specWait: 0, sent: false, rail: null, railT: 0 };
     if (GameBot.enabled) {
         picks[1] = MODE === 'tower' ? SpinParts.sanitize(FLOOR.cfg || { core: FLOOR.type }).cfg
             : SpinParts.defaultCfg(MODE === 'tutorial' ? 'defense' : BASE_TYPES[Math.floor(Math.random() * BASE_TYPES.length)]);
@@ -766,6 +801,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
         } else if (me.st === 0 && op.st !== 2) {
+            if (bot.railT > 0) bot.railT--;
             if (--bot.timer <= 0) {
                 bot.timer = BOT.react;
                 const b = me.b;
@@ -774,7 +810,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 const aggressive = op.st === 0 && (me.type === 'attack' || me.type === 'balance' ||
                     (me.type === 'defense' && Math.hypot(op.x - CX, op.y - CY) > 120) ||
                     me.spin > op.spin + 25 || me.sp > 0);
-                if (aggressive || op.st !== 0) {
+                const om0 = Math.hypot(op.x - me.x, op.y - me.y);
+                // gear rail run: sticky for up to 2 s, dropped once the X-DASH fires or the rival closes in
+                if (bot.railT > 0 && (me.xcd > 0 || om0 < 130)) bot.railT = 0;
+                if (bot.railT <= 0 && b.gear >= 0.5 && me.xcd <= 0 && me.spin > 40 && op.st === 0 && om0 > 190 &&
+                    Math.random() < BOT.rail * 0.25) bot.railT = 120;
+                bot.rail = null;
+                if (bot.railT > 0) {
+                    const ma = Math.atan2(me.y - CY, me.x - CX), md0 = Math.hypot(me.x - CX, me.y - CY);
+                    const near = (r) => Math.abs(Math.atan2(Math.sin(ma - r), Math.cos(ma - r)));
+                    const c = RAILS.reduce((best, r) => (near(r) < near(best) ? r : best));
+                    // on the rail already → roll along it (+angle = spin direction) pressing outwards;
+                    // otherwise head for its upstream end
+                    const ea = onRail(ma) && md0 > ARENA_R - b.r - 30 ? ma + 0.35 : c - RAIL_HALF * 0.6;
+                    const er = ARENA_R - b.r + 20;
+                    bot.rail = [CX + Math.cos(ea) * er, CY + Math.sin(ea) * er];
+                }
+                if (bot.rail) {
+                    [tx, ty] = bot.rail;
+                } else if (aggressive || op.st !== 0) {
                     // hit the opponent from the side away from its nearest pocket
                     const px = op.x >= CX ? CX + ARENA_R : CX - ARENA_R;
                     let ax = px - ox, ay = CY - oy;
@@ -940,6 +994,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (me.type === 'stamina' && (me.dash > 0 || d.bt < 360)) return ['style', L('hint_style_stamina'), me.dash > 0 ? 'warn' : ''];
         if (me.type === 'defense' && d.bt < 360) return ['style', L('hint_style_defense'), ''];
         if (d.bt < 360 && d.rd === 1) return ['start', L('hint_start', { key: dashKey }), ''];
+        // gear tops: point at the rails while the rival is far away (host: me.b; client: rebuilt from cfgs)
+        const gear = (me.b || beyOf(myIdx)).gear;
+        if (gear >= 0.9 && d.bt > 300 && d.bt < 1500 && op.st === 0 && Math.hypot(op.x - me.x, op.y - me.y) > 220) return ['rail', L('hint_rail'), 'good'];
         return null;
     }
     function updateCoach(d, tops) {
@@ -1206,7 +1263,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else { p.x += (tx - p.x) * 0.45; p.y += (ty - p.y) * 0.45; }
             return {
                 type: net.tp[i], x: p.x, y: p.y, vx: a[2], vy: a[3], spin: a[4], bg: a[5], sg: a[6],
-                sp: a[7], dash: a[8], cd: a[9], st: a[10]
+                sp: a[7], dash: a[8], cd: a[9], st: a[10], xd: a[11] || 0
             };
         });
     }
@@ -1259,6 +1316,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 shake = Math.max(shake, ev.i * 0.5);
                 Sfx.wall(ev.i);
                 break;
+            case 'xdash': {
+                const b = beyOf(ev.p);
+                sparks(p.x, p.y, 26, ['#fff', '#ffe27a', b.c1], 6);
+                ring(p.x, p.y, 'rgba(255,226,122,', 70, 18, 4);
+                floater(p.x, p.y + (p.y > H / 2 ? -40 : 40), 'X-DASH!', '#ffe27a', 22);
+                shake = Math.max(shake, 5);
+                Sfx.dash();
+                break;
+            }
             case 'dash': {
                 ring(p.x, p.y, 'rgba(255,255,255,', 50, 14, 3);
                 Sfx.dash();
@@ -1394,6 +1460,25 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         rimSeg(POCKET_HALF, Math.PI - POCKET_HALF);
         rimSeg(Math.PI + POCKET_HALF, Math.PI * 2 - POCKET_HALF);
+        // gear rails: gold toothed arcs
+        for (const c of RAILS) {
+            g.save();
+            g.shadowColor = '#ffd34d'; g.shadowBlur = 10;
+            g.strokeStyle = '#ffd34d'; g.lineWidth = 4; g.lineCap = 'butt';
+            g.beginPath(); g.arc(CX, CY, ARENA_R + 2, c - RAIL_HALF, c + RAIL_HALF); g.stroke();
+            g.shadowBlur = 0;
+            g.fillStyle = '#e8b830';
+            const n = 22;
+            for (let k = 0; k <= n; k++) {
+                const a = c - RAIL_HALF + (2 * RAIL_HALF) * k / n;
+                g.save();
+                g.translate(CX + Math.cos(a) * (ARENA_R + 3), CY + Math.sin(a) * (ARENA_R + 3));
+                g.rotate(a);
+                g.fillRect(-7, -2.2, 7, 4.4);          // teeth point into the bowl
+                g.restore();
+            }
+            g.restore();
+        }
         // pockets
         for (const base of [0, Math.PI]) {
             g.save();
@@ -1654,7 +1739,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const v = toView(t.x, t.y);
             const tr = trails[i];
             if (t.st === 0 && (ph === 'battle' || ph === 'finish')) {
-                tr.push({ x: v.x, y: v.y, dash: t.dash > 0 || (t.sp > 0) });
+                tr.push({ x: v.x, y: v.y, dash: t.dash > 0 || t.xd > 0 || (t.sp > 0) });
                 if (tr.length > 18) tr.shift();
             } else if (tr.length) tr.shift();
             if (tr.length < 2) return;
