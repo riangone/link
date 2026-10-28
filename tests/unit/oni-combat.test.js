@@ -252,4 +252,62 @@ test('Oni Combat core module loading and P0+P1 simulation verification', async (
         for (let i = 0; i < 45; i++) sim.tick({}, {});
         assert.ok(sim.f2.hp < hpBefore, 'Homing missiles should track and damage target');
     });
+
+    await t.test('P3 Behavior Tree AI: Projectile Evade, Tactical Hypo-Spray Heal & Survival Waves', () => {
+        const sim = new Simulation(999);
+        const bot = new BotBrain('hard', 777);
+
+        // 1. Tactical Hypo-Spray Retreat & Heal when HP is low
+        sim.f2.hp = 20; // below 32% retreatHpRatio
+        sim.f2.hypoCount = 1;
+        sim.f1.x = -2.0;
+        sim.f2.x = 2.5; // dist = 4.5m (> 2.8m safe distance)
+
+        const decision = bot.think(sim.f2, sim.f1, sim);
+        assert.strictEqual(decision.heal, true, 'Hard AI should trigger Hypo-Spray heal when low HP at safe distance');
+        assert.strictEqual(bot.lastBranch, 'TACTICAL_HYPO_RETREAT');
+
+        // Execute heal in simulation
+        sim.tick({}, decision);
+        for (let i = 0; i < 14; i++) sim.tick({}, {});
+        assert.ok(sim.f2.hp >= 50, `Hypo-Spray should restore +35 HP (got ${sim.f2.hp})`);
+        assert.strictEqual(sim.f2.hypoCount, 0, 'Hypo-Spray charge should be consumed');
+
+        // 2. Survival Wave mode respawn upon defeating enemy
+        const waveSim = new Simulation(888);
+        waveSim.enableSurvivalMode(true);
+        assert.strictEqual(waveSim.waveNumber, 1);
+        waveSim.f2.hp = 4;
+        waveSim.f1.x = 1.0;
+        waveSim.f2.x = 1.75;
+        waveSim.tick({ punch: true }, {});
+        for (let i = 0; i < 8; i++) waveSim.tick({}, {});
+        assert.strictEqual(waveSim.isMatchOver, false, 'Survival mode should not end match when enemy is defeated');
+        assert.ok(waveSim.respawnTimer > 0, 'Survival mode should start reinforcement respawn timer');
+        for (let i = 0; i < 80; i++) waveSim.tick({}, {});
+        assert.strictEqual(waveSim.waveNumber, 2, 'Wave number should advance to 2 after respawn timer');
+        assert.ok(waveSim.f2.hp > 90, 'New wave enemy should spawn with full HP');
+    });
+
+    await t.test('P4 Daodan Chrysalis: Stage evolution, Devil Spin Kick unlock, and Daodan Overdrive Burst', () => {
+        const sim = new Simulation();
+        sim.f1.x = 0;
+        sim.f2.x = 1.1;
+        sim.f1.facing = 1;
+        sim.f2.facing = -1;
+
+        assert.strictEqual(sim.f1.daodanStage, 1, 'Fighter starts at Daodan Stage 1');
+        sim.f1.gainDaodan(80, sim.events);
+        assert.strictEqual(sim.f1.daodanStage, 3, 'Gaining 80 Daodan meter evolves fighter to Stage 3');
+        assert.strictEqual(sim.f1.unlockedMoves.has('DEVIL_SPIN_KICK'), true);
+
+        // Trigger Daodan Surge (Overdrive activation) via daodan button
+        const hpBefore = sim.f2.hp;
+        sim.tick({ daodan: true }, { block: true });
+        assert.strictEqual(sim.f1.currentMove.id, 'DAODAN_SURGE');
+        for (let i = 0; i < 8; i++) sim.tick({}, { block: true });
+
+        assert.strictEqual(sim.f1.daodanOverdrive, true, 'DAODAN_SURGE should activate Daodan Overdrive');
+        assert.ok(sim.f2.hp < hpBefore - 15, 'DAODAN_SURGE should pierce guard and deal burst damage');
+    });
 });

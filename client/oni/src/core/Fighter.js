@@ -14,6 +14,7 @@ import {
     FIGHTER_STATE,
     STAGE_BOUNDS,
     POISE_CONFIG,
+    DAODAN_CONFIG,
     THROW_TECH_WINDOW,
     TECH_RECOVERY_WINDOW,
     WEAPON_PICKUP_RANGE,
@@ -72,6 +73,15 @@ export class Fighter {
         // P2 Single-Slot Firearm State (null or { id, type, name, ammo, maxAmmo, color })
         this.weapon = null;
 
+        // P3 Hypo-Spray (打针回血) & P4 Daodan Chrysalis (道弹蛹生物机械觉醒)
+        this.maxHypo = 1;
+        this.hypoCount = this.maxHypo;
+        this.daodanMeter = 0;
+        this.maxDaodanMeter = DAODAN_CONFIG.MAX_METER;
+        this.daodanStage = 1; // 1 | 2 | 3
+        this.daodanOverdrive = false;
+        this.overdriveTimer = 0;
+
         // Flags
         this.isGrounded = true;
         this.isBlocking = false;
@@ -109,6 +119,66 @@ export class Fighter {
         const w = this.weapon;
         this.weapon = null;
         return w;
+    }
+
+    /**
+     * P4 Daodan Chrysalis: Add bio-mechanical resonance meter & evolve stages (1 -> 2 -> 3)
+     */
+    gainDaodan(amount, simEvents = null) {
+        if (amount <= 0) return;
+        const prevStage = this.daodanStage;
+        this.daodanMeter = Math.min(this.maxDaodanMeter, this.daodanMeter + amount);
+
+        if (this.daodanMeter >= DAODAN_CONFIG.STAGE_THRESHOLDS.STAGE_3 && this.daodanStage < 3) {
+            this.daodanStage = 3;
+            this.unlockMove('DEVIL_SPIN_KICK');
+            this.unlockMove('DAODAN_SURGE');
+        } else if (this.daodanMeter >= DAODAN_CONFIG.STAGE_THRESHOLDS.STAGE_2 && this.daodanStage < 2) {
+            this.daodanStage = 2;
+            this.unlockMove('RISING_FURY');
+            this.unlockMove('DISARM_KICK');
+        }
+
+        if (this.daodanStage > prevStage && simEvents) {
+            simEvents.push({
+                type: 'DAODAN_STAGE_UP',
+                fighter: this.id,
+                stage: this.daodanStage,
+                x: this.x,
+                y: this.y + 1.1,
+                z: this.z
+            });
+        }
+    }
+
+    unlockMove(moveId) {
+        this.unlockedMoves.add(moveId);
+    }
+
+    lockMove(moveId) {
+        this.unlockedMoves.delete(moveId);
+    }
+
+    /**
+     * Activate P4 Daodan Overdrive (Full Chrysalis Awakening: Hyper-Armor, +35% Damage, Bio-Regen, Speed Boost)
+     */
+    activateDaodanOverdrive(simEvents = null) {
+        this.daodanOverdrive = true;
+        this.daodanStage = 3;
+        this.unlockMove('DEVIL_SPIN_KICK');
+        this.unlockMove('DAODAN_SURGE');
+        this.overdriveTimer = Math.max(240, Math.round(this.daodanMeter / DAODAN_CONFIG.OVERDRIVE_DRAIN_PER_TICK));
+        this.poise = this.maxPoise;
+
+        if (simEvents) {
+            simEvents.push({
+                type: 'DAODAN_OVERDRIVE',
+                fighter: this.id,
+                x: this.x,
+                y: this.y + 1.1,
+                z: this.z
+            });
+        }
     }
 
     get facing() {
@@ -178,6 +248,11 @@ export class Fighter {
         this.thrownBy = null;
         this.evadeDir = 'BACK';
         this.weapon = null;
+        this.hypoCount = this.maxHypo;
+        this.daodanMeter = 0;
+        this.daodanStage = 1;
+        this.daodanOverdrive = false;
+        this.overdriveTimer = 0;
         this.isGrounded = true;
         this.isBlocking = false;
         this.invincible = false;
@@ -222,6 +297,21 @@ export class Fighter {
 
         this.stateTimer++;
         if (this.dashTimer > 0) this.dashTimer--;
+
+        // P4 Daodan Overdrive tick (passive bio-regen, hyper-armor poise floor, meter drain)
+        if (this.daodanOverdrive) {
+            this.daodanMeter = Math.max(0, this.daodanMeter - DAODAN_CONFIG.OVERDRIVE_DRAIN_PER_TICK);
+            if (this.hp > 0 && this.hp < this.maxHp) {
+                this.hp = Math.min(this.maxHp, this.hp + DAODAN_CONFIG.OVERDRIVE_REGEN_PER_TICK);
+            }
+            if (this.poise < DAODAN_CONFIG.OVERDRIVE_POISE_FLOOR && this.state !== FIGHTER_STATE.DIZZY) {
+                this.poise = DAODAN_CONFIG.OVERDRIVE_POISE_FLOOR;
+            }
+            if (this.daodanMeter <= 0) {
+                this.daodanOverdrive = false;
+                this.overdriveTimer = 0;
+            }
+        }
 
         // Combo reset decay
         if (this.comboResetTimer > 0) {
@@ -410,6 +500,8 @@ export class Fighter {
             else if (entry.button === 'kick') triggered = input.kickJustPressed;
             else if (entry.button === 'slide') triggered = input.slideJustPressed;
             else if (entry.button === 'fire') triggered = input.fireJustPressed;
+            else if (entry.button === 'daodan') triggered = input.daodanJustPressed;
+            else if (entry.button === 'heal') triggered = input.healJustPressed;
             else if (entry.button === 'crouch') triggered = input.crouchJustPressed || input.down;
             else if (entry.button === 'punchOrThrow') triggered = input.punchJustPressed || input.throwJustPressed;
 
@@ -601,7 +693,8 @@ export class Fighter {
         }
 
         const isMovingForward = fwdDot >= 0;
-        const speed = isMovingForward ? MOVE_SPEED.WALK_FORWARD : MOVE_SPEED.WALK_BACK;
+        const speedMult = this.daodanOverdrive ? 1.18 : 1.0;
+        const speed = (isMovingForward ? MOVE_SPEED.WALK_FORWARD : MOVE_SPEED.WALK_BACK) * speedMult;
 
         this.vx = input.dirX * speed;
         this.vz = input.dirZ * speed * 0.78;
@@ -621,10 +714,11 @@ export class Fighter {
 
         const { fx, fz } = this.getForwardVector();
         const fwdDot = input.dirX * fx + input.dirZ * fz;
+        const runSpd = MOVE_SPEED.RUN * (this.daodanOverdrive ? 1.18 : 1.0);
 
         if (fwdDot > 0.2) {
-            this.vx = fx * MOVE_SPEED.RUN;
-            this.vz = fz * MOVE_SPEED.RUN + input.dirZ * MOVE_SPEED.RUN * 0.4;
+            this.vx = fx * runSpd;
+            this.vz = fz * runSpd + input.dirZ * runSpd * 0.4;
         } else {
             this.transitionTo(FIGHTER_STATE.IDLE);
         }
@@ -674,9 +768,30 @@ export class Fighter {
         const totalFrames = move.startup + move.active + move.recovery;
         const startCancel = move.cancelWindowStart || (move.startup + 1);
 
-        // P2 Firearm Discharge or Weapon Throw trigger on first active frame
-        if (this.stateTimer === move.startup && !this.hasHitThisMove) {
-            if (move.isFirearmMove && this.weapon && this.weapon.ammo > 0) {
+        // P2 Firearm Discharge, Weapon Throw, P3 Hypo-Spray Heal, or P4 Daodan Overdrive Burst on first active frame
+        if (this.stateTimer === move.startup) {
+            if (move.isDaodanBurst && !this.daodanOverdrive) {
+                this.activateDaodanOverdrive(simEvents);
+            } else if (move.isHealMove && !this.hasHitThisMove && this.hypoCount > 0) {
+                this.hasHitThisMove = true;
+                this.hypoCount = Math.max(0, this.hypoCount - 1);
+                const healAmt = move.healAmount || DAODAN_CONFIG.HYPO_HEAL_AMOUNT;
+                const oldHp = this.hp;
+                this.hp = Math.min(this.maxHp, this.hp + healAmt);
+                this.poise = this.maxPoise;
+                this.gainDaodan(20, simEvents);
+                if (simEvents) {
+                    simEvents.push({
+                        type: 'HYPO_HEAL',
+                        fighter: this.id,
+                        healed: Math.round(this.hp - oldHp),
+                        hypoLeft: this.hypoCount,
+                        x: this.x,
+                        y: this.y + 1.15,
+                        z: this.z
+                    });
+                }
+            } else if (!this.hasHitThisMove && move.isFirearmMove && this.weapon && this.weapon.ammo > 0) {
                 this.hasHitThisMove = true;
                 this.weapon.ammo = Math.max(0, this.weapon.ammo - 1);
                 if (opponent) this.faceTowards(opponent.x, opponent.z, Math.PI);
@@ -688,7 +803,7 @@ export class Fighter {
                         ammoLeft: this.weapon.ammo
                     });
                 }
-            } else if (move.isWeaponThrow && this.weapon) {
+            } else if (!this.hasHitThisMove && move.isWeaponThrow && this.weapon) {
                 this.hasHitThisMove = true;
                 const thrownWpn = this.unequipWeapon();
                 if (opponent) this.faceTowards(opponent.x, opponent.z, Math.PI);
@@ -936,16 +1051,21 @@ export class Fighter {
         const move = hitInfo.move;
         let fx = 1;
         let fz = 0;
+        let dmgMult = 1.0;
         if (typeof attackerFacingOrFighter === 'object' && attackerFacingOrFighter !== null) {
             const vec = CollisionSystem.getForwardVector(attackerFacingOrFighter);
             fx = vec.fx;
             fz = vec.fz;
+            if (attackerFacingOrFighter.daodanOverdrive) {
+                dmgMult = DAODAN_CONFIG.OVERDRIVE_DAMAGE_MULT;
+            }
         } else {
             fx = attackerFacingOrFighter >= 0 ? 1 : -1;
         }
+        const effectiveDmg = Math.round(move.damage * dmgMult);
 
         if (hitInfo.isBlock) {
-            const chipDamage = Math.max(1, Math.floor(move.damage * 0.15));
+            const chipDamage = Math.max(1, Math.floor(effectiveDmg * 0.15));
             this.hp = Math.max(0, this.hp - chipDamage);
             this.vx = fx * 2.0;
             this.vz = fz * 2.0;
@@ -956,16 +1076,17 @@ export class Fighter {
         }
 
         // Clean Hit!
-        this.hp = Math.max(0, this.hp - move.damage);
+        this.hp = Math.max(0, this.hp - effectiveDmg);
         const poiseDmg = move.poiseDamage || move.damage * 2;
         this.poise = Math.max(0, this.poise - poiseDmg);
         this.poiseRegenCooldown = POISE_CONFIG.REGEN_DELAY;
 
-        // Check Hyper-Armor: if currently executing a heavy move with armorThreshold > poiseDmg
-        const currentArmor =
+        // Check Hyper-Armor: if currently executing a heavy move OR in P4 Daodan Overdrive
+        const baseArmor =
             this.state === FIGHTER_STATE.ATTACK && this.currentMove
                 ? (this.currentMove.armorThreshold || 0)
                 : 0;
+        const currentArmor = this.daodanOverdrive ? Math.max(baseArmor, DAODAN_CONFIG.OVERDRIVE_POISE_FLOOR) : baseArmor;
         const hasArmor =
             currentArmor > poiseDmg &&
             this.hp > 0 &&
@@ -974,7 +1095,7 @@ export class Fighter {
             !move.isLauncher;
 
         if (hasArmor) {
-            return { blocked: false, damage: move.damage, armored: true, poiseBroken: false };
+            return { blocked: false, damage: effectiveDmg, armored: true, poiseBroken: false };
         }
 
         // Airborne Juggle or Knockdown / Launcher
@@ -989,7 +1110,7 @@ export class Fighter {
                 : (move.knockback.y || 4.5);
             this.isGrounded = false;
             this.poise = this.maxPoise;
-            return { blocked: false, damage: move.damage, poiseBroken: false, juggled: isAirborneJuggle };
+            return { blocked: false, damage: effectiveDmg, poiseBroken: false, juggled: isAirborneJuggle };
         }
 
         // Poise broken -> Enter DIZZY state (vulnerable to frontal grabs!)
@@ -997,7 +1118,7 @@ export class Fighter {
             this.transitionTo(FIGHTER_STATE.DIZZY);
             this.vx = fx * 1.5;
             this.vz = fz * 1.5;
-            return { blocked: false, damage: move.damage, poiseBroken: true };
+            return { blocked: false, damage: effectiveDmg, poiseBroken: true };
         }
 
         this.transitionTo(FIGHTER_STATE.HIT_STUN);
@@ -1006,6 +1127,6 @@ export class Fighter {
         this.vx = fx * kbX;
         this.vz = fz * kbX;
 
-        return { blocked: false, damage: move.damage, poiseBroken: false };
+        return { blocked: false, damage: effectiveDmg, poiseBroken: false };
     }
 }

@@ -379,6 +379,15 @@ export class ProceduralFighterMesh {
         this.blob.scale.setScalar(0.8 + k * 0.4);
         this.blob.material.opacity = k;
         this.ring.position.set(f.x, 0.015, f.z);
+        if (f.daodanOverdrive) {
+            this.ring.material.color.setHex(0xd946ef);
+            this.ring.scale.setScalar(1.32 + Math.sin((this.lastTime || 0) * 14) * 0.12);
+            this.ring.material.opacity = 0.88;
+        } else {
+            this.ring.material.color.setHex(this.accent);
+            this.ring.scale.setScalar(1.0);
+            this.ring.material.opacity = 0.55;
+        }
     }
 
     updateTrail(f, dt) {
@@ -409,6 +418,7 @@ export class ProceduralFighterMesh {
         }
 
         const samples = this.trailSamples;
+        this.trailColor.setHex(f.daodanOverdrive ? 0xd946ef : this.accent);
         const c = this.trailColor;
         for (let i = 0; i < n; i++) {
             const s = samples[Math.min(i, samples.length - 1)];

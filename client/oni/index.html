@@ -18,33 +18,47 @@
                 <div class="fighter-card p1">
                     <div class="fighter-info">
                         <span id="p1-name">KONOKO</span>
+                        <span id="p1-hypo-badge" class="hypo-badge" title="再生剂 (Hypo-Spray) - 按 H 键注射回血">💉×1</span>
                         <span id="p1-weapon-badge" class="weapon-badge">徒手 (UNARMED)</span>
                         <span id="p1-hp-text">100 / 100</span>
                     </div>
                     <div class="hp-bar-bg">
                         <div id="p1-hp-fill" class="hp-bar-fill" style="width: 100%;"></div>
                     </div>
-                    <div class="poise-bar-bg" title="韧性条 (Poise) - 耗尽进入眩晕可被正面抓投">
-                        <div id="p1-poise-fill" class="poise-bar-fill" style="width: 100%;"></div>
+                    <div class="sub-bars-row">
+                        <div class="poise-bar-bg" title="韧性条 (Poise) - 耗尽进入眩晕可被正面抓投">
+                            <div id="p1-poise-fill" class="poise-bar-fill" style="width: 100%;"></div>
+                        </div>
+                        <div class="daodan-bar-bg" title="道弹蛹觉醒槽 (Daodan Chrysalis) - 满50%按 Q/E 爆发超载">
+                            <div id="p1-daodan-fill" class="daodan-bar-fill" style="width: 0%;"></div>
+                            <span id="p1-daodan-stage" class="daodan-stage-label">S1</span>
+                        </div>
                     </div>
                 </div>
 
                 <div class="timer-box">
                     <span id="round-timer" class="timer-num">99</span>
-                    <span class="timer-label">TIME</span>
+                    <span id="round-wave-label" class="timer-label">TIME</span>
                 </div>
 
                 <div class="fighter-card p2">
                     <div class="fighter-info">
                         <span id="p2-name">SYNDI-BOT</span>
+                        <span id="p2-hypo-badge" class="hypo-badge">💉×1</span>
                         <span id="p2-weapon-badge" class="weapon-badge">徒手 (UNARMED)</span>
                         <span id="p2-hp-text">100 / 100</span>
                     </div>
                     <div class="hp-bar-bg">
                         <div id="p2-hp-fill" class="hp-bar-fill" style="width: 100%;"></div>
                     </div>
-                    <div class="poise-bar-bg" title="韧性条 (Poise) - 耗尽进入眩晕可被正面抓投">
-                        <div id="p2-poise-fill" class="poise-bar-fill" style="width: 100%;"></div>
+                    <div class="sub-bars-row">
+                        <div class="poise-bar-bg" title="韧性条 (Poise) - 耗尽进入眩晕可被正面抓投">
+                            <div id="p2-poise-fill" class="poise-bar-fill" style="width: 100%;"></div>
+                        </div>
+                        <div class="daodan-bar-bg" title="道弹蛹觉醒槽 (Daodan Chrysalis)">
+                            <div id="p2-daodan-fill" class="daodan-bar-fill" style="width: 0%;"></div>
+                            <span id="p2-daodan-stage" class="daodan-stage-label">S1</span>
+                        </div>
                     </div>
                 </div>
 
@@ -72,10 +86,10 @@
                         <span><strong>J-J-K</strong> 刺拳-直拳-旋踢 · <strong>K-K-K</strong> 三段重踢(踢飞枪械)</span>
                         <span><strong>疾跑 + J / K / C</strong> 冲刺穿心拳 / 疾风飞踢(缴械) / 滑铲夺枪</span>
                         <span><strong>疾跑 + Space + J</strong> 腾空缴械踢 (直接踢落并凌空夺取敌人枪械)</span>
-                        <span><strong>F / H (或持枪远距 J)</strong> 射击 / 掷空枪砸击 · <strong>靠近枪械 J/滑铲</strong> 拾取</span>
+                        <span><strong>F (或持枪远距 J)</strong> 射击 / 掷空枪砸击 · <strong>靠近枪械 J/滑铲</strong> 拾取</span>
                         <span><strong>U / G / J+K</strong> 贴身抓投 (过肩摔 / 剪刀脚缴械 / 背身过桥摔 / 拆投)</span>
-                        <span><strong>S+D+J</strong> 升龙拳 · <strong>蹲+跳+K</strong> 旋风升龙腿 · <strong>倒地 Space</strong> 受身</span>
-                        <span><strong>1-4</strong> 切换视角 · <strong>拖动</strong> 旋转 · <strong>滚轮</strong> 缩放 · <strong>0/双击</strong> 复位</span>
+                        <span><strong>S+D+J</strong> 升龙拳 · <strong>S+D+K</strong> 鬼神烈风脚(S3觉醒) · <strong>倒地 Space</strong> 受身</span>
+                        <span><strong>Q / E</strong> 道弹蛹超载爆发(满50%霸体/增伤/再生) · <strong>H</strong> 注射再生剂回血</span>
                     </div>
                 </div>
                 <div class="mobile-tip-bar" id="mobile-tip-bar">
@@ -113,7 +127,8 @@
                 <h1 id="modal-title">⚔️ 鬼神对决 · ONI</h1>
                 <p id="modal-desc">经典《Oni》纯前端 3D 动作对战 · 搓招缓冲、分层动作状态机、Hitbox 与疾风滑铲。</p>
                 <div class="btn-group">
-                    <button type="button" class="cyber-btn primary-glow" id="btn-start">开始对决 (VS BOT)</button>
+                    <button type="button" class="cyber-btn primary-glow" id="btn-start">开始对决 (1v1 VS BOT)</button>
+                    <button type="button" class="cyber-btn survival-glow" id="btn-start-survival">🔥 生存波次模式 (SURVIVAL WAVES)</button>
                     <a href="../play/" class="cyber-btn secondary" style="text-decoration: none; display: block;">返回对战大厅</a>
                 </div>
                 <div class="modal-hint">提示：按 空格键(Space) 或 点击按钮立即开战</div>

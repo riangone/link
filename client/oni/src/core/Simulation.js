@@ -12,6 +12,7 @@ import {
     STAGE_BOUNDS,
     WEAPON_PICKUP_RANGE,
     WEAPON_SPECS,
+    DAODAN_CONFIG,
     MOVES
 } from './Constants.js';
 
@@ -63,6 +64,39 @@ export class Simulation {
 
         // Event queue for render/audio listeners (drained each frame)
         this.events = [];
+
+        // P3 Survival Wave Mode (optional continuous enemy reinforcements)
+        this.survivalMode = false;
+        this.waveNumber = 1;
+        this.respawnTimer = 0;
+        this.WAVE_ROSTER = [
+            { name: 'STRIKER GRUNT', level: 'easy', maxHp: 90, weapon: 'TCTF_PISTOL', hypo: 0 },
+            { name: 'BLACK OPS ELITE', level: 'normal', maxHp: 110, weapon: 'SCRAM_CANNON', hypo: 1 },
+            { name: 'SYNDICATE NINJA', level: 'hard', maxHp: 130, weapon: 'MERCURY_BOW', hypo: 1 }
+        ];
+    }
+
+    enableSurvivalMode(enabled = true) {
+        this.survivalMode = !!enabled;
+        this.waveNumber = 1;
+        this.respawnTimer = 0;
+        this.applyWaveEnemyConfig(1);
+    }
+
+    applyWaveEnemyConfig(waveNum) {
+        const idx = Math.min(this.WAVE_ROSTER.length - 1, (waveNum - 1) % this.WAVE_ROSTER.length);
+        const cfg = this.WAVE_ROSTER[idx];
+        const tierCycle = Math.floor((waveNum - 1) / this.WAVE_ROSTER.length);
+        this.f2.name = tierCycle > 0 ? `${cfg.name} MK-${tierCycle + 1}` : cfg.name;
+        this.f2.maxHp = cfg.maxHp + tierCycle * 15;
+        this.f2.hp = this.f2.maxHp;
+        this.f2.poise = this.f2.maxPoise;
+        this.f2.maxHypo = cfg.hypo;
+        this.f2.hypoCount = cfg.hypo;
+        this.f2.aiProfileLevel = cfg.level;
+        if (cfg.weapon) {
+            this.f2.equipWeapon({ type: cfg.weapon, id: `wpn_wave_${waveNum}` });
+        }
     }
 
     registerEntity(entity) {
@@ -151,6 +185,7 @@ export class Simulation {
 
         if (autoSnatch && attacker && !attacker.weapon && wpnData.ammo > 0) {
             attacker.equipWeapon(wpnData);
+            if (attacker.gainDaodan) attacker.gainDaodan(DAODAN_CONFIG.GAIN_ON_DISARM, this.events);
             this.events.push({
                 type: 'WEAPON_SNATCH',
                 fighter: attacker.id,
@@ -161,6 +196,10 @@ export class Simulation {
                 z: defender.z
             });
             return null;
+        }
+
+        if (attacker && attacker.gainDaodan) {
+            attacker.gainDaodan(DAODAN_CONFIG.GAIN_ON_DISARM, this.events);
         }
 
         // Launch weapon along parabola between defender and attacker so either can grab it!
@@ -219,6 +258,11 @@ export class Simulation {
         this.hitstopFrames = 0;
         this.isMatchOver = false;
         this.winner = null;
+        this.waveNumber = 1;
+        this.respawnTimer = 0;
+        if (this.survivalMode) {
+            this.applyWaveEnemyConfig(1);
+        }
         this.events = [];
     }
 
@@ -241,6 +285,30 @@ export class Simulation {
             // Still run basic physics for falling fighters
             this.f1.update({ dirX: 0, dirZ: 0 }, this.f2, this.events);
             this.f2.update({ dirX: 0, dirZ: 0 }, this.f1, this.events);
+            return;
+        }
+
+        // P3 Survival Wave Respawn Countdown
+        if (this.survivalMode && this.respawnTimer > 0) {
+            this.respawnTimer--;
+            this.f1.update(input1, this.f2, this.events);
+            this.f2.update({ dirX: 0, dirZ: 0 }, this.f1, this.events);
+            if (this.respawnTimer === 0) {
+                this.waveNumber++;
+                const spawnSide = this.f1.x >= 0 ? -4.5 : 4.5;
+                this.f2.reset(spawnSide, spawnSide < 0 ? 1 : -1);
+                this.applyWaveEnemyConfig(this.waveNumber);
+                this.roundTimer = Math.min(99 * 60, this.roundTimer + 30 * 60);
+                this.events.push({
+                    type: 'WAVE_SPAWN',
+                    wave: this.waveNumber,
+                    enemyName: this.f2.name,
+                    level: this.f2.aiProfileLevel || 'normal',
+                    x: this.f2.x,
+                    y: 0.2,
+                    z: this.f2.z
+                });
+            }
             return;
         }
 
@@ -370,10 +438,14 @@ export class Simulation {
                 this.events.splice(i, 1);
                 const attacker = ev.attacker === 'p1' ? this.f1 : this.f2;
                 this.executeWeaponThrow(attacker, ev.weapon, ev.move);
-            } else if (ev.type === 'HIT' && ev.isThrow && ev.move && ev.move.disarms) {
+            } else if (ev.type === 'HIT' && ev.isThrow) {
                 const attacker = ev.attacker === 'p1' ? this.f1 : this.f2;
                 const defender = ev.defender === 'p1' ? this.f1 : this.f2;
-                this.disarmFighter(defender, attacker, false);
+                if (attacker.gainDaodan) attacker.gainDaodan(ev.damage * DAODAN_CONFIG.GAIN_ON_DEAL_DAMAGE, this.events);
+                if (defender.gainDaodan) defender.gainDaodan(ev.damage * DAODAN_CONFIG.GAIN_ON_TAKE_DAMAGE, this.events);
+                if (ev.move && ev.move.disarms) {
+                    this.disarmFighter(defender, attacker, false);
+                }
             }
         }
     }
@@ -671,6 +743,14 @@ export class Simulation {
             hitInfo.poiseBroken;
         this.hitstopFrames = hitInfo.blocked ? 4 : (isHeavy ? 10 : 6);
 
+        // P4 Daodan Chrysalis resonance gain on dealing / taking damage
+        if (attacker.gainDaodan) {
+            attacker.gainDaodan(hitInfo.damage * DAODAN_CONFIG.GAIN_ON_DEAL_DAMAGE, this.events);
+        }
+        if (defender.gainDaodan) {
+            defender.gainDaodan(hitInfo.damage * DAODAN_CONFIG.GAIN_ON_TAKE_DAMAGE, this.events);
+        }
+
         // P2 Disarm Check: if clean hit with a disarming move (or defender is knocked down/dizzy while holding a gun)
         let disarmed = false;
         if (
@@ -704,6 +784,17 @@ export class Simulation {
     }
 
     declareWinner(winnerId) {
+        if (this.survivalMode && winnerId === 'p1') {
+            this.f2.transitionTo(FIGHTER_STATE.DEFEAT);
+            this.respawnTimer = 75; // 1.25s before next Syndicate reinforcement drops in
+            this.f1.hypoCount = Math.min(2, this.f1.hypoCount + 1); // reward +1 Hypo-Spray per wave cleared!
+            this.events.push({
+                type: 'WAVE_CLEARED',
+                wave: this.waveNumber
+            });
+            return;
+        }
+
         this.isMatchOver = true;
         this.winner = winnerId;
         if (winnerId === 'p1') {
@@ -744,8 +835,12 @@ export class Simulation {
             vz: Number(f.vz.toFixed(2)),
             facing: f.facing,
             facingAngle: Number(f.facingAngle.toFixed(3)),
-            hp: f.hp,
+            hp: Math.round(f.hp),
             poise: Math.round(f.poise),
+            daodan: Math.round(f.daodanMeter),
+            daodanStage: f.daodanStage,
+            overdrive: !!f.daodanOverdrive,
+            hypo: f.hypoCount,
             state: f.state,
             stateTimer: f.stateTimer,
             moveId: f.currentMove ? f.currentMove.id : null,

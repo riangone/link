@@ -32,6 +32,68 @@ export const POISE_CONFIG = {
     DIZZY_DURATION: 90     // frames spent in DIZZY (vulnerable to frontal throws)
 };
 
+// P4 Daodan Chrysalis (道弹蛹生物机械寄生体觉醒 & 超载)
+export const DAODAN_CONFIG = {
+    MAX_METER: 100,
+    GAIN_ON_DEAL_DAMAGE: 0.9,     // meter gained per 1 HP of damage dealt
+    GAIN_ON_TAKE_DAMAGE: 1.15,    // meter gained per 1 HP of damage taken (pain-fueled chrysalis)
+    GAIN_ON_DISARM: 18,           // bonus meter on tactical disarm/snatch
+    OVERDRIVE_THRESHOLD: 100,     // meter required to trigger Daodan Overdrive (Full Awakening)
+    OVERDRIVE_DRAIN_PER_TICK: 0.22, // ~450 frames (7.5s) of Overdrive duration
+    OVERDRIVE_DAMAGE_MULT: 1.35,  // +35% strike damage in Overdrive
+    OVERDRIVE_POISE_FLOOR: 35,    // passive hyper-armor against light/medium pokes during Overdrive
+    OVERDRIVE_REGEN_PER_TICK: 0.04, // passive bio-regeneration per tick in Overdrive
+    HYPO_HEAL_AMOUNT: 35,         // HP restored by Hypo-Spray (打针回血)
+    STAGE_THRESHOLDS: {
+        STAGE_1: 0,               // Base TCTF Combatives
+        STAGE_2: 35,              // Awakens Rising Fury & Acrobatic Disarm Kick
+        STAGE_3: 75               // Awakens Devil Spin Kick (鬼神旋风脚) & Daodan Surge (道弹冲击波)
+    }
+};
+
+// P3 AI Rank Archetypes (Behavior Tree Profiles)
+export const AI_ARCHETYPES = {
+    STRIKER_GRUNT: {
+        id: 'STRIKER_GRUNT',
+        name: 'TCTF 新兵杂兵 (Striker Grunt)',
+        level: 'easy',
+        reactionFrames: 18,
+        blockChance: 0.15,
+        techChance: 0.0,
+        ukemiChance: 0.0,
+        evadeChance: 0.05,
+        comboDepth: 1,
+        hypoCount: 0,
+        retreatHpRatio: 0.0
+    },
+    COMBAT_ELITE: {
+        id: 'COMBAT_ELITE',
+        name: '黑曜石战术精锐 (Black Ops Elite)',
+        level: 'normal',
+        reactionFrames: 10,
+        blockChance: 0.50,
+        techChance: 0.25,
+        ukemiChance: 0.35,
+        evadeChance: 0.45,
+        comboDepth: 2,
+        hypoCount: 1,
+        retreatHpRatio: 0.28
+    },
+    SYNDICATE_NINJA: {
+        id: 'SYNDICATE_NINJA',
+        name: '辛迪加暗影指挥官 (Syndicate Commander)',
+        level: 'hard',
+        reactionFrames: 4,
+        blockChance: 0.82,
+        techChance: 0.58,
+        ukemiChance: 0.70,
+        evadeChance: 0.80,
+        comboDepth: 3,
+        hypoCount: 1,
+        retreatHpRatio: 0.32
+    }
+};
+
 // Throw & Evasion constants
 export const THROW_RANGE = 1.38;
 export const THROW_TECH_WINDOW = 10; // frames during which defender can tech a frontal throw
@@ -433,6 +495,62 @@ export const MOVES = {
         blockStun: 10,
         knockback: { x: 3.0, y: 1.5 },
         cancelTo: []
+    },
+
+    // --- P3 Tactical Recovery & P4 Daodan Chrysalis Awakened Moves ---
+    USE_HYPO: {
+        id: 'USE_HYPO',
+        name: '道弹再生剂注射 (Hypo-Spray)',
+        isHealMove: true,
+        startup: 12,
+        active: 4,
+        recovery: 14,
+        healAmount: 35,
+        damage: 0,
+        poiseDamage: 0,
+        hitStun: 0,
+        blockStun: 0,
+        knockback: { x: 0, y: 0 },
+        cancelTo: []
+    },
+    DEVIL_SPIN_KICK: {
+        id: 'DEVIL_SPIN_KICK',
+        name: '鬼神烈风脚 (Devil Spin Kick)',
+        startup: 5,
+        active: 10,
+        recovery: 14,
+        damage: 28,
+        poiseDamage: 75,
+        armorThreshold: 40,
+        hitStun: 30,
+        blockStun: 16,
+        knockback: { x: 5.8, y: 4.5 },
+        knockdown: true,
+        disarms: true,
+        piercesGuard: true,
+        velocityImpulse: 13.5,
+        verticalImpulse: 3.5,
+        cancelTo: [],
+        hitbox: { offset: { x: 1.15, y: 1.25, z: 0 }, radius: 0.62 }
+    },
+    DAODAN_SURGE: {
+        id: 'DAODAN_SURGE',
+        name: '道弹蛹超载爆发 (Daodan Chrysalis Surge)',
+        isDaodanBurst: true,
+        startup: 4,
+        active: 8,
+        recovery: 12,
+        damage: 22,
+        poiseDamage: 85,
+        armorThreshold: 100,
+        hitStun: 28,
+        blockStun: 18,
+        knockback: { x: 6.2, y: 3.8 },
+        knockdown: true,
+        disarms: true,
+        piercesGuard: true,
+        cancelTo: [],
+        hitbox: { offset: { x: 0.4, y: 1.1, z: 0 }, radius: 1.45 }
     }
 };
 
@@ -460,6 +578,22 @@ export const FIGHTER_STATE = {
  * Evaluated by Fighter.resolveCommandTable(input, opponent, relContext)
  */
 export const MOVE_TABLE = [
+    // 0. P4 Daodan Chrysalis Burst / Overdrive Activation & P3 Hypo-Spray Heal
+    {
+        id: 'DAODAN_SURGE',
+        priority: 110,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN, FIGHTER_STATE.CROUCH],
+        button: 'daodan',
+        condition: (f) => f.daodanMeter >= 50 && !f.daodanOverdrive
+    },
+    {
+        id: 'USE_HYPO',
+        priority: 105,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.CROUCH],
+        button: 'heal',
+        condition: (f) => f.isGrounded && f.hypoCount > 0 && f.hp < f.maxHp
+    },
+
     // 1. Context-Sensitive Throws (Close range + Punch or Throw input)
     {
         id: 'THROW_BACK',
@@ -566,6 +700,13 @@ export const MOVE_TABLE = [
     },
 
     // 5. Motion & Crouch Specials
+    {
+        id: 'DEVIL_SPIN_KICK',
+        priority: 77,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN, FIGHTER_STATE.CROUCH],
+        button: 'kick',
+        condition: (f) => (f.daodanStage >= 3 || f.daodanOverdrive) && f.inputBuffer.checkUppercut(f.facing)
+    },
     {
         id: 'RISING_FURY',
         priority: 76,

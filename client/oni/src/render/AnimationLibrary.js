@@ -469,6 +469,67 @@ export const ATTACK_ANIMS = {
             { at: 'act', pose: { rSP: 1.5, fwd: 0.2 } },
             { at: 'rec:0.5', ease: 'inout', pose: { spY: 0.3, rSP: 0.95, rEB: 1.5, fwd: 0.05 } }
         ]
+    },
+    USE_HYPO: { // P3 Hypo-Spray neck/chest bio-injection + deep breath
+        trail: 'rFist',
+        keys: [
+            {
+                at: 'wind', ease: 'out', pose: {
+                    hipY: -0.14, spP: 0.18, hdP: 0.2,
+                    rSP: 1.45, rSR: -0.15, rSY: 0.65, rEB: 2.35,
+                    lSP: 0.85, lSR: 0.25, lEB: 1.85, turn: 0.5
+                }
+            },
+            {
+                at: 'hit', ease: 'out', pose: {
+                    hipY: -0.05, spP: -0.22, hdP: -0.35,
+                    rSP: 1.55, rSR: -0.2, rSY: 0.72, rEB: 2.5,
+                    lSP: 0.4, lSR: 0.55, lEB: 1.2, turn: 0.6
+                }
+            },
+            { at: 'act', pose: { spP: -0.28, hdP: -0.4 } },
+            { at: 'rec:0.5', ease: 'inout', pose: { hipY: -0.08, spP: 0.08, rSP: 0.85, rEB: 1.9, hdP: 0.05 } }
+        ]
+    },
+    DEVIL_SPIN_KICK: { // P4 Stage-3 Awakened 720° Cyclone Spin Kick
+        trail: 'rFoot',
+        keepSpin: true,
+        keys: [
+            { at: 'wind', ease: 'in', pose: { hipY: -0.25, spP: 0.35, spin: Math.PI * 0.8, lSP: 0.4, rSP: 0.4, lSR: 1.0, rSR: 1.0 } },
+            {
+                at: 'hit', ease: 'out', pose: {
+                    lIK: 0, rIK: 0, lift: 0.32, spin: Math.PI * 2.2,
+                    rHP: 1.8, rHR: 1.15, rKB: 0.03, rFP: 0.9,
+                    lHP: 0.9, lKB: 1.9,
+                    spP: -0.45, spR: -0.65,
+                    lSP: 0.2, lSR: 1.55, lEB: 0.2, rSP: 0.2, rSR: 1.55, rEB: 0.2,
+                    fwd: 0.26, turn: 0.2
+                }
+            },
+            { at: 'act', pose: { lift: 0.38, spin: Math.PI * 3.8, rHP: 1.85 } },
+            { at: 'rec:0.55', ease: 'inout', pose: { lift: 0.08, spin: Math.PI * 4, rHP: 0.75, rKB: 1.4, lSR: 0.5, rSR: 0.5 } },
+            { at: 'rec:0.85', ease: 'in', pose: { lIK: 1, rIK: 1, lift: 0, rFP: 0 } }
+        ]
+    },
+    DAODAN_SURGE: { // P4 Daodan Chrysalis Overdrive Burst (coil in -> explosive arch outward)
+        trail: 'rFist',
+        keys: [
+            {
+                at: 'wind', ease: 'in', pose: {
+                    hipY: -0.32, spP: 0.55, hdP: 0.45,
+                    lSP: 1.35, lSY: 0.65, lEB: 2.3, rSP: 1.35, rSY: 0.65, rEB: 2.3, turn: 0.8
+                }
+            },
+            {
+                at: 'hit', ease: 'out', pose: {
+                    hipY: 0.06, lift: 0.18, spP: -0.52, hdP: -0.65,
+                    lSP: 0.25, lSR: 1.45, lEB: 0.25, rSP: 0.25, rSR: 1.45, rEB: 0.25,
+                    lFP: 0.45, rFP: 0.45, turn: 0.95
+                }
+            },
+            { at: 'act', pose: { lift: 0.22, spP: -0.58, lSR: 1.55, rSR: 1.55 } },
+            { at: 'rec:0.55', ease: 'inout', pose: { lift: 0, hipY: -0.08, spP: 0.05, lSR: 0.4, rSR: 0.4, lEB: 1.6, rEB: 1.8, lFP: 0, rFP: 0 } }
+        ]
     }
 };
 

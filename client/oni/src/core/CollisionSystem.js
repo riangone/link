@@ -184,7 +184,12 @@ export class CollisionSystem {
                 const sector = this.getRelativeSector(defender, attacker);
                 const isFacingAttacker = sector === 'FRONT';
                 const lowGuardBreak = hitbox.move.isLow && defender.state !== FIGHTER_STATE.CROUCH;
-                const isBlock = defender.isBlocking && isFacingAttacker && !lowGuardBreak && !isGroundedDown;
+                const isBlock =
+                    !hitbox.move.piercesGuard &&
+                    defender.isBlocking &&
+                    isFacingAttacker &&
+                    !lowGuardBreak &&
+                    !isGroundedDown;
 
                 return {
                     hitPoint,

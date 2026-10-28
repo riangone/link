@@ -116,6 +116,24 @@ body {
     box-shadow: 0 0 8px rgba(255, 230, 0, 0.35);
 }
 
+.hypo-badge {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: rgba(0, 255, 136, 0.16);
+    border: 1px solid rgba(0, 255, 136, 0.45);
+    color: var(--hp-green);
+    cursor: pointer;
+    pointer-events: auto;
+    white-space: nowrap;
+}
+
+.hypo-badge.empty {
+    opacity: 0.35;
+    filter: grayscale(1);
+}
+
 .hp-bar-bg {
     width: 100%;
     height: 20px;
@@ -139,8 +157,15 @@ body {
     float: right;
 }
 
-.poise-bar-bg {
+.sub-bars-row {
+    display: flex;
+    gap: 6px;
     width: 100%;
+    align-items: center;
+}
+
+.poise-bar-bg {
+    flex: 1;
     height: 6px;
     background: rgba(0, 0, 0, 0.55);
     border: 1px solid rgba(255, 230, 0, 0.35);
@@ -157,6 +182,47 @@ body {
 
 .fighter-card.p2 .poise-bar-fill {
     float: right;
+}
+
+.daodan-bar-bg {
+    flex: 1;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(217, 70, 239, 0.45);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.daodan-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #a855f7, #ec4899, #00f0ff);
+    transition: width 0.12s ease-out;
+}
+
+.daodan-bar-bg.overdrive {
+    border-color: #f0abfc;
+    box-shadow: 0 0 10px rgba(217, 70, 239, 0.85);
+}
+
+.daodan-stage-label {
+    position: absolute;
+    right: 3px;
+    top: -2px;
+    font-size: 7px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 4px #000;
+    pointer-events: none;
+}
+
+.cyber-btn.survival-glow {
+    background: linear-gradient(90deg, #d946ef, #ff0077);
+    color: #fff;
+    box-shadow: 0 0 18px rgba(217, 70, 239, 0.45);
 }
 
 .hp-bar-chip {

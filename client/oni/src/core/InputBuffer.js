@@ -18,7 +18,9 @@ export class InputBuffer {
             crouch: false,
             slide: false,
             throwBtn: false,
-            fire: false
+            fire: false,
+            daodan: false,
+            heal: false
         };
     }
 
@@ -35,6 +37,8 @@ export class InputBuffer {
             slide: false,
             throwBtn: false,
             fire: false,
+            daodan: false,
+            heal: false,
             punchJustPressed: false,
             kickJustPressed: false,
             jumpJustPressed: false,
@@ -42,13 +46,15 @@ export class InputBuffer {
             slideJustPressed: false,
             throwJustPressed: false,
             fireJustPressed: false,
+            daodanJustPressed: false,
+            healJustPressed: false,
             frame: 0
         };
     }
 
     /**
      * Push raw input for the current fixed frame
-     * @param {Object} raw - { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn, fire }
+     * @param {Object} raw - { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn, fire, daodan, heal }
      */
     push(raw = {}) {
         this.currentFrame++;
@@ -61,6 +67,8 @@ export class InputBuffer {
         const crouch = !!raw.crouch;
         const slide = !!raw.slide;
         const fire = !!raw.fire;
+        const daodan = !!raw.daodan;
+        const heal = !!raw.heal;
         // Throw can be triggered by dedicated throwBtn OR simultaneous Punch + Kick
         const throwBtn = !!raw.throwBtn || (punch && kick);
 
@@ -70,6 +78,8 @@ export class InputBuffer {
         const crouchJustPressed = crouch && !this.prevRaw.crouch;
         const slideJustPressed = slide && !this.prevRaw.slide;
         const fireJustPressed = fire && !this.prevRaw.fire;
+        const daodanJustPressed = daodan && !this.prevRaw.daodan;
+        const healJustPressed = heal && !this.prevRaw.heal;
         const throwJustPressed = (!!raw.throwBtn && !this.prevRaw.throwBtn) ||
             (punch && kick && (!this.prevRaw.punch || !this.prevRaw.kick));
 
@@ -86,6 +96,8 @@ export class InputBuffer {
             slide,
             throwBtn,
             fire,
+            daodan,
+            heal,
             punchJustPressed,
             kickJustPressed,
             jumpJustPressed,
@@ -93,10 +105,12 @@ export class InputBuffer {
             slideJustPressed,
             throwJustPressed,
             fireJustPressed,
+            daodanJustPressed,
+            healJustPressed,
             frame: this.currentFrame
         };
 
-        this.prevRaw = { punch, kick, block, jump, crouch, slide, throwBtn, fire };
+        this.prevRaw = { punch, kick, block, jump, crouch, slide, throwBtn, fire, daodan, heal };
     }
 
     /**
@@ -271,7 +285,9 @@ export class InputBuffer {
             crouch: false,
             slide: false,
             throwBtn: false,
-            fire: false
+            fire: false,
+            daodan: false,
+            heal: false
         };
     }
 }

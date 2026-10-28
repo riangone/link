@@ -21,20 +21,30 @@ function init() {
 
     // DOM Elements
     const container = document.getElementById('canvas-container');
+    const p1NameEl = document.getElementById('p1-name');
+    const p2NameEl = document.getElementById('p2-name');
     const p1HpFill = document.getElementById('p1-hp-fill');
     const p2HpFill = document.getElementById('p2-hp-fill');
     const p1PoiseFill = document.getElementById('p1-poise-fill');
     const p2PoiseFill = document.getElementById('p2-poise-fill');
+    const p1DaodanFill = document.getElementById('p1-daodan-fill');
+    const p2DaodanFill = document.getElementById('p2-daodan-fill');
+    const p1DaodanStage = document.getElementById('p1-daodan-stage');
+    const p2DaodanStage = document.getElementById('p2-daodan-stage');
+    const p1HypoBadge = document.getElementById('p1-hypo-badge');
+    const p2HypoBadge = document.getElementById('p2-hypo-badge');
     const p1WeaponBadge = document.getElementById('p1-weapon-badge');
     const p2WeaponBadge = document.getElementById('p2-weapon-badge');
     const p1HpText = document.getElementById('p1-hp-text');
     const p2HpText = document.getElementById('p2-hp-text');
     const roundTimerEl = document.getElementById('round-timer');
+    const roundWaveLabel = document.getElementById('round-wave-label');
     const comboNotice = document.getElementById('combo-notice');
     const koBanner = document.getElementById('ko-banner');
     const startOverlay = document.getElementById('start-overlay');
     const gameoverOverlay = document.getElementById('gameover-overlay');
     const btnStart = document.getElementById('btn-start');
+    const btnStartSurvival = document.getElementById('btn-start-survival');
     const btnRematch = document.getElementById('btn-rematch');
     const winnerText = document.getElementById('winner-text');
     const fpsCounter = document.getElementById('fps-counter');
@@ -95,7 +105,7 @@ function init() {
     setCam(threeScene.camMode);
 
     // Touch Virtual Joystick & Buttons
-    const touchState = { punch: false, kick: false, block: false, slide: false, jump: false, crouch: false, throwBtn: false };
+    const touchState = { punch: false, kick: false, block: false, slide: false, jump: false, crouch: false, throwBtn: false, fire: false, daodan: false, heal: false };
     const setupTouchBtn = (id, key) => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -117,6 +127,15 @@ function init() {
     setupTouchBtn('btn-slide', 'slide');
     setupTouchBtn('btn-block', 'block');
     setupTouchBtn('btn-jump', 'jump');
+    setupTouchBtn('p1-hypo-badge', 'heal');
+    if (p1DaodanFill && p1DaodanFill.parentElement) {
+        p1DaodanFill.parentElement.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            touchState.daodan = true;
+        });
+        window.addEventListener('pointerup', () => { touchState.daodan = false; });
+    }
 
     // Virtual Joystick logic (supports touch & mouse drag)
     let touchDirX = 0;
@@ -219,9 +238,11 @@ function init() {
         const crouch = !!(keysDown['ShiftLeft'] || keysDown['ShiftRight'] || touchState.crouch);
         const slide = !!(keysDown['KeyI'] || keysDown['KeyV'] || touchState.slide);
         const throwBtn = !!(keysDown['KeyU'] || keysDown['KeyG'] || touchState.throwBtn || (punch && kick));
-        const fire = !!(keysDown['KeyF'] || keysDown['KeyH'] || touchState.fire);
+        const fire = !!(keysDown['KeyF'] || touchState.fire);
+        const heal = !!(keysDown['KeyH'] || touchState.heal);
+        const daodan = !!(keysDown['KeyQ'] || keysDown['KeyE'] || touchState.daodan);
 
-        return { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn, fire };
+        return { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn, fire, heal, daodan };
     }
 
     // Match State
@@ -267,17 +288,27 @@ function init() {
 
     let remoteInput = { dirX: 0, dirZ: 0, punch: false, kick: false, block: false };
 
-    function startFight() {
+    function startFight(survival = false) {
         startOverlay.classList.add('hidden');
         gameoverOverlay.classList.add('hidden');
         koBanner.style.display = 'none';
+        sim.survivalMode = !!survival;
         sim.reset();
+        if (survival) {
+            sim.enableSurvivalMode(true);
+            botBrain.setLevel(sim.f2.aiProfileLevel || 'easy');
+        } else {
+            botBrain.setLevel(botMode);
+        }
         isPlaying = true;
         document.body.classList.add('in-fight');
     }
 
-    btnStart.addEventListener('click', startFight);
-    btnRematch.addEventListener('click', startFight);
+    btnStart.addEventListener('click', () => startFight(false));
+    if (btnStartSurvival) {
+        btnStartSurvival.addEventListener('click', () => startFight(true));
+    }
+    btnRematch.addEventListener('click', () => startFight(sim.survivalMode));
 
     // Event Dispatcher
     function showActionNotice(text) {
@@ -337,6 +368,25 @@ function init() {
             } else if (ev.type === 'TECH_RECOVERY') {
                 vfx.spawnShockwave(ev.x, 0.15, ev.z, 0x00ff88);
                 showActionNotice('UKEMI! 受身!');
+            } else if (ev.type === 'HYPO_HEAL') {
+                vfx.spawnShockwave(ev.x, 0.9, ev.z, 0x00ff88);
+                vfx.spawnHitSpark(ev.x, ev.y, ev.z, false, 16);
+                showActionNotice(`HYPO-SPRAY! +${ev.healed} HP`);
+            } else if (ev.type === 'DAODAN_STAGE_UP') {
+                vfx.spawnShockwave(ev.x, 0.85, ev.z, 0xd946ef);
+                showActionNotice(`DAODAN STAGE ${ev.stage}! 道弹进化!`);
+            } else if (ev.type === 'DAODAN_OVERDRIVE') {
+                vfx.spawnShockwave(ev.x, 0.95, ev.z, 0xf0abfc);
+                vfx.spawnShockwave(ev.x, 0.1, ev.z, 0x00f0ff);
+                threeScene.addTrauma(0.55);
+                threeScene.hitFlash(0.28);
+                showActionNotice('DAODAN OVERDRIVE! 道弹蛹完全觉醒!');
+            } else if (ev.type === 'WAVE_CLEARED') {
+                showActionNotice(`WAVE ${ev.wave} CLEARED! +1💉 增援接近中!`);
+            } else if (ev.type === 'WAVE_SPAWN') {
+                botBrain.setLevel(ev.level || 'normal');
+                vfx.spawnShockwave(ev.x, 0.15, ev.z, 0xff0077);
+                showActionNotice(`WAVE ${ev.wave}: ${ev.enemyName}!`);
             } else if (ev.type === 'KO') {
                 koBanner.style.display = 'block';
                 threeScene.addTrauma(0.65);
@@ -405,10 +455,37 @@ function init() {
         threeScene.render();
 
         // Update HUD
+        if (p1NameEl) p1NameEl.textContent = sim.f1.name || 'KONOKO';
+        if (p2NameEl) p2NameEl.textContent = sim.f2.name || 'SYNDI-BOT';
         p1HpFill.style.width = `${Math.max(0, (sim.f1.hp / sim.f1.maxHp) * 100)}%`;
         p2HpFill.style.width = `${Math.max(0, (sim.f2.hp / sim.f2.maxHp) * 100)}%`;
         if (p1PoiseFill) p1PoiseFill.style.width = `${Math.max(0, (sim.f1.poise / sim.f1.maxPoise) * 100)}%`;
         if (p2PoiseFill) p2PoiseFill.style.width = `${Math.max(0, (sim.f2.poise / sim.f2.maxPoise) * 100)}%`;
+        if (p1DaodanFill) {
+            p1DaodanFill.style.width = `${Math.max(0, (sim.f1.daodanMeter / sim.f1.maxDaodanMeter) * 100)}%`;
+            if (p1DaodanFill.parentElement) {
+                p1DaodanFill.parentElement.classList.toggle('overdrive', !!sim.f1.daodanOverdrive);
+            }
+        }
+        if (p2DaodanFill) {
+            p2DaodanFill.style.width = `${Math.max(0, (sim.f2.daodanMeter / sim.f2.maxDaodanMeter) * 100)}%`;
+            if (p2DaodanFill.parentElement) {
+                p2DaodanFill.parentElement.classList.toggle('overdrive', !!sim.f2.daodanOverdrive);
+            }
+        }
+        if (p1DaodanStage) p1DaodanStage.textContent = sim.f1.daodanOverdrive ? 'OVR' : `S${sim.f1.daodanStage}`;
+        if (p2DaodanStage) p2DaodanStage.textContent = sim.f2.daodanOverdrive ? 'OVR' : `S${sim.f2.daodanStage}`;
+        if (p1HypoBadge) {
+            p1HypoBadge.textContent = `💉×${sim.f1.hypoCount}`;
+            p1HypoBadge.classList.toggle('empty', sim.f1.hypoCount <= 0);
+        }
+        if (p2HypoBadge) {
+            p2HypoBadge.textContent = `💉×${sim.f2.hypoCount}`;
+            p2HypoBadge.classList.toggle('empty', sim.f2.hypoCount <= 0);
+        }
+        if (roundWaveLabel) {
+            roundWaveLabel.textContent = sim.survivalMode ? `WAVE ${sim.waveNumber}` : 'TIME';
+        }
         if (p1WeaponBadge) {
             if (sim.f1.weapon) {
                 p1WeaponBadge.textContent = `🔫 ${sim.f1.weapon.type} [${sim.f1.weapon.ammo}/${sim.f1.weapon.maxAmmo}]`;
