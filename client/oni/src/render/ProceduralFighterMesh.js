@@ -373,13 +373,16 @@ export class ProceduralFighterMesh {
     }
 
     updateDecals(f) {
-        const h = Math.max(0, f.y + this.pose.lift);
-        const k = 1 / (1 + h * 1.5);
-        this.blob.position.set(f.x, 0.012, f.z);
+        const floorY = Number.isFinite(f.floorY) ? f.floorY : 0;
+        const h = Math.max(0, (f.y - floorY) + this.pose.lift);
+        const k = Number.isFinite(f.floorY) ? (1 / (1 + h * 1.5)) : 0;
+        this.blob.position.set(f.x, floorY + 0.012, f.z);
         this.blob.scale.setScalar(0.8 + k * 0.4);
         this.blob.material.opacity = k;
-        this.ring.position.set(f.x, 0.015, f.z);
-        if (f.daodanOverdrive) {
+        this.ring.position.set(f.x, floorY + 0.015, f.z);
+        if (!Number.isFinite(f.floorY)) {
+            this.ring.material.opacity = 0;
+        } else if (f.daodanOverdrive) {
             this.ring.material.color.setHex(0xd946ef);
             this.ring.scale.setScalar(1.32 + Math.sin((this.lastTime || 0) * 14) * 0.12);
             this.ring.material.opacity = 0.88;

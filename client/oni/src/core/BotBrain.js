@@ -16,8 +16,9 @@
  *    └── 7. Range-Based Offensive Pressure: Close (3-hit chains, command specials) / Mid-Long (Firearms, Throw empty gun, Dash)
  */
 
-import { FIGHTER_STATE, AI_ARCHETYPES } from './Constants.js';
+import { FIGHTER_STATE, AI_ARCHETYPES, STAGE_CONFIG } from './Constants.js';
 import { createDeterministicRNG } from './Simulation.js';
+import { CollisionSystem } from './CollisionSystem.js';
 
 export const BT_STATUS = {
     SUCCESS: 'SUCCESS',
@@ -88,6 +89,7 @@ export class BotBrain {
         const branches = [
             { name: 'SURVIVAL_REFLEX', fn: (bb) => this.branchSurvivalReflex(bb) },
             { name: 'STUNNED_IDLE', fn: (bb) => this.branchStunnedGuard(bb) },
+            { name: 'LEDGE_HAZARD_AWARENESS', fn: (bb) => this.branchLedgeHazardAwareness(bb) },
             { name: 'PROJECTILE_EVADE', fn: (bb) => this.branchProjectileEvade(bb) },
             { name: 'TACTICAL_HYPO_RETREAT', fn: (bb) => this.branchTacticalHypoRetreat(bb) },
             { name: 'DAODAN_AWAKEN', fn: (bb) => this.branchDaodanAwaken(bb) },
@@ -128,7 +130,41 @@ export class BotBrain {
         }
 
         if (bot.state === FIGHTER_STATE.KNOCKED_DOWN && bot.hp > 0) {
-            if (!bot.isGrounded && bot.vy < 0 && bot.y <= 0.75 && this.rand(sim) < this.profile.ukemiChance) {
+            const floorY = CollisionSystem.getFloorHeightAt(bot.x, bot.z);
+            const distAbove = Number.isFinite(floorY) ? (bot.y - floorY) : Infinity;
+            if (!bot.isGrounded && bot.vy < 0 && distAbove <= 0.75 && distAbove >= 0 && this.rand(sim) < this.profile.ukemiChance) {
+                input.jump = true;
+            }
+            return BT_STATUS.SUCCESS;
+        }
+
+        return BT_STATUS.FAILURE;
+    }
+
+    /**
+     * Branch 2b: P5 Ledge Hazard Awareness & High-Ground Recovery
+     * Prevents AI from accidentally walking/backflipping into the outer abyss,
+     * and jumps back up onto the main rooftop deck if knocked onto the lower catwalk.
+     */
+    branchLedgeHazardAwareness(bb) {
+        const { bot, opp, input } = bb;
+
+        // If dangerously close to the outer abyss edge of the lower catwalk, steer inward immediately!
+        if (Math.abs(bot.x) > STAGE_CONFIG.LOWER_CATWALK_X - 1.1 || Math.abs(bot.z) > STAGE_CONFIG.LOWER_CATWALK_Z - 0.9) {
+            input.dirX = bot.x > 0 ? -1 : 1;
+            input.dirZ = Math.abs(bot.z) > 1.0 ? (bot.z > 0 ? -1 : 1) : 0;
+            if (bot.isGrounded && Math.abs(bot.x) > STAGE_CONFIG.LOWER_CATWALK_X - 0.65) {
+                input.jump = true;
+            }
+            return BT_STATUS.SUCCESS;
+        }
+
+        // If bot is on the lower catwalk (y <= -1.5) while opponent is on the upper rooftop deck (y >= -0.2),
+        // move toward the upper deck wall and jump up!
+        if (bot.isGrounded && bot.y <= STAGE_CONFIG.LOWER_CATWALK_Y + 0.25 && opp.y > bot.y + 0.8) {
+            input.dirX = bot.x > 0 ? -1 : 1;
+            input.dirZ = Math.abs(bot.z) > 1.5 ? (bot.z > 0 ? -1 : 1) : 0;
+            if (Math.abs(bot.x) <= STAGE_CONFIG.UPPER_DECK_X + 0.85) {
                 input.jump = true;
             }
             return BT_STATUS.SUCCESS;

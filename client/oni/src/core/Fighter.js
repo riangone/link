@@ -13,6 +13,7 @@ import {
     MOVE_TABLE,
     FIGHTER_STATE,
     STAGE_BOUNDS,
+    STAGE_CONFIG,
     POISE_CONFIG,
     DAODAN_CONFIG,
     THROW_TECH_WINDOW,
@@ -82,11 +83,13 @@ export class Fighter {
         this.daodanOverdrive = false;
         this.overdriveTimer = 0;
 
-        // Flags
+        // Flags & P5 Arena Elevation Tracking
         this.isGrounded = true;
         this.isBlocking = false;
         this.invincible = false;
         this.dashTimer = 0;
+        this.ringOut = false;
+        this.floorY = 0;
 
         // Input
         this.inputBuffer = new InputBuffer();
@@ -257,6 +260,8 @@ export class Fighter {
         this.isBlocking = false;
         this.invincible = false;
         this.dashTimer = 0;
+        this.ringOut = false;
+        this.floorY = 0;
         this.inputBuffer.clear();
     }
 
@@ -391,37 +396,108 @@ export class Fighter {
                 break;
         }
 
-        // Apply physics (gravity & velocity)
+        // Horizontal integration + P5 Step-Up / Ledge-Drop / Ring-Out Elevation Physics
+        const nextX = this.x + this.vx * FIXED_DT;
+        const nextZ = this.z + this.vz * FIXED_DT;
+        const nextFloorY = CollisionSystem.getFloorHeightAt(nextX, nextZ);
+
+        // If moving horizontally into a higher wall (e.g. on lower catwalk y = -1.8 trying to walk into upper deck wall y = 0 without jumping high enough)
+        if (Number.isFinite(nextFloorY) && nextFloorY > this.y + 0.35) {
+            // Block horizontal penetration into the higher deck wall
+            const onlyXFloor = CollisionSystem.getFloorHeightAt(nextX, this.z);
+            const onlyZFloor = CollisionSystem.getFloorHeightAt(this.x, nextZ);
+            if (!Number.isFinite(onlyXFloor) || onlyXFloor <= this.y + 0.35) {
+                this.x = nextX;
+            } else {
+                this.vx = 0;
+            }
+            if (!Number.isFinite(onlyZFloor) || onlyZFloor <= this.y + 0.35) {
+                this.z = nextZ;
+            } else {
+                this.vz = 0;
+            }
+        } else {
+            this.x = nextX;
+            this.z = nextZ;
+        }
+
+        // Clamp within outer simulation bounds
+        this.x = Math.max(STAGE_BOUNDS.minX, Math.min(STAGE_BOUNDS.maxX, this.x));
+        this.z = Math.max(STAGE_BOUNDS.minZ, Math.min(STAGE_BOUNDS.maxZ, this.z));
+
+        const targetFloorY = CollisionSystem.getFloorHeightAt(this.x, this.z);
+        this.floorY = targetFloorY;
+
+        // If fighter was grounded on a higher ledge and stepped/slid off into a lower tier or the abyss:
+        if (this.isGrounded && this.y > targetFloorY + 0.08) {
+            this.isGrounded = false;
+        }
+
+        // Apply vertical gravity, Break-Fall Ukemi, and Fall Damage / Ring-Out checks
         if (!this.isGrounded) {
-            // Break-Fall Tech Recovery check right before hitting ground while falling in KNOCKED_DOWN
+            const distAboveFloor = Number.isFinite(targetFloorY) ? (this.y - targetFloorY) : Infinity;
+
+            // Break-Fall Tech Recovery check right before hitting a valid floor while falling in KNOCKED_DOWN
             if (
                 this.state === FIGHTER_STATE.KNOCKED_DOWN &&
                 this.hp > 0 &&
                 this.vy < 0 &&
-                this.y <= 0.85 &&
+                distAboveFloor <= 0.85 &&
+                distAboveFloor >= 0 &&
                 input.jumpJustPressed
             ) {
                 this.triggerTechRecovery(simEvents);
             } else {
+                const impactVy = this.vy;
                 this.vy += GRAVITY * FIXED_DT;
                 this.y += this.vy * FIXED_DT;
 
-                if (this.y <= 0) {
-                    this.y = 0;
+                if (Number.isFinite(targetFloorY) && this.y <= targetFloorY) {
+                    this.y = targetFloorY;
                     this.vy = 0;
                     this.isGrounded = true;
 
-                    if (this.state === FIGHTER_STATE.KNOCKED_DOWN) {
+                    // P5 Fall Damage: landing from a high launch or dropping off the upper rooftop onto the lower catwalk
+                    if (impactVy < STAGE_CONFIG.FALL_DAMAGE_THRESHOLD_VY && !this.invincible && this.hp > 0) {
+                        const excessSpeed = Math.abs(impactVy) - Math.abs(STAGE_CONFIG.FALL_DAMAGE_THRESHOLD_VY);
+                        const fallDmg = Math.max(4, Math.round(excessSpeed * STAGE_CONFIG.FALL_DAMAGE_SCALE));
+                        const fallPoise = Math.round(excessSpeed * STAGE_CONFIG.FALL_POISE_SCALE);
+                        this.hp = Math.max(0, this.hp - fallDmg);
+                        this.poise = Math.max(0, this.poise - fallPoise);
+                        this.transitionTo(FIGHTER_STATE.KNOCKED_DOWN);
+                        this.vx *= 0.35;
+                        this.vz *= 0.35;
+                        if (simEvents) {
+                            simEvents.push({
+                                type: 'FALL_DAMAGE',
+                                fighter: this.id,
+                                damage: fallDmg,
+                                x: this.x,
+                                y: this.y + 0.2,
+                                z: this.z
+                            });
+                        }
+                    } else if (this.state === FIGHTER_STATE.KNOCKED_DOWN) {
                         this.vx *= 0.3;
                         this.vz *= 0.3;
+                    }
+                } else if (!this.ringOut && this.y <= STAGE_CONFIG.ABYSS_DEATH_Y) {
+                    // P5 Ring-Out into the cyberpunk abyss!
+                    this.ringOut = true;
+                    this.hp = 0;
+                    this.transitionTo(FIGHTER_STATE.DEFEAT);
+                    if (simEvents) {
+                        simEvents.push({
+                            type: 'RING_OUT',
+                            fighter: this.id,
+                            x: this.x,
+                            y: this.y,
+                            z: this.z
+                        });
                     }
                 }
             }
         }
-
-        // Horizontal integration
-        this.x += this.vx * FIXED_DT;
-        this.z += this.vz * FIXED_DT;
 
         // Friction when on ground
         if (this.isGrounded) {
@@ -436,10 +512,6 @@ export class Fighter {
                 if (Math.abs(this.vz) < 0.05) this.vz = 0;
             }
         }
-
-        // Stage bounds clamping
-        this.x = Math.max(STAGE_BOUNDS.minX, Math.min(STAGE_BOUNDS.maxX, this.x));
-        this.z = Math.max(STAGE_BOUNDS.minZ, Math.min(STAGE_BOUNDS.maxZ, this.z));
     }
 
     /**
@@ -1099,7 +1171,7 @@ export class Fighter {
         }
 
         // Airborne Juggle or Knockdown / Launcher
-        const isAirborneJuggle = !this.isGrounded && this.y > 0.12;
+        const isAirborneJuggle = !this.isGrounded;
         if (move.knockdown || this.hp <= 0 || move.isLauncher || isAirborneJuggle) {
             this.transitionTo(FIGHTER_STATE.KNOCKED_DOWN);
             const kbX = move.knockback.x || 3.5;

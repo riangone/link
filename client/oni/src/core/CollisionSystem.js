@@ -3,9 +3,42 @@
  * Pure mathematical intersection checks in 3D (supporting arbitrary yaw facingAngle).
  */
 
-import { FIGHTER_STATE } from './Constants.js';
+import { FIGHTER_STATE, STAGE_CONFIG } from './Constants.js';
 
 export class CollisionSystem {
+    /**
+     * P5 Rooftop Arena Elevation Query
+     * Returns the floor height Y at world coordinates (x, z):
+     *   - Upper Rooftop Deck: |x| <= 6.4, |z| <= 4.6 -> y = 0.0
+     *   - Lower Perimeter Catwalk: |x| <= 9.8, |z| <= 5.8 -> y = -1.8
+     *   - Outer Cyberpunk Abyss: beyond catwalk -> -Infinity (Ring-Out!)
+     */
+    static getFloorHeightAt(x, z) {
+        const ax = Math.abs(x);
+        const az = Math.abs(z);
+        if (ax <= STAGE_CONFIG.UPPER_DECK_X && az <= STAGE_CONFIG.UPPER_DECK_Z) {
+            return STAGE_CONFIG.UPPER_DECK_Y;
+        }
+        if (ax <= STAGE_CONFIG.LOWER_CATWALK_X && az <= STAGE_CONFIG.LOWER_CATWALK_Z) {
+            return STAGE_CONFIG.LOWER_CATWALK_Y;
+        }
+        return -Infinity;
+    }
+
+    /**
+     * Returns which platform zone (x, z) belongs to: 'UPPER_DECK' | 'LOWER_CATWALK' | 'ABYSS'
+     */
+    static getPlatformZone(x, z) {
+        const ax = Math.abs(x);
+        const az = Math.abs(z);
+        if (ax <= STAGE_CONFIG.UPPER_DECK_X && az <= STAGE_CONFIG.UPPER_DECK_Z) {
+            return 'UPPER_DECK';
+        }
+        if (ax <= STAGE_CONFIG.LOWER_CATWALK_X && az <= STAGE_CONFIG.LOWER_CATWALK_Z) {
+            return 'LOWER_CATWALK';
+        }
+        return 'ABYSS';
+    }
     /**
      * Get 2D unit forward vector (fx, fz) for a fighter.
      * If facingAngle is defined and finite, uses (cos(facingAngle), sin(facingAngle));
@@ -61,6 +94,11 @@ export class CollisionSystem {
             return;
         }
 
+        // Do not push apart if two fighters are at significantly different elevations (> 0.9m)
+        if (Math.abs((f1.y || 0) - (f2.y || 0)) > 0.9) {
+            return;
+        }
+
         const dx = f2.x - f1.x;
         const dz = f2.z - f1.z;
         const distSq = dx * dx + dz * dz;
@@ -71,6 +109,24 @@ export class CollisionSystem {
             const overlap = (minDist - dist) * 0.5;
             const nx = dx / dist;
             const nz = dz / dist;
+
+            // P5 Body Bowling (敌人浮空或倒地滑行后具有碰撞体积判定，可撞飞或撞落高台边缘的另一名角色)
+            const f1Bowling =
+                f1.state === FIGHTER_STATE.KNOCKED_DOWN &&
+                Math.hypot(f1.vx || 0, f1.vz || 0) > 3.2;
+            const f2Bowling =
+                f2.state === FIGHTER_STATE.KNOCKED_DOWN &&
+                Math.hypot(f2.vx || 0, f2.vz || 0) > 3.2;
+
+            if (f1Bowling && !f2Bowling && !f2.invincible) {
+                f2.vx = (f2.vx || 0) + (f1.vx || 0) * 0.65;
+                f2.vz = (f2.vz || 0) + (f1.vz || 0) * 0.65;
+                f2.poise = Math.max(0, (f2.poise || 0) - STAGE_CONFIG.BODY_BOWL_POISE);
+            } else if (f2Bowling && !f1Bowling && !f1.invincible) {
+                f1.vx = (f1.vx || 0) + (f2.vx || 0) * 0.65;
+                f1.vz = (f1.vz || 0) + (f2.vz || 0) * 0.65;
+                f1.poise = Math.max(0, (f1.poise || 0) - STAGE_CONFIG.BODY_BOWL_POISE);
+            }
 
             f1.x -= nx * overlap;
             f1.z -= nz * overlap;
@@ -158,7 +214,7 @@ export class CollisionSystem {
 
         // Grounded opponents can only be hit by moves with `hitsGrounded` (e.g. Ground Stomp)
         // UNLESS they are still airborne (juggle physics!)
-        const isGroundedDown = defender.state === FIGHTER_STATE.KNOCKED_DOWN && defender.y <= 0.12;
+        const isGroundedDown = defender.state === FIGHTER_STATE.KNOCKED_DOWN && defender.isGrounded;
         if (isGroundedDown && !hitbox.move.hitsGrounded) {
             return null;
         }
@@ -196,7 +252,7 @@ export class CollisionSystem {
                     move: hitbox.move,
                     isBlock,
                     hurtPart: hurt.part,
-                    isJuggle: !defender.isGrounded && defender.y > 0.12
+                    isJuggle: !defender.isGrounded
                 };
             }
         }

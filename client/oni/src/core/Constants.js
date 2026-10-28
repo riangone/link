@@ -6,12 +6,28 @@
 export const TICK_RATE = 60;
 export const FIXED_DT = 1 / TICK_RATE;
 
-// Stage bounds
+// Stage bounds & P5 Multi-Elevation Rooftop / Ring-Out Geometry
 export const STAGE_BOUNDS = {
     minX: -14,
     maxX: 14,
     minZ: -6,
     maxZ: 6
+};
+
+export const STAGE_CONFIG = {
+    UPPER_DECK_X: 6.4,            // |x| <= 6.4 & |z| <= 4.6 is the main elevated rooftop dojo (y = 0)
+    UPPER_DECK_Z: 4.6,
+    UPPER_DECK_Y: 0.0,
+    LOWER_CATWALK_X: 9.8,         // |x| <= 9.8 & |z| <= 5.8 is the lower perimeter catwalk (y = -1.8)
+    LOWER_CATWALK_Z: 5.8,
+    LOWER_CATWALK_Y: -1.8,
+    ABYSS_DEATH_Y: -5.2,          // falling below y = -5.2 triggers fatal RING-OUT KO
+    FALL_DAMAGE_THRESHOLD_VY: -13.2, // landing downward faster than this deals heavy impact damage
+    FALL_DAMAGE_SCALE: 2.2,       // HP lost per m/s beyond threshold
+    FALL_POISE_SCALE: 4.5,        // Poise lost per m/s beyond threshold
+    BODY_BOWL_RADIUS: 0.92,       // Airborne/knocked-down body collision radius
+    BODY_BOWL_DAMAGE: 12,         // Bowling collision damage when a launched body slams into another fighter
+    BODY_BOWL_POISE: 35           // Bowling collision poise damage
 };
 
 // Physics
@@ -627,7 +643,7 @@ export const MOVE_TABLE = [
         states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.CROUCH],
         button: 'kick',
         condition: (f, input, opp, ctx) =>
-            opp && opp.state === FIGHTER_STATE.KNOCKED_DOWN && opp.y <= 0.15 && ctx.dist <= 1.65
+            opp && opp.state === FIGHTER_STATE.KNOCKED_DOWN && opp.isGrounded && ctx.dist <= 1.65
     },
 
     // 3. Dedicated Slide Button or Run + Crouch/Slide/Kick

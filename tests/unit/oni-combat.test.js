@@ -310,4 +310,43 @@ test('Oni Combat core module loading and P0+P1 simulation verification', async (
         assert.strictEqual(sim.f1.daodanOverdrive, true, 'DAODAN_SURGE should activate Daodan Overdrive');
         assert.ok(sim.f2.hp < hpBefore - 15, 'DAODAN_SURGE should pierce guard and deal burst damage');
     });
+
+    await t.test('P5 Rooftop Elevation, Fall Damage & Ring-Out Abyss KO', () => {
+        const sim = new Simulation();
+
+        // 1. Multi-tier elevation query: Upper Deck (y = 0), Lower Catwalk (y = -1.8), Abyss (-Infinity)
+        assert.strictEqual(CollisionSystem.getFloorHeightAt(0, 0), 0, 'Center of arena should be Upper Deck (y=0)');
+        assert.strictEqual(CollisionSystem.getFloorHeightAt(7.5, 0), -1.8, 'x=7.5 should be Lower Catwalk (y=-1.8)');
+        assert.strictEqual(CollisionSystem.getFloorHeightAt(11.0, 0), -Infinity, 'x=11.0 should be Outer Abyss (-Infinity)');
+
+        // 2. Fall Damage when dropping from high altitude onto the Lower Catwalk
+        sim.f2.x = 7.5;
+        sim.f2.z = 0;
+        sim.f2.y = 3.0;
+        sim.f2.vy = -16.5; // exceeding FALL_DAMAGE_THRESHOLD_VY (-13.2)
+        sim.f2.isGrounded = false;
+        const hpBeforeFall = sim.f2.hp;
+        for (let i = 0; i < 25; i++) {
+            sim.tick({}, {});
+            if (sim.f2.isGrounded) break;
+        }
+        assert.strictEqual(sim.f2.y, -1.8, 'Fighter should land on the lower perimeter catwalk (y = -1.8)');
+        assert.ok(sim.f2.hp < hpBeforeFall, `High-velocity impact should deal fall damage (HP: ${hpBeforeFall} -> ${sim.f2.hp})`);
+        assert.strictEqual(sim.f2.state, FIGHTER_STATE.KNOCKED_DOWN, 'Heavy fall impact should knock fighter down');
+
+        // 3. Ring-Out KO when knocked beyond the outer catwalk edge into the cyberpunk abyss
+        const ringSim = new Simulation();
+        ringSim.f2.x = 10.6; // beyond LOWER_CATWALK_X (9.8)
+        ringSim.f2.z = 0;
+        ringSim.f2.y = -1.8;
+        ringSim.f2.vy = -8.0;
+        ringSim.f2.isGrounded = false;
+        for (let i = 0; i < 40; i++) {
+            ringSim.tick({}, {});
+            if (ringSim.isMatchOver) break;
+        }
+        assert.strictEqual(ringSim.f2.ringOut, true, 'Falling below ABYSS_DEATH_Y should flag ringOut = true');
+        assert.strictEqual(ringSim.isMatchOver, true, 'Ring-Out should immediately end the match');
+        assert.strictEqual(ringSim.winner, 'p1', 'Opponent Ring-Out should award victory to P1');
+    });
 });

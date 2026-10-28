@@ -10,6 +10,7 @@ import {
     FIXED_DT,
     GRAVITY,
     STAGE_BOUNDS,
+    STAGE_CONFIG,
     WEAPON_PICKUP_RANGE,
     WEAPON_SPECS,
     DAODAN_CONFIG,
@@ -625,9 +626,10 @@ export class Simulation {
                     }
                 }
 
-                // Floor bounce / settle
-                if (wpn.y <= 0.14) {
-                    wpn.y = 0.14;
+                // Floor bounce / settle at current platform elevation (Upper Deck y=0 or Lower Catwalk y=-1.8)
+                const floorY = CollisionSystem.getFloorHeightAt(wpn.x, wpn.z);
+                if (Number.isFinite(floorY) && wpn.y <= floorY + 0.14) {
+                    wpn.y = floorY + 0.14;
                     if (Math.abs(wpn.vy) > 2.2) {
                         wpn.vy = -wpn.vy * 0.35;
                         wpn.vx *= 0.6;
@@ -642,9 +644,18 @@ export class Simulation {
                         wpn.spinPitch = 0;
                         wpn.spinSpeed = 1.8;
                     }
+                } else if (wpn.y <= STAGE_CONFIG.ABYSS_DEATH_Y) {
+                    // Weapon fell into the abyss
+                    this.removeEntity(wpn.id);
+                    continue;
                 }
             } else {
-                wpn.spinYaw += 1.8 * FIXED_DT;
+                const floorY = CollisionSystem.getFloorHeightAt(wpn.x, wpn.z);
+                if (!Number.isFinite(floorY) || wpn.y > floorY + 0.22) {
+                    wpn.isGrounded = false;
+                } else {
+                    wpn.spinYaw += 1.8 * FIXED_DT;
+                }
             }
 
             wpn.x = Math.max(STAGE_BOUNDS.minX + 0.5, Math.min(STAGE_BOUNDS.maxX - 0.5, wpn.x));
@@ -711,8 +722,10 @@ export class Simulation {
             }
 
             // Remove if hits floor or out of stage bounds
+            const projFloorY = CollisionSystem.getFloorHeightAt(p.x, p.z);
             if (
-                p.y <= 0.05 ||
+                (Number.isFinite(projFloorY) && p.y <= projFloorY + 0.05) ||
+                p.y <= STAGE_CONFIG.ABYSS_DEATH_Y ||
                 p.x < STAGE_BOUNDS.minX - 2 ||
                 p.x > STAGE_BOUNDS.maxX + 2 ||
                 p.z < STAGE_BOUNDS.minZ - 2 ||

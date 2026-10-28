@@ -177,44 +177,94 @@ export class ThreeScene {
 
     setupStage() {
         const { map, emissive } = this.makeFloorTextures();
-        const floor = new THREE.Mesh(
-            new THREE.PlaneGeometry(36, 20),
-            new THREE.MeshStandardMaterial({
-                map, emissiveMap: emissive, emissive: 0xffffff, emissiveIntensity: 0.3,
-                roughness: 0.32, metalness: 0.55
-            })
-        );
-        floor.rotation.x = -Math.PI / 2;
-        floor.receiveShadow = true;
-        this.scene.add(floor);
 
-        // glowing arena ring (thick tube reads far better than 1px lines)
+        // P5 Tier 1: Elevated Upper Rooftop Deck (|x| <= 6.4, |z| <= 4.6, y = 0.0)
+        const upperDeckMat = new THREE.MeshStandardMaterial({
+            map,
+            emissiveMap: emissive,
+            emissive: 0xffffff,
+            emissiveIntensity: 0.35,
+            roughness: 0.32,
+            metalness: 0.55
+        });
+        const upperDeck = new THREE.Mesh(new THREE.BoxGeometry(12.8, 1.8, 9.2), upperDeckMat);
+        upperDeck.position.set(0, -0.9, 0);
+        upperDeck.receiveShadow = true;
+        upperDeck.castShadow = true;
+        this.scene.add(upperDeck);
+
+        // Glowing cyan/amber hazard trim along the upper deck edge (|x| = 6.4, |z| = 4.6)
+        const edgeGlowC = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x22e6ff).multiplyScalar(1.5) });
+        const edgeGlowWarn = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff9900).multiplyScalar(1.6) });
+        const upperRimX1 = new THREE.Mesh(new THREE.BoxGeometry(12.88, 0.06, 0.08), edgeGlowC);
+        upperRimX1.position.set(0, 0.01, 4.6);
+        this.scene.add(upperRimX1);
+        const upperRimX2 = upperRimX1.clone();
+        upperRimX2.position.set(0, 0.01, -4.6);
+        this.scene.add(upperRimX2);
+
+        const upperRimZ1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 9.28), edgeGlowWarn);
+        upperRimZ1.position.set(-6.4, 0.01, 0);
+        this.scene.add(upperRimZ1);
+        const upperRimZ2 = upperRimZ1.clone();
+        upperRimZ2.position.set(6.4, 0.01, 0);
+        this.scene.add(upperRimZ2);
+
+        // P5 Tier 2: Lower Perimeter Catwalk (|x| <= 9.8, |z| <= 5.8, top surface at y = -1.8)
+        const catwalkMat = new THREE.MeshStandardMaterial({
+            color: 0x121526,
+            roughness: 0.45,
+            metalness: 0.72,
+            emissive: 0x0b162c,
+            emissiveIntensity: 0.4
+        });
+        const lowerCatwalk = new THREE.Mesh(new THREE.BoxGeometry(19.6, 2.2, 11.6), catwalkMat);
+        lowerCatwalk.position.set(0, -2.9, 0);
+        lowerCatwalk.receiveShadow = true;
+        this.scene.add(lowerCatwalk);
+
+        // Fatal Abyss Danger Trim around outer catwalk edge (|x| = 9.8, |z| = 5.8, y = -1.8)
+        const dangerMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff0055).multiplyScalar(1.8) });
+        const lowerRimX1 = new THREE.Mesh(new THREE.BoxGeometry(19.68, 0.07, 0.09), dangerMat);
+        lowerRimX1.position.set(0, -1.79, 5.8);
+        this.scene.add(lowerRimX1);
+        const lowerRimX2 = lowerRimX1.clone();
+        lowerRimX2.position.set(0, -1.79, -5.8);
+        this.scene.add(lowerRimX2);
+        const lowerRimZ1 = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.07, 11.68), dangerMat);
+        lowerRimZ1.position.set(-9.8, -1.79, 0);
+        this.scene.add(lowerRimZ1);
+        const lowerRimZ2 = lowerRimZ1.clone();
+        lowerRimZ2.position.set(9.8, -1.79, 0);
+        this.scene.add(lowerRimZ2);
+
+        // Glowing arena ring in the center of the upper deck
         const ringMat = new THREE.MeshBasicMaterial({ color: 0x22e6ff });
         ringMat.color.multiplyScalar(1.4);
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(5.4, 0.035, 8, 96), ringMat);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.035, 8, 96), ringMat);
         ring.rotation.x = -Math.PI / 2;
         ring.position.y = 0.03;
         this.scene.add(ring);
 
-        // perimeter barrier posts + light bars behind the fighters
+        // Perimeter barrier posts + light bars along the back of the lower catwalk
         const postMat = new THREE.MeshStandardMaterial({ color: 0x1a1c2c, roughness: 0.4, metalness: 0.8 });
         const barC = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x22e6ff).multiplyScalar(1.6) });
         const barM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff2f8a).multiplyScalar(1.6) });
-        for (let i = -6; i <= 6; i++) {
-            const x = i * 2.4;
+        for (let i = -4; i <= 4; i++) {
+            const x = i * 2.3;
             const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.3, 0.18), postMat);
-            post.position.set(x, 0.65, -8.2);
+            post.position.set(x, -1.15, -5.7);
             post.castShadow = true;
             this.scene.add(post);
             const bar = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.0, 0.04), i % 2 ? barM : barC);
-            bar.position.set(x, 0.7, -8.09);
+            bar.position.set(x, -1.1, -5.59);
             this.scene.add(bar);
         }
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(30, 0.05, 0.05), barC);
-        rail.position.set(0, 1.25, -8.12);
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(19.2, 0.05, 0.05), barC);
+        rail.position.set(0, -0.55, -5.62);
         this.scene.add(rail);
-        const rail2 = new THREE.Mesh(new THREE.BoxGeometry(30, 0.03, 0.03), barM);
-        rail2.position.set(0, 0.25, -8.12);
+        const rail2 = new THREE.Mesh(new THREE.BoxGeometry(19.2, 0.03, 0.03), barM);
+        rail2.position.set(0, -1.55, -5.62);
         this.scene.add(rail2);
     }
 

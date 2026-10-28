@@ -381,6 +381,14 @@ function init() {
                 threeScene.addTrauma(0.55);
                 threeScene.hitFlash(0.28);
                 showActionNotice('DAODAN OVERDRIVE! 道弹蛹完全觉醒!');
+            } else if (ev.type === 'FALL_DAMAGE') {
+                vfx.spawnShockwave(ev.x, ev.y, ev.z, 0xffaa00);
+                threeScene.addTrauma(0.38);
+                showActionNotice(`FALL IMPACT! -${ev.damage} HP 跌落重创!`);
+            } else if (ev.type === 'RING_OUT') {
+                vfx.spawnShockwave(ev.x, -1.8, ev.z, 0xff0055);
+                threeScene.addTrauma(0.75);
+                showActionNotice('RING OUT! 击落深渊!');
             } else if (ev.type === 'WAVE_CLEARED') {
                 showActionNotice(`WAVE ${ev.wave} CLEARED! +1💉 增援接近中!`);
             } else if (ev.type === 'WAVE_SPAWN') {
@@ -388,6 +396,8 @@ function init() {
                 vfx.spawnShockwave(ev.x, 0.15, ev.z, 0xff0077);
                 showActionNotice(`WAVE ${ev.wave}: ${ev.enemyName}!`);
             } else if (ev.type === 'KO') {
+                const isRingOut = sim.f1.ringOut || sim.f2.ringOut;
+                koBanner.textContent = isRingOut ? 'RING OUT!' : 'K.O.';
                 koBanner.style.display = 'block';
                 threeScene.addTrauma(0.65);
                 setTimeout(() => {
