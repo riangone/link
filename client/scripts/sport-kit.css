@@ -1,0 +1,618 @@
+/**
+ * SportKit — shared on-screen touch controls, desktop key hints, HUD & help modal
+ * for the 1v1 top-down sports games (volley / soccer / tennis / hoops).
+ */
+
+/* ==================================================================
+   Touch Controls (Virtual Joystick + Touch Guidance + Action Buttons)
+   ================================================================== */
+.touch-controls {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 10px;
+    height: 128px;
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+    margin-top: 6px;
+}
+
+html.gf-touch .touch-controls {
+    display: flex;
+}
+
+.stick-zone {
+    flex: 0 0 136px;
+    height: 100%;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 8px;
+    color: var(--text-secondary, #94a3b8);
+    font-size: 11px;
+    font-weight: 500;
+    touch-action: none;
+}
+
+.stick-zone.active {
+    background: rgba(45, 226, 255, 0.12);
+    border-color: rgba(45, 226, 255, 0.55);
+}
+
+.stick-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 54px;
+    height: 54px;
+    margin: -27px 0 0 -27px;
+    border-radius: 50%;
+    background: rgba(45, 226, 255, 0.35);
+    border: 2px solid rgba(45, 226, 255, 0.85);
+    box-shadow: 0 0 14px rgba(45, 226, 255, 0.45);
+    pointer-events: none;
+    opacity: 0.55;
+    transition: opacity 0.12s ease;
+}
+
+.stick-zone.active .stick-knob {
+    opacity: 1;
+}
+
+.touch-hint {
+    flex: 1 1 auto;
+    text-align: center;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--text-secondary, #94a3b8);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 8px 10px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+    margin: 0 4px;
+}
+
+.touch-hint b {
+    color: #2de2ff;
+}
+
+.touch-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex: none;
+}
+
+.act-btn {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    border: 2.5px solid rgba(255, 255, 255, 0.85);
+    color: #fff;
+    font: 800 24px/1 Orbitron, system-ui, sans-serif;
+    box-shadow: 0 5px 0 rgba(0, 0, 0, 0.45), 0 0 14px rgba(0, 0, 0, 0.35);
+    touch-action: none;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    transition: transform 0.08s ease, filter 0.08s ease;
+}
+
+.act-btn small {
+    display: block;
+    font-size: 10px;
+    font-family: system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    opacity: 0.95;
+}
+
+.act-btn:active,
+.act-btn.active {
+    transform: translateY(3px) scale(0.95);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+    filter: brightness(1.2);
+}
+
+@media (max-width: 540px) {
+    .touch-controls {
+        height: 110px;
+        gap: 6px;
+        padding: 4px 6px;
+    }
+    .stick-zone {
+        flex: 0 0 100px;
+    }
+    .act-btn {
+        width: 68px;
+        height: 68px;
+        font-size: 18px;
+    }
+    .act-btn small {
+        font-size: 8.5px;
+    }
+    .touch-hint {
+        font-size: 10px;
+        padding: 4px 6px;
+        line-height: 1.35;
+    }
+}
+
+/* ==================================================================
+   Desktop Live HUD Bar (Always visible below canvas on desktop)
+   ================================================================== */
+.desktop-hud-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: rgba(12, 16, 28, 0.92);
+    border: 1px solid rgba(45, 226, 255, 0.25);
+    border-radius: 12px;
+    padding: 8px 14px;
+    margin-top: 6px;
+    box-sizing: border-box;
+    font-size: 12px;
+    color: var(--text-secondary, #94a3b8);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+html.gf-touch .desktop-hud-bar {
+    display: none !important;
+}
+
+.desktop-hud-bar .hud-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.desktop-hud-bar .hud-label {
+    font-family: Orbitron, sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #2de2ff;
+    text-transform: uppercase;
+    background: rgba(45, 226, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(45, 226, 255, 0.3);
+}
+
+.desktop-hud-bar .hud-keys {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.desktop-hud-bar .key-combo {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-primary, #f1f5f9);
+}
+
+.desktop-hud-bar kbd, .control-keys .key, .briefing-card kbd, .modal-body kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    font-family: Orbitron, monospace, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 5px;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+    transition: all 0.08s ease;
+}
+
+/* Dynamic Live Key Highlight when pressed on physical keyboard */
+.desktop-hud-bar kbd.active-key {
+    background: #2de2ff !important;
+    color: #050b14 !important;
+    border-color: #8af2ff !important;
+    box-shadow: 0 0 12px rgba(45, 226, 255, 0.9) !important;
+    transform: translateY(2px) !important;
+}
+
+.desktop-hud-bar .hud-divider {
+    width: 1px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.desktop-hud-bar .hud-mouse {
+    font-size: 11.5px;
+    color: #94a3b8;
+}
+
+.desktop-hud-bar .hud-help-trigger {
+    background: rgba(45, 226, 255, 0.12);
+    border: 1px solid rgba(45, 226, 255, 0.4);
+    color: #2de2ff;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    margin-left: auto;
+}
+
+.desktop-hud-bar .hud-help-trigger:hover {
+    background: rgba(45, 226, 255, 0.25);
+    border-color: #2de2ff;
+    color: #fff;
+    box-shadow: 0 0 10px rgba(45, 226, 255, 0.4);
+}
+
+/* ==================================================================
+   In-Game Round-Start Toast Banner (Canvas Float Prompt)
+   ================================================================== */
+.game-toast {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10, 14, 26, 0.94);
+    border: 1.5px solid #ffd34d;
+    border-radius: 24px;
+    padding: 7px 20px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffd34d;
+    box-shadow: 0 0 24px rgba(255, 211, 77, 0.45);
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 35;
+    white-space: nowrap;
+    letter-spacing: 0.4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.game-toast.hidden {
+    opacity: 0 !important;
+    transform: translateX(-50%) translateY(12px) !important;
+    pointer-events: none !important;
+    display: none !important;
+}
+
+/* ==================================================================
+   Tactical Briefing Card (Lobby & Ready Overlays)
+   ================================================================== */
+.briefing-card {
+    background: rgba(15, 22, 38, 0.9);
+    border: 1px solid rgba(45, 226, 255, 0.35);
+    border-radius: 12px;
+    padding: 10px 16px;
+    margin: 8px auto 14px;
+    max-width: 520px;
+    text-align: left;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.55);
+}
+
+.briefing-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 6px;
+}
+
+.briefing-tag {
+    font-family: Orbitron, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: #2de2ff;
+    letter-spacing: 0.5px;
+}
+
+.btn-briefing-help {
+    background: none;
+    border: none;
+    color: #ffd34d;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+}
+
+.btn-briefing-help:hover {
+    color: #ffe685;
+}
+
+.briefing-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: #cbd5e1;
+}
+
+.briefing-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.briefing-item .briefing-label {
+    flex: none;
+    width: 88px;
+    font-size: 11px;
+    color: var(--text-secondary, #94a3b8);
+}
+
+.briefing-item .briefing-val {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.briefing-tip {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.1);
+    font-size: 11.5px;
+    color: #94a3b8;
+    line-height: 1.4;
+}
+
+.tip-badge {
+    color: #ffd34d;
+    font-weight: 700;
+    margin-right: 4px;
+}
+
+/* ==================================================================
+   Header Help Button & Tactical Controls Modal
+   ================================================================== */
+.help-btn {
+    font-family: Orbitron, system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: #2de2ff;
+    border-color: rgba(45, 226, 255, 0.4);
+    background: rgba(45, 226, 255, 0.1);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 11px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.help-btn:hover {
+    background: rgba(45, 226, 255, 0.22);
+    border-color: #2de2ff;
+    color: #fff;
+    box-shadow: 0 0 12px rgba(45, 226, 255, 0.4);
+}
+
+.controls-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.controls-modal.hidden {
+    display: none !important;
+}
+
+.modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(6, 8, 16, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.modal-dialog {
+    position: relative;
+    max-width: 660px;
+    width: 100%;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    background: #0d1222;
+    border: 1.5px solid #2de2ff;
+    border-radius: 16px;
+    box-shadow: 0 0 35px rgba(45, 226, 255, 0.25), 0 20px 50px rgba(0, 0, 0, 0.8);
+    color: #f1f5f9;
+    overflow: hidden;
+    animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPop {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: rgba(45, 226, 255, 0.08);
+    border-bottom: 1px solid rgba(45, 226, 255, 0.25);
+}
+
+.modal-title {
+    font-family: Orbitron, sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #2de2ff;
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 6px;
+    transition: color 0.15s;
+}
+
+.modal-close:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.modal-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 10px 20px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 14px;
+    font-family: Orbitron, system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tab-btn:hover {
+    color: #fff;
+}
+
+.tab-btn.active {
+    color: #2de2ff;
+    border-bottom-color: #2de2ff;
+}
+
+.modal-body {
+    padding: 18px 22px;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #cbd5e1;
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+.modal-body table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 12px;
+}
+
+.modal-body th, .modal-body td {
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: left;
+}
+
+.modal-body th {
+    background: rgba(45, 226, 255, 0.08);
+    color: #2de2ff;
+    font-family: Orbitron, sans-serif;
+    font-size: 11px;
+}
+
+.modal-body td strong {
+    color: #ffd34d;
+}
+
+.modal-body ul {
+    margin: 8px 0 12px 18px;
+    padding: 0;
+}
+
+.modal-body li {
+    margin-bottom: 6px;
+}
+
+.modal-footer {
+    padding: 12px 20px;
+    background: rgba(0, 0, 0, 0.25);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.modal-ok-btn {
+    padding: 8px 22px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+/* ==================================================================
+   Side-Panel Control Keys HUD (Drawer)
+   ================================================================== */
+.control-keys {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary, #94a3b8);
+    padding: 8px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    margin-top: 6px;
+}
+
+.control-keys .key-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.control-keys .key {
+    display: inline-block;
+    padding: 1px 6px;
+    font-family: Orbitron, monospace, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-primary, #f1f5f9);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 5px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    margin: 0 1px;
+}
+
+/* Mobile users can still view control-keys when they open the side drawer */
+html.gf.gf-touch .control-keys {
+    display: flex;
+}

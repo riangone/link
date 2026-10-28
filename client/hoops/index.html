@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Link Hoops</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../scripts/sport-kit.css">
+    <link rel="stylesheet" href="../scripts/game-fit.css">
+</head>
+<body>
+    <div class="game-container">
+        <header class="game-header">
+            <div class="logo">
+                <span class="logo-link">LINK</span>
+                <span class="logo-sport">HOOPS</span>
+            </div>
+            <div class="header-actions">
+                <button id="help-btn" class="gf-btn help-btn" type="button" data-i18n-title="help_title">🎮 <span data-i18n="help_btn">操作说明</span></button>
+                <select id="lang-select" class="gf-btn lang-select" data-i18n-title="lang_title" aria-label="language"></select>
+                <button id="mute-btn" class="gf-btn" type="button" data-i18n-title="mute_title">🔊</button>
+                <div class="stats">
+                    <div class="stat-box">
+                        <span class="stat-label" id="p1-label" data-i18n="p1_host">P1</span>
+                        <span id="p1-score" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label" id="p2-label" data-i18n="p2_client">P2</span>
+                        <span id="p2-score" class="stat-value">0</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-panel">
+            <div class="stage-column">
+                <div class="canvas-wrapper">
+                    <canvas id="game-canvas" width="800" height="450"></canvas>
+                    <div id="game-toast" class="game-toast hidden"></div>
+
+                    <div id="overlay" class="overlay">
+                        <div class="overlay-content" id="lobby-screen">
+                            <h2 class="title-glow">MECH HOOPS</h2>
+                            <p class="tagline" data-i18n="tagline"></p>
+                            <div class="briefing-card">
+                                <div class="briefing-header">
+                                    <span class="briefing-tag" data-i18n="briefing_title">🎮 作战操控速查</span>
+                                    <button type="button" class="btn-briefing-help open-help-modal" data-i18n="view_manual">📖 完整操作手册</button>
+                                </div>
+                                <div class="briefing-grid">
+                                    <div class="briefing-item">
+                                        <div class="briefing-label"><span class="icon">💻</span> <b data-i18n="tip_keyboard">电脑键盘</b></div>
+                                        <div class="briefing-val" data-i18n="briefing_keys">WASD 走位 · Space/J 跳投/篮下暴扣 · Shift/K 防守盖帽</div>
+                                    </div>
+                                    <div class="briefing-item">
+                                        <div class="briefing-label"><span class="icon">📱</span> <b data-i18n="tip_touch">手机触控</b></div>
+                                        <div class="briefing-val" data-i18n="briefing_touch">左摇杆移动 · 投篮键跳投/暴扣 · 防守键抢断/盖帽</div>
+                                    </div>
+                                </div>
+                                <div class="briefing-tip">
+                                    <span class="tip-badge">💡 核心机制</span> <span data-i18n="k_mark">跳到最高点出手最准；对手投篮刚离手时起跳可盖帽</span>
+                                </div>
+                            </div>
+                            <p class="how-mini" data-i18n="how_mini"></p>
+                            <div class="room-info">
+                                <span class="label" data-i18n="invite_label"></span>
+                                <div class="invite-link-container">
+                                    <input type="text" id="invite-url" readonly value="...">
+                                    <button id="copy-btn" class="btn btn-secondary" data-i18n="copy"></button>
+                                </div>
+                            </div>
+                            <div class="connection-status">
+                                <span class="spinner"></span>
+                                <span id="connection-state-text" data-i18n="conn_wait"></span>
+                            </div>
+                        </div>
+
+                        <div class="overlay-content hidden" id="ready-screen">
+                            <h2 data-i18n="ready_h2"></h2>
+                            <p class="tagline" id="role-text"></p>
+                            <div class="briefing-card">
+                                <div class="briefing-header">
+                                    <span class="briefing-tag" data-i18n="briefing_title">🎮 作战操控速查</span>
+                                    <button type="button" class="btn-briefing-help open-help-modal" data-i18n="view_manual">📖 完整操作手册</button>
+                                </div>
+                                <div class="briefing-grid">
+                                    <div class="briefing-item">
+                                        <div class="briefing-label"><span class="icon">💻</span> <b data-i18n="tip_keyboard">电脑键盘</b></div>
+                                        <div class="briefing-val" data-i18n="briefing_keys">WASD 走位 · Space/J 跳投/篮下暴扣 · Shift/K 防守盖帽</div>
+                                    </div>
+                                    <div class="briefing-item">
+                                        <div class="briefing-label"><span class="icon">📱</span> <b data-i18n="tip_touch">手机触控</b></div>
+                                        <div class="briefing-val" data-i18n="briefing_touch">左摇杆移动 · 投篮键跳投/暴扣 · 防守键抢断/盖帽</div>
+                                    </div>
+                                </div>
+                                <div class="briefing-tip">
+                                    <span class="tip-badge">💡 核心机制</span> <span data-i18n="k_mark">跳到最高点出手最准；对手投篮刚离手时起跳可盖帽</span>
+                                </div>
+                            </div>
+                            <p class="how-mini" data-i18n="how_mini"></p>
+                            <button id="start-btn" class="btn btn-primary">TIP OFF!</button>
+                        </div>
+
+                        <div class="overlay-content hidden" id="gameover-screen">
+                            <h2 id="win-loss-title" class="neon-text">MATCH COMPLETE</h2>
+                            <p class="final-score-text"><span data-i18n="final_score"></span>: <span id="final-score">0 - 0</span></p>
+                            <button id="restart-btn" class="btn btn-primary" data-i18n="rematch"></button>
+                        </div>
+
+                        <div class="overlay-content hidden" id="disconnect-screen">
+                            <h2 class="danger-text" data-i18n="lost_h2"></h2>
+                            <p data-i18n="lost_p"></p>
+                            <button id="lobby-btn" class="btn btn-primary" data-i18n="lobby_btn"></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Desktop Key HUD Bar -->
+                <div class="desktop-hud-bar" id="desktop-hud-bar" aria-label="Controls HUD">
+                    <div class="hud-group">
+                        <span class="hud-label" data-i18n="tip_keyboard">键盘</span>
+                        <div class="hud-keys">
+                            <span class="key-combo"><kbd data-key="w">W</kbd><kbd data-key="a">A</kbd><kbd data-key="s">S</kbd><kbd data-key="d">D</kbd> <span data-i18n="k_move">跑位走位</span></span>
+                            <span class="key-combo"><kbd data-key="space">Space</kbd> / <kbd data-key="j">J</kbd> <span data-i18n="k_act1">跳投/暴扣</span></span>
+                            <span class="key-combo"><kbd data-key="shift">Shift</kbd> / <kbd data-key="k">K</kbd> <span data-i18n="k_act2">盖帽/抢断</span></span>
+                        </div>
+                    </div>
+                    <div class="hud-divider"></div>
+                    <div class="hud-group hud-mouse">
+                        <span class="hud-label" data-i18n="tip_mouse">鼠标</span>
+                        <span class="hud-desc" data-i18n="hud_mouse">拖动画布跑位 · 单击跳投</span>
+                    </div>
+                    <button type="button" class="hud-help-trigger open-help-modal" data-i18n="view_manual">📖 完整说明</button>
+                </div>
+
+                <div class="touch-controls" id="touch-controls" aria-label="Touch Controls">
+                    <div class="stick-zone" id="move-stick">
+                        <span data-i18n="k_move">跑位</span>
+                        <div class="stick-knob" id="move-knob"></div>
+                    </div>
+                    <div class="touch-hint" id="touch-hint" data-i18n="touch_hint">🕹️ 摇杆走位晃人<br>🏀 <b>最高点跳投</b>/篮下暴扣 · 🛡️防守盖帽抢断！</div>
+                    <div class="touch-actions">
+                        <button type="button" class="act-btn act-steal" id="steal-btn" data-action="steal">💨<small data-i18n="btn_steal"></small></button>
+                        <button type="button" class="act-btn act-shoot" id="shoot-btn" data-action="shoot">🏀<small data-i18n="btn_shoot"></small></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="side-panel">
+                <div class="panel-section instructions">
+                    <h3 data-i18n="how_h3"></h3>
+                    <div class="control-keys">
+                        <div class="key-row"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> <span data-i18n="k_move"></span></div>
+                        <div class="key-row"><span class="key">Space</span> / <span class="key">J</span> <span data-i18n="k_shoot"></span></div>
+                        <div class="key-row"><span class="key">Shift</span> / <span class="key">K</span> <span data-i18n="k_steal"></span></div>
+                        <div class="key-row note-row" data-i18n="k_touch"></div>
+                        <div class="key-row note-row" data-i18n="k_mark"></div>
+                        <div class="key-row note-row" data-i18n="k_rule"></div>
+                    </div>
+                </div>
+
+                <div class="panel-section status-section">
+                    <h3 data-i18n="status_h3"></h3>
+                    <div class="status-grid">
+                        <div><span data-i18n="st_state"></span>: <span id="status-text" class="status-offline" data-i18n="st_disconnected"></span></div>
+                        <div><span data-i18n="st_ping"></span>: <span id="ping-text">-- ms</span></div>
+                        <div><span data-i18n="st_role"></span>: <span id="role-status-text" data-i18n="st_spectator"></span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="game-footer">
+            <a href="../" class="back-link">
+                <svg class="back-icon" viewBox="0 0 24 24" width="16" height="16">
+                    <path fill="currentColor" d="M20,11H7.83l5.59-5.59L12,4l-8,8l8,8l1.41-1.41L7.83,13H20V11z"/>
+                </svg>
+                <span data-i18n="back"></span>
+            </a>
+        </footer>
+    </div>
+
+    <script src="../scripts/game-session.js"></script>
+    <script src="../scripts/game-bot.js" data-lobby="../play/"></script>
+    <script src="../scripts/game-fit.js"></script>
+    <script src="../scripts/sport-kit.js"></script>
+    <script src="../scripts/sport-mech.js"></script>
+    <script src="i18n.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

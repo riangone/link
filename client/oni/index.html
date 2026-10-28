@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>鬼神对决 · Oni Combat - Link</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 3D Three.js Viewport Container -->
+        <div id="canvas-container"></div>
+
+        <!-- Combat HUD Overlay -->
+        <div class="hud">
+            <!-- Top Health & Round Timer -->
+            <div class="top-bar">
+                <div class="fighter-card p1">
+                    <div class="fighter-info">
+                        <span id="p1-name">KONOKO</span>
+                        <span id="p1-hp-text">100 / 100</span>
+                    </div>
+                    <div class="hp-bar-bg">
+                        <div id="p1-hp-fill" class="hp-bar-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+
+                <div class="timer-box">
+                    <span id="round-timer" class="timer-num">99</span>
+                    <span class="timer-label">TIME</span>
+                </div>
+
+                <div class="fighter-card p2">
+                    <div class="fighter-info">
+                        <span id="p2-name">SYNDI-BOT</span>
+                        <span id="p2-hp-text">100 / 100</span>
+                    </div>
+                    <div class="hp-bar-bg">
+                        <div id="p2-hp-fill" class="hp-bar-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mid Screen Banners: K.O., Combos -->
+            <div class="mid-banner">
+                <div id="combo-notice" class="combo-notice">2 HITS!</div>
+                <div id="ko-banner" class="ko-text">K.O.</div>
+            </div>
+
+            <!-- Bottom Command HUD -->
+            <div class="controls-hud">
+                <div class="command-box">
+                    <strong id="hud-cmd-title">⚡ 战术指令 (出招表)</strong>
+                    <span>A/D 移动 (双击前冲) | W/S 3D走位</span>
+                    <span>J / Z: 刺拳(连按打出直拳)</span>
+                    <span>K / X: 踢腿 | 前冲中按K: 疾风滑铲</span>
+                    <span>S + D + J: 升龙破空拳 (击飞) | L / C: 格挡</span>
+                </div>
+                <div class="command-box" style="text-align: right;">
+                    <strong id="mode-status-text">🤖 人机战模式</strong>
+                    <span id="fps-counter">60 FPS</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- On-Screen Touch Controls (Active on Mobile/Touch) -->
+        <div class="touch-controls">
+            <div class="touch-btn-pad">
+                <button type="button" class="t-btn block" id="btn-block">B</button>
+                <button type="button" class="t-btn kick" id="btn-kick">K</button>
+                <button type="button" class="t-btn" id="btn-punch">P</button>
+            </div>
+        </div>
+
+        <!-- Start / Lobby Overlay -->
+        <div id="start-overlay" class="overlay">
+            <div class="modal">
+                <h1 id="modal-title">⚔️ 鬼神对决 (ONI COMBAT)</h1>
+                <p id="modal-desc">3D 纯前端赛博近空格斗 · 搓招缓冲、分层动作状态机、Hitbox判定与滑铲对战。</p>
+                <div class="btn-group">
+                    <button type="button" class="cyber-btn" id="btn-start">开始对决 (VS BOT)</button>
+                    <a href="../play/" class="cyber-btn secondary" style="text-decoration: none; display: block;">返回对战大厅</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div id="gameover-overlay" class="overlay hidden">
+            <div class="modal">
+                <h1 id="ko-title">K.O.</h1>
+                <p id="winner-text">KONOKO 获胜！</p>
+                <div class="btn-group">
+                    <button type="button" class="cyber-btn" id="btn-rematch">再来一局</button>
+                    <a href="../play/" class="cyber-btn secondary" style="text-decoration: none; display: block;">返回对战大厅</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../scripts/game-session.js"></script>
+    <script src="../scripts/game-bot.js" data-lobby="../play/"></script>
+    <script type="module" src="game.js"></script>
+</body>
+</html>

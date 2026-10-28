@@ -1,0 +1,377 @@
+/**
+ * Oni Combat Cyberpunk Theme & HUD Stylesheet
+ */
+
+:root {
+    --bg-dark: #0a0c16;
+    --card-bg: rgba(18, 22, 38, 0.88);
+    --border-line: rgba(0, 240, 255, 0.3);
+    --neon-cyan: #00f0ff;
+    --neon-magenta: #ff0077;
+    --neon-yellow: #ffe600;
+    --hp-green: #00ff88;
+    --hp-red: #ff3344;
+    --text-main: #eef2ff;
+    --text-muted: #8e9bb5;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background: var(--bg-dark);
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans", sans-serif;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+}
+
+#app {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+#canvas-container {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+/* Combat HUD Overlay */
+.hud {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 16px 24px;
+}
+
+/* Top Health Bars & Timer */
+.top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    gap: 16px;
+}
+
+.fighter-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.fighter-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.fighter-card.p1 .fighter-info {
+    color: var(--neon-cyan);
+}
+
+.fighter-card.p2 .fighter-info {
+    color: var(--neon-magenta);
+    flex-direction: row-reverse;
+}
+
+.hp-bar-bg {
+    width: 100%;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid var(--border-line);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.15);
+}
+
+.hp-bar-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #00f0ff, #00ff88);
+    transition: width 0.15s ease-out;
+}
+
+.fighter-card.p2 .hp-bar-fill {
+    background: linear-gradient(90deg, #ff0077, #ff6600);
+    float: right;
+}
+
+.hp-bar-chip {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.4);
+    transition: width 0.4s ease-out;
+    pointer-events: none;
+}
+
+/* Central Round Timer */
+.timer-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 74px;
+    height: 60px;
+    background: var(--card-bg);
+    border: 2px solid var(--neon-yellow);
+    border-radius: 8px;
+    box-shadow: 0 0 16px rgba(255, 230, 0, 0.3);
+}
+
+.timer-num {
+    font-size: 32px;
+    font-weight: 900;
+    color: var(--neon-yellow);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.timer-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+}
+
+/* Mid screen Banner: K.O., COMBOS */
+.mid-banner {
+    position: absolute;
+    top: 38%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+}
+
+.ko-text {
+    font-size: 64px;
+    font-weight: 900;
+    font-style: italic;
+    color: #fff;
+    text-shadow: 0 0 20px var(--neon-magenta), 0 0 40px var(--neon-cyan);
+    letter-spacing: 0.1em;
+    display: none;
+    animation: pop 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+@keyframes pop {
+    0% { transform: scale(0.4); opacity: 0; }
+    80% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1.0); opacity: 1; }
+}
+
+.combo-notice {
+    font-size: 26px;
+    font-weight: 800;
+    font-style: italic;
+    color: var(--neon-yellow);
+    text-shadow: 0 0 12px rgba(255, 230, 0, 0.6);
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.combo-notice.show {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* Controls Guide & Move List */
+.controls-hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.command-box {
+    background: var(--card-bg);
+    border: 1px solid var(--border-line);
+    border-radius: 8px;
+    padding: 8px 14px;
+    line-height: 1.5;
+    pointer-events: auto;
+    backdrop-filter: blur(8px);
+}
+
+.command-box strong {
+    color: var(--neon-cyan);
+    display: block;
+    margin-bottom: 3px;
+}
+
+.command-box span {
+    display: block;
+    font-family: monospace;
+    font-size: 11px;
+    color: #cbd5e1;
+}
+
+/* Touch On-Screen Controls (Shown on touch / mobile devices) */
+.touch-controls {
+    display: none;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 20;
+}
+
+@media (pointer: coarse) {
+    .touch-controls {
+        display: block;
+    }
+}
+
+.touch-dpad {
+    position: absolute;
+    bottom: 24px;
+    left: 24px;
+    width: 140px;
+    height: 140px;
+    pointer-events: auto;
+}
+
+.touch-btn-pad {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    gap: 12px;
+    pointer-events: auto;
+}
+
+.t-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(18, 22, 38, 0.85);
+    border: 2px solid var(--neon-cyan);
+    color: #fff;
+    font-weight: 800;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+
+.t-btn:active {
+    background: var(--neon-cyan);
+    color: #000;
+}
+
+.t-btn.kick {
+    border-color: var(--neon-magenta);
+    box-shadow: 0 0 10px rgba(255, 0, 119, 0.3);
+}
+
+.t-btn.kick:active {
+    background: var(--neon-magenta);
+}
+
+.t-btn.block {
+    border-color: var(--neon-yellow);
+    box-shadow: 0 0 10px rgba(255, 230, 0, 0.3);
+}
+
+.t-btn.block:active {
+    background: var(--neon-yellow);
+}
+
+/* Modals & Overlays */
+.overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    background: rgba(8, 10, 22, 0.88);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.overlay.hidden {
+    display: none;
+}
+
+.modal {
+    background: var(--card-bg);
+    border: 1px solid var(--border-line);
+    border-radius: 16px;
+    padding: 28px 32px;
+    text-align: center;
+    max-width: 440px;
+    width: 100%;
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.2);
+}
+
+.modal h1 {
+    font-size: 26px;
+    font-weight: 900;
+    color: var(--neon-cyan);
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+}
+
+.modal p {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+.btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cyber-btn {
+    background: linear-gradient(90deg, #00f0ff, #0088ff);
+    color: #000;
+    font-weight: 800;
+    font-size: 15px;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: transform 0.1s, box-shadow 0.2s;
+}
+
+.cyber-btn:hover {
+    box-shadow: 0 0 18px rgba(0, 240, 255, 0.6);
+    transform: translateY(-2px);
+}
+
+.cyber-btn.secondary {
+    background: transparent;
+    border: 1px solid var(--border-line);
+    color: var(--text-main);
+}

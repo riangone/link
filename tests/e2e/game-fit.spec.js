@@ -11,7 +11,7 @@ const { startDevServer } = require('./dev-server.js');
  *    needs a confirming second tap on touch screens.
  */
 const PHONE = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 };
-const GAMES = ['pong', 'gomoku', 'hockey', 'tanks', 'brawl', 'tron', 'blaster', 'blocks', 'bombs', 'tag', 'paint', 'kart', 'spin'];
+const GAMES = ['pong', 'gomoku', 'hockey', 'tanks', 'brawl', 'tron', 'blaster', 'blocks', 'bombs', 'tag', 'paint', 'kart', 'spin', 'armor', 'volley', 'soccer', 'tennis', 'hoops'];
 
 test.describe('GameFit layout', () => {
     /** @type {Awaited<ReturnType<typeof startDevServer>>} */

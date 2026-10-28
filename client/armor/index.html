@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Link Armor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../scripts/game-fit.css">
+</head>
+<body>
+    <div class="game-container">
+        <header class="game-header">
+            <div class="logo">
+                <span class="logo-link">LINK</span>
+                <span class="logo-spin">ARMOR</span>
+            </div>
+            <div class="header-actions">
+                <select id="lang-select" class="gf-btn lang-select" data-i18n-title="lang_title" aria-label="language"></select>
+                <button id="mute-btn" class="gf-btn" type="button" data-i18n-title="mute_title">🔊</button>
+                <div class="stats">
+                    <div class="stat-box">
+                        <span class="stat-label" id="p1-label" data-i18n="p1_host">P1</span>
+                        <span id="p1-score" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label" id="p2-label" data-i18n="p2_client">P2</span>
+                        <span id="p2-score" class="stat-value">0</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-panel">
+            <div class="stage-column">
+                <div class="canvas-wrapper">
+                    <canvas id="game-canvas" width="640" height="640"></canvas>
+
+                    <div id="overlay" class="overlay">
+                        <div class="overlay-content" id="lobby-screen">
+                            <h2 class="title-glow">TANK DUEL</h2>
+                            <p class="tagline" data-i18n="tagline"></p>
+                            <p class="safe-note" data-i18n="safe"></p>
+                            <div class="room-info">
+                                <span class="label" data-i18n="invite_label"></span>
+                                <div class="invite-link-container">
+                                    <input type="text" id="invite-url" readonly value="...">
+                                    <button id="copy-btn" class="btn btn-secondary" data-i18n="copy"></button>
+                                </div>
+                            </div>
+                            <div class="connection-status">
+                                <span class="spinner"></span>
+                                <span id="connection-state-text" data-i18n="conn_wait"></span>
+                            </div>
+                        </div>
+
+                        <div class="overlay-content hidden" id="ready-screen">
+                            <h2 data-i18n="ready_h2"></h2>
+                            <p class="tagline" id="role-text"></p>
+                            <div id="picker-slot">
+                                <div class="picker" id="picker"></div>
+                                <p class="opp-pick" id="opp-pick" data-i18n="opp_choosing"></p>
+                            </div>
+                            <button id="start-btn" class="btn btn-primary">ROLL OUT!</button>
+                        </div>
+
+                        <div class="overlay-content hidden" id="gameover-screen">
+                            <h2 id="win-loss-title" class="neon-text">MATCH COMPLETE</h2>
+                            <p class="final-score-text"><span data-i18n="final_score"></span>: <span id="final-score">0 - 0</span></p>
+                            <div id="picker-slot-2"></div>
+                            <button id="restart-btn" class="btn btn-primary" data-i18n="rematch"></button>
+                        </div>
+
+                        <div class="overlay-content hidden" id="disconnect-screen">
+                            <h2 class="danger-text" data-i18n="lost_h2"></h2>
+                            <p data-i18n="lost_p"></p>
+                            <button id="lobby-btn" class="btn btn-primary" data-i18n="lobby_btn"></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="touch-controls" id="touch-controls">
+                    <button type="button" class="ctrl-mode-btn" id="ctrl-mode-btn"></button>
+                    <div class="stick-zone" id="stick-zone"><span data-i18n="stick"></span><span class="auto-fire-tag" data-i18n="auto_fire"></span><div class="stick-knob" id="stick-knob"></div></div>
+                    <div class="touch-actions">
+                        <button class="act-btn act-special" id="special-btn" data-action="special">⚡<small data-i18n="btn_special"></small></button>
+                        <button class="act-btn act-dash" id="dash-btn" data-action="dash">💨<small data-i18n="btn_dash"></small></button>
+                        <button class="act-btn act-fire" id="fire-btn" data-action="fire">💥<small data-i18n="btn_fire"></small></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="side-panel">
+                <div class="panel-section instructions">
+                    <h3 data-i18n="how_h3"></h3>
+                    <div class="control-keys">
+                        <div class="key-row" data-i18n="k_move"></div>
+                        <div class="key-row" data-i18n="k_fire"></div>
+                        <div class="key-row" data-i18n="k_aim"></div>
+                        <div class="key-row" data-i18n="k_dash"></div>
+                        <div class="key-row" data-i18n="k_special"></div>
+                        <div class="key-row" data-i18n="k_onehand"></div>
+                        <div class="key-row note-row" data-i18n="k_rule" data-i18n-n="3"></div>
+                        <div class="key-row note-row" data-i18n="safe"></div>
+                        <div class="key-row note-row" data-i18n="k_tri"></div>
+                        <div class="key-row note-row" data-i18n="k_zone"></div>
+                    </div>
+                </div>
+
+                <div class="panel-section status-section">
+                    <h3 data-i18n="status_h3"></h3>
+                    <div class="status-grid">
+                        <div><span data-i18n="st_state"></span>: <span id="status-text" class="status-offline" data-i18n="st_disconnected"></span></div>
+                        <div><span data-i18n="st_ping"></span>: <span id="ping-text">-- ms</span></div>
+                        <div><span data-i18n="st_role"></span>: <span id="role-status-text" data-i18n="st_spectator"></span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="game-footer">
+            <a href="../" class="back-link">
+                <svg class="back-icon" viewBox="0 0 24 24" width="16" height="16">
+                    <path fill="currentColor" d="M20,11H7.83l5.59-5.59L12,4l-8,8l8,8l1.41-1.41L7.83,13H20V11z"/>
+                </svg>
+                <span data-i18n="back"></span>
+            </a>
+        </footer>
+    </div>
+
+    <script src="../scripts/game-session.js"></script>
+    <script src="../scripts/game-bot.js" data-lobby="../play/"></script>
+    <script src="../scripts/game-fit.js"></script>
+    <script src="i18n.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

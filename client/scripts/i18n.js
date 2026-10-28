@@ -196,7 +196,17 @@ class I18n {
                 game_name_kart3d: "Link Kart 3D",
                 game_desc_kart3d: "Mode-7 perspective 3D kart racing with drift boosts and items",
                 game_name_spin: "Link Spin",
-                game_desc_spin: "Bey battle: let it rip, burst or ring-out your rival"
+                game_desc_spin: "Bey battle: let it rip, burst or ring-out your rival",
+                game_name_armor: "Link Armor",
+                game_desc_armor: "Tank duel: 4 tank types, cover, specials — no self-damage",
+                game_name_volley: "Mech Volley",
+                game_desc_volley: "Arena volleyball 1v1: drag to run, tap to jump & spike",
+                game_name_soccer: "Mech Soccer",
+                game_desc_soccer: "1v1 mini football: dribble, hold to charge, beat the auto keeper",
+                game_name_tennis: "Mech Tennis",
+                game_desc_tennis: "Auto-running tennis: just swipe to pick your shot",
+                game_name_hoops: "Mech Hoops",
+                game_desc_hoops: "1v1 mech streetball: jump shots, steals, blocks and dunks"
             },
             zh: {
                 header_about_title: "关于 Link",
@@ -386,7 +396,17 @@ class I18n {
                 game_name_kart3d: "3D 卡丁车",
                 game_desc_kart3d: "第一/追尾视角 3D 卡丁车 · 漂移喷火抢道具",
                 game_name_spin: "爆旋陀螺",
-                game_desc_spin: "GO SHOOT! 撞飞出场 · 打到爆裂 · 比谁转得久"
+                game_desc_spin: "GO SHOOT! 撞飞出场 · 打到爆裂 · 比谁转得久",
+                game_name_armor: "装甲对决",
+                game_desc_armor: "四种坦克 · 掩体对射 · 必杀技 · 不会误伤自己",
+                game_name_volley: "机甲排球",
+                game_desc_volley: "钢铁竞技场 1v1 排球 · 拖动跑位 · 点一下起跳扣球",
+                game_name_soccer: "机甲足球",
+                game_desc_soccer: "1v1 小足球 · 带球突破 · 蓄力射门过守门员",
+                game_name_tennis: "机甲网球",
+                game_desc_tennis: "自动跑位 · 划一下决定回球方向和力度",
+                game_name_hoops: "机甲篮球",
+                game_desc_hoops: "1v1 斗牛 · 跳投 · 抢断 · 盖帽 · 扣篮"
             },
             ja: {
                 header_about_title: "Link について",
