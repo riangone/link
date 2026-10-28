@@ -17,7 +17,8 @@ export class InputBuffer {
             jump: false,
             crouch: false,
             slide: false,
-            throwBtn: false
+            throwBtn: false,
+            fire: false
         };
     }
 
@@ -33,19 +34,21 @@ export class InputBuffer {
             crouch: false,
             slide: false,
             throwBtn: false,
+            fire: false,
             punchJustPressed: false,
             kickJustPressed: false,
             jumpJustPressed: false,
             crouchJustPressed: false,
             slideJustPressed: false,
             throwJustPressed: false,
+            fireJustPressed: false,
             frame: 0
         };
     }
 
     /**
      * Push raw input for the current fixed frame
-     * @param {Object} raw - { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn }
+     * @param {Object} raw - { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn, fire }
      */
     push(raw = {}) {
         this.currentFrame++;
@@ -57,6 +60,7 @@ export class InputBuffer {
         const jump = !!raw.jump;
         const crouch = !!raw.crouch;
         const slide = !!raw.slide;
+        const fire = !!raw.fire;
         // Throw can be triggered by dedicated throwBtn OR simultaneous Punch + Kick
         const throwBtn = !!raw.throwBtn || (punch && kick);
 
@@ -65,6 +69,7 @@ export class InputBuffer {
         const jumpJustPressed = jump && !this.prevRaw.jump;
         const crouchJustPressed = crouch && !this.prevRaw.crouch;
         const slideJustPressed = slide && !this.prevRaw.slide;
+        const fireJustPressed = fire && !this.prevRaw.fire;
         const throwJustPressed = (!!raw.throwBtn && !this.prevRaw.throwBtn) ||
             (punch && kick && (!this.prevRaw.punch || !this.prevRaw.kick));
 
@@ -80,16 +85,18 @@ export class InputBuffer {
             crouch,
             slide,
             throwBtn,
+            fire,
             punchJustPressed,
             kickJustPressed,
             jumpJustPressed,
             crouchJustPressed,
             slideJustPressed,
             throwJustPressed,
+            fireJustPressed,
             frame: this.currentFrame
         };
 
-        this.prevRaw = { punch, kick, block, jump, crouch, slide, throwBtn };
+        this.prevRaw = { punch, kick, block, jump, crouch, slide, throwBtn, fire };
     }
 
     /**
@@ -238,6 +245,18 @@ export class InputBuffer {
     }
 
     /**
+     * Match Jump + Punch/Kick within recent frames (used for Run + Jump + Punch = Disarm Kick)
+     */
+    checkJumpAttack(windowFrames = 10) {
+        for (let i = 0; i < windowFrames; i++) {
+            const entry = this.get(i);
+            if (!entry) break;
+            if (entry.jump) return true;
+        }
+        return false;
+    }
+
+    /**
      * Clear buffer state on round reset / knockdown
      */
     clear() {
@@ -251,7 +270,8 @@ export class InputBuffer {
             jump: false,
             crouch: false,
             slide: false,
-            throwBtn: false
+            throwBtn: false,
+            fire: false
         };
     }
 }

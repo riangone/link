@@ -198,4 +198,103 @@ export class CollisionSystem {
 
         return null;
     }
+
+    /**
+     * Check if a ray / beam from (ox, oy, oz) in direction (fx, fz) up to `maxRange`
+     * intersects `defender`'s hurtboxes.
+     * @returns {Object|null} { hitPoint, move, isBlock, hurtPart, isJuggle, distance }
+     */
+    static checkRayHit(attacker, defender, ox, oy, oz, fx, fz, maxRange, syntheticMove) {
+        if (
+            defender.invincible ||
+            defender.hp <= 0 ||
+            defender.state === FIGHTER_STATE.WAKEUP ||
+            defender.state === FIGHTER_STATE.TECH_RECOVERY ||
+            defender.state === FIGHTER_STATE.BEING_THROWN
+        ) {
+            return null;
+        }
+
+        const dx = defender.x - ox;
+        const dz = defender.z - oz;
+        const proj = dx * fx + dz * fz; // distance along ray
+        if (proj < 0 || proj > maxRange) return null;
+
+        // Lateral distance from ray in XZ plane
+        const perpX = dx - proj * fx;
+        const perpZ = dz - proj * fz;
+        const lateralDist = Math.hypot(perpX, perpZ);
+
+        const hurtboxes = this.getHurtboxesWorld(defender);
+        const beamRadius = 0.25;
+
+        for (let i = 0; i < hurtboxes.length; i++) {
+            const hurt = hurtboxes[i];
+            if (lateralDist <= hurt.radius + beamRadius && Math.abs(oy - hurt.y) <= hurt.radius + 0.45) {
+                const hitPoint = {
+                    x: ox + fx * Math.max(0.2, proj - hurt.radius * 0.5),
+                    y: hurt.y,
+                    z: oz + fz * Math.max(0.2, proj - hurt.radius * 0.5)
+                };
+
+                const sector = this.getRelativeSector(defender, attacker);
+                const isFacingAttacker = sector === 'FRONT';
+                const isBlock =
+                    !syntheticMove.piercesGuard &&
+                    defender.isBlocking &&
+                    isFacingAttacker &&
+                    defender.state !== FIGHTER_STATE.KNOCKED_DOWN;
+
+                return {
+                    hitPoint,
+                    move: syntheticMove,
+                    isBlock,
+                    hurtPart: hurt.part,
+                    isJuggle: !defender.isGrounded && defender.y > 0.12,
+                    distance: proj
+                };
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Check if a point/sphere projectile intersects `defender`'s hurtboxes
+     */
+    static checkSphereHit(attacker, defender, px, py, pz, radius, syntheticMove) {
+        if (
+            defender.invincible ||
+            defender.hp <= 0 ||
+            defender.state === FIGHTER_STATE.WAKEUP ||
+            defender.state === FIGHTER_STATE.TECH_RECOVERY ||
+            defender.state === FIGHTER_STATE.BEING_THROWN
+        ) {
+            return null;
+        }
+
+        const hurtboxes = this.getHurtboxesWorld(defender);
+        for (let i = 0; i < hurtboxes.length; i++) {
+            const hurt = hurtboxes[i];
+            const dx = px - hurt.x;
+            const dy = py - hurt.y;
+            const dz = pz - hurt.z;
+            const rSum = radius + hurt.radius;
+            if (dx * dx + dy * dy + dz * dz <= rSum * rSum) {
+                const sector = this.getRelativeSector(defender, { x: px - dx, z: pz - dz });
+                const isBlock =
+                    !syntheticMove.piercesGuard &&
+                    defender.isBlocking &&
+                    sector === 'FRONT' &&
+                    defender.state !== FIGHTER_STATE.KNOCKED_DOWN;
+                return {
+                    hitPoint: { x: (px + hurt.x) * 0.5, y: (py + hurt.y) * 0.5, z: (pz + hurt.z) * 0.5 },
+                    move: syntheticMove,
+                    isBlock,
+                    hurtPart: hurt.part,
+                    isJuggle: !defender.isGrounded && defender.y > 0.12
+                };
+            }
+        }
+        return null;
+    }
 }

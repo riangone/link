@@ -25,6 +25,8 @@ function init() {
     const p2HpFill = document.getElementById('p2-hp-fill');
     const p1PoiseFill = document.getElementById('p1-poise-fill');
     const p2PoiseFill = document.getElementById('p2-poise-fill');
+    const p1WeaponBadge = document.getElementById('p1-weapon-badge');
+    const p2WeaponBadge = document.getElementById('p2-weapon-badge');
     const p1HpText = document.getElementById('p1-hp-text');
     const p2HpText = document.getElementById('p2-hp-text');
     const roundTimerEl = document.getElementById('round-timer');
@@ -217,8 +219,9 @@ function init() {
         const crouch = !!(keysDown['ShiftLeft'] || keysDown['ShiftRight'] || touchState.crouch);
         const slide = !!(keysDown['KeyI'] || keysDown['KeyV'] || touchState.slide);
         const throwBtn = !!(keysDown['KeyU'] || keysDown['KeyG'] || touchState.throwBtn || (punch && kick));
+        const fire = !!(keysDown['KeyF'] || keysDown['KeyH'] || touchState.fire);
 
-        return { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn };
+        return { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn, fire };
     }
 
     // Match State
@@ -302,12 +305,30 @@ function init() {
                 }
 
                 // Combo or special state notice
-                if (ev.poiseBroken) {
+                if (ev.disarmed) {
+                    showActionNotice('DISARMED! 缴械击飞!');
+                } else if (ev.poiseBroken) {
                     showActionNotice('STUNNED! 破防眩晕!');
                 } else if (ev.isThrow) {
                     showActionNotice(`${ev.move.name}!`);
                 } else if (ev.combo >= 2) {
                     showActionNotice(`${ev.combo} HITS!`);
+                }
+            } else if (ev.type === 'WEAPON_FIRE') {
+                vfx.spawnTracerBeam(
+                    ev.muzzle,
+                    ev.endPoint,
+                    ev.color,
+                    ev.fireType === 'PIERCING_BEAM'
+                );
+                threeScene.addTrauma(ev.fireType === 'PIERCING_BEAM' ? 0.35 : 0.12);
+            } else if (ev.type === 'WEAPON_SNATCH') {
+                vfx.spawnShockwave(ev.x, ev.y, ev.z, 0x00ffaa);
+                showActionNotice('SNATCHED! 凌空夺枪!');
+            } else if (ev.type === 'WEAPON_PICKUP') {
+                vfx.spawnShockwave(ev.x, Math.max(0.1, ev.y), ev.z, 0x00f0ff);
+                if (ev.midAir) {
+                    showActionNotice('AIR GRAB! 空中接枪!');
                 }
             } else if (ev.type === 'THROW_TECH') {
                 vfx.spawnShockwave(ev.x, 0.9, ev.z, 0xffe600);
@@ -378,6 +399,7 @@ function init() {
         meshP1.update(sim.f1, timeSec);
         meshP2.update(sim.f2, timeSec);
 
+        vfx.syncEntities(sim);
         vfx.update(delta);
         threeScene.updateCamera(sim.f1, sim.f2, !isPlaying, timeSec);
         threeScene.render();
@@ -387,6 +409,24 @@ function init() {
         p2HpFill.style.width = `${Math.max(0, (sim.f2.hp / sim.f2.maxHp) * 100)}%`;
         if (p1PoiseFill) p1PoiseFill.style.width = `${Math.max(0, (sim.f1.poise / sim.f1.maxPoise) * 100)}%`;
         if (p2PoiseFill) p2PoiseFill.style.width = `${Math.max(0, (sim.f2.poise / sim.f2.maxPoise) * 100)}%`;
+        if (p1WeaponBadge) {
+            if (sim.f1.weapon) {
+                p1WeaponBadge.textContent = `🔫 ${sim.f1.weapon.type} [${sim.f1.weapon.ammo}/${sim.f1.weapon.maxAmmo}]`;
+                p1WeaponBadge.classList.add('armed');
+            } else {
+                p1WeaponBadge.textContent = '徒手';
+                p1WeaponBadge.classList.remove('armed');
+            }
+        }
+        if (p2WeaponBadge) {
+            if (sim.f2.weapon) {
+                p2WeaponBadge.textContent = `🔫 ${sim.f2.weapon.type} [${sim.f2.weapon.ammo}/${sim.f2.weapon.maxAmmo}]`;
+                p2WeaponBadge.classList.add('armed');
+            } else {
+                p2WeaponBadge.textContent = '徒手';
+                p2WeaponBadge.classList.remove('armed');
+            }
+        }
         p1HpText.textContent = `${Math.ceil(sim.f1.hp)} / ${sim.f1.maxHp}`;
         p2HpText.textContent = `${Math.ceil(sim.f2.hp)} / ${sim.f2.maxHp}`;
         roundTimerEl.textContent = Math.ceil(sim.roundTimer / 60);

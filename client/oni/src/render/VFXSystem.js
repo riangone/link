@@ -10,6 +10,9 @@ export class VFXSystem {
         this.scene = scene;
         this.particles = [];
         this.rings = [];
+        this.beams = [];
+        this.weaponMeshes = new Map();
+        this.projectileMeshes = new Map();
 
         // Audio Context (Synthesized sound effects)
         this.audioCtx = null;
@@ -114,6 +117,124 @@ export class VFXSystem {
         this.playHeavyImpactSound();
     }
 
+    /**
+     * Spawn muzzle flash & ballistic tracer / piercing energy beam
+     */
+    spawnTracerBeam(muzzle, endPoint, colorHex = 0x00f0ff, isHeavyBeam = false) {
+        const start = new THREE.Vector3(muzzle.x, muzzle.y, muzzle.z);
+        const end = new THREE.Vector3(endPoint.x, endPoint.y, endPoint.z);
+        const dist = start.distanceTo(end);
+        if (dist < 0.05) return;
+
+        const radius = isHeavyBeam ? 0.065 : 0.025;
+        const geo = new THREE.CylinderGeometry(radius, radius, dist, 8);
+        geo.rotateX(Math.PI / 2);
+        const mat = new THREE.MeshBasicMaterial({
+            color: colorHex,
+            transparent: true,
+            opacity: 0.95,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(start).lerp(end, 0.5);
+        mesh.lookAt(end);
+        this.scene.add(mesh);
+
+        this.beams.push({
+            mesh,
+            life: isHeavyBeam ? 0.25 : 0.12,
+            maxLife: isHeavyBeam ? 0.25 : 0.12
+        });
+
+        this.spawnHitSpark(muzzle.x, muzzle.y, muzzle.z, false, 8);
+        this.playGunshotSound(isHeavyBeam);
+    }
+
+    /**
+     * Synchronize 3D meshes for dropped/flying weapons and active homing projectiles in Simulation
+     */
+    syncEntities(sim) {
+        if (!sim) return;
+
+        // 1. Dropped / Spinning Weapons
+        const weapons = sim.getWeapons ? sim.getWeapons() : [];
+        const activeWpnIds = new Set();
+        for (let i = 0; i < weapons.length; i++) {
+            const w = weapons[i];
+            activeWpnIds.add(w.id);
+            let group = this.weaponMeshes.get(w.id);
+            if (!group) {
+                group = new THREE.Group();
+                const gunBody = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.08, 0.14, 0.42),
+                    new THREE.MeshStandardMaterial({ color: 0x2a3146, roughness: 0.3, metalness: 0.8 })
+                );
+                const glowStrip = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.09, 0.04, 0.34),
+                    new THREE.MeshBasicMaterial({ color: w.color || 0x00f0ff })
+                );
+                const haloRing = new THREE.Mesh(
+                    new THREE.RingGeometry(0.28, 0.34, 24),
+                    new THREE.MeshBasicMaterial({
+                        color: w.color || 0x00f0ff,
+                        side: THREE.DoubleSide,
+                        transparent: true,
+                        opacity: 0.7,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    })
+                );
+                haloRing.rotation.x = -Math.PI / 2;
+                haloRing.position.y = -0.1;
+                group.add(gunBody, glowStrip, haloRing);
+                group.userData = { glowStrip, haloRing };
+                this.scene.add(group);
+                this.weaponMeshes.set(w.id, group);
+            }
+            group.position.set(w.x, w.y + (w.isGrounded ? 0.08 : 0), w.z);
+            group.rotation.set(w.spinPitch || 0, w.spinYaw || 0, w.isGrounded ? 0.35 : 0.8);
+            if (group.userData.haloRing) {
+                group.userData.haloRing.visible = w.isGrounded && w.ammo > 0;
+            }
+        }
+        for (const [id, mesh] of this.weaponMeshes.entries()) {
+            if (!activeWpnIds.has(id)) {
+                this.scene.remove(mesh);
+                this.weaponMeshes.delete(id);
+            }
+        }
+
+        // 2. Active Projectiles (Scram Cannon Homing Missiles)
+        const projectiles = sim.getProjectiles ? sim.getProjectiles() : [];
+        const activeProjIds = new Set();
+        for (let i = 0; i < projectiles.length; i++) {
+            const p = projectiles[i];
+            activeProjIds.add(p.id);
+            let mesh = this.projectileMeshes.get(p.id);
+            if (!mesh) {
+                mesh = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.11, 10, 10),
+                    new THREE.MeshBasicMaterial({
+                        color: p.color || 0xff9900,
+                        blending: THREE.AdditiveBlending
+                    })
+                );
+                this.scene.add(mesh);
+                this.projectileMeshes.set(p.id, mesh);
+            }
+            mesh.position.set(p.x, p.y, p.z);
+        }
+        for (const [id, mesh] of this.projectileMeshes.entries()) {
+            if (!activeProjIds.has(id)) {
+                this.scene.remove(mesh);
+                mesh.geometry.dispose();
+                mesh.material.dispose();
+                this.projectileMeshes.delete(id);
+            }
+        }
+    }
+
     update(dt) {
         // Update particles
         for (let i = this.particles.length - 1; i >= 0; i--) {
@@ -153,6 +274,42 @@ export class VFXSystem {
                 this.rings.splice(i, 1);
             }
         }
+
+        // Update tracer beams
+        for (let i = this.beams.length - 1; i >= 0; i--) {
+            const b = this.beams[i];
+            b.life -= dt;
+            if (b.life <= 0) {
+                this.scene.remove(b.mesh);
+                b.mesh.geometry.dispose();
+                b.mesh.material.dispose();
+                this.beams.splice(i, 1);
+                continue;
+            }
+            b.mesh.material.opacity = Math.max(0, b.life / b.maxLife);
+        }
+    }
+
+    playGunshotSound(isHeavy = false) {
+        if (!this.audioCtx) return;
+        try {
+            const ctx = this.audioCtx;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.type = isHeavy ? 'sawtooth' : 'square';
+            osc.frequency.setValueAtTime(isHeavy ? 620 : 880, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(isHeavy ? 60 : 120, ctx.currentTime + (isHeavy ? 0.22 : 0.09));
+
+            gain.gain.setValueAtTime(0.32, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + (isHeavy ? 0.22 : 0.09));
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start();
+            osc.stop(ctx.currentTime + (isHeavy ? 0.22 : 0.09));
+        } catch (e) {}
     }
 
     // Audio Synthesizers (Zero file downloads)

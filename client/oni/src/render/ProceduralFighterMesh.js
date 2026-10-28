@@ -69,6 +69,7 @@ export class ProceduralFighterMesh {
 
         this.buildGroundDecal();
         this.buildTrail();
+        this.buildHeldWeaponMesh();
 
         this.pose = makePose();
         this.vel = makePose();         // spring velocities
@@ -136,6 +137,30 @@ export class ProceduralFighterMesh {
         this.trailColor = new THREE.Color(this.accent);
     }
 
+    buildHeldWeaponMesh() {
+        this.heldGunGroup = new THREE.Group();
+        this.heldGunMat = new THREE.MeshStandardMaterial({
+            color: 0x262c3e,
+            roughness: 0.35,
+            metalness: 0.75
+        });
+        this.heldGunGlowMat = new THREE.MeshBasicMaterial({
+            color: 0x00f0ff
+        });
+
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.08, 0.28), this.heldGunMat);
+        body.position.set(0, -0.04, 0.10);
+        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.11, 0.055), this.heldGunMat);
+        grip.position.set(0, -0.02, 0.0);
+        grip.rotation.x = 0.25;
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.02, 0.22), this.heldGunGlowMat);
+        strip.position.set(0, -0.04, 0.12);
+
+        this.heldGunGroup.add(body, grip, strip);
+        this.heldGunGroup.visible = false;
+        this.arms.r.fist.add(this.heldGunGroup);
+    }
+
     // ------------------------------------------------------------------ per-frame
     update(fighter, timeSeconds, dtIn) {
         const dt = dtIn !== undefined ? dtIn
@@ -157,10 +182,23 @@ export class ProceduralFighterMesh {
 
         this.applyRoot(fighter);
         this.applyPose(this.pose, !this.target.gait);
+        this.updateHeldWeapon(fighter);
         this.updateHair(dt);
         this.updateDecals(fighter);
         this.updateTrail(fighter, dt);
         this.updateFlash(dt);
+    }
+
+    updateHeldWeapon(fighter) {
+        if (!this.heldGunGroup) return;
+        const hasGun = !!(fighter.weapon && fighter.hp > 0);
+        this.heldGunGroup.visible = hasGun;
+        if (hasGun) {
+            const col = fighter.weapon.color || 0x00f0ff;
+            this.heldGunGlowMat.color.setHex(fighter.weapon.ammo > 0 ? col : 0x555566);
+            const scaleZ = fighter.weapon.type === 'MERCURY_BOW' ? 1.55 : (fighter.weapon.type === 'SCRAM_CANNON' ? 1.25 : 1.0);
+            this.heldGunGroup.scale.set(1, 1, scaleZ);
+        }
     }
 
     /** Taking damage: white flash + a physical jolt injected into the spring velocities. */

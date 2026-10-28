@@ -173,4 +173,83 @@ test('Oni Combat core module loading and P0+P1 simulation verification', async (
         assert.strictEqual(sim.f1.state, FIGHTER_STATE.VICTORY);
         assert.strictEqual(sim.f2.state, FIGHTER_STATE.DEFEAT);
     });
+
+    await t.test('P2 Gun-Fu: Single-slot weapon, Slide disarm -> airborne drop -> pickup & shoot', () => {
+        const sim = new Simulation();
+        // Clear initial arena weapons for isolated test
+        for (const w of sim.getWeapons()) sim.removeEntity(w.id);
+        sim.f1.unequipWeapon();
+        sim.f2.equipWeapon({ type: 'TCTF_PISTOL', ammo: 4 });
+
+        sim.f1.x = 0;
+        sim.f2.x = 1.65;
+        sim.f1.facing = 1;
+        sim.f2.facing = -1;
+
+        // 1. P1 performs SLIDE_KICK into armed P2 -> should disarm P2 and spawn an airborne weapon entity!
+        sim.tick({ slide: true }, {});
+        for (let i = 0; i < 10; i++) {
+            sim.tick({ slide: false }, {});
+        }
+        assert.strictEqual(sim.f2.weapon, null, 'P2 should be disarmed by SLIDE_KICK');
+        const droppedWeapons = sim.getWeapons();
+        assert.strictEqual(droppedWeapons.length, 1, 'Disarmed gun should spawn as a physical weapon entity in arena');
+        assert.strictEqual(droppedWeapons[0].type, 'TCTF_PISTOL');
+
+        // 2. Acrobatic Disarm Snatch: Run + Jump + Punch directly snatches the gun into P1's hand
+        const sim2 = new Simulation();
+        for (const w of sim2.getWeapons()) sim2.removeEntity(w.id);
+        sim2.f1.unequipWeapon();
+        sim2.f2.equipWeapon({ type: 'MERCURY_BOW', ammo: 2 });
+        sim2.f1.x = 0;
+        sim2.f2.x = 1.4;
+        sim2.f1.transitionTo(FIGHTER_STATE.RUN);
+        sim2.tick({ dirX: 1, jump: true, punch: true }, {});
+        assert.strictEqual(sim2.f1.currentMove.id, 'DISARM_KICK', 'Run + Jump + Punch should trigger DISARM_KICK');
+        for (let i = 0; i < 7; i++) {
+            sim2.tick({ dirX: 1 }, {});
+        }
+        assert.strictEqual(sim2.f2.weapon, null, 'Defender should lose weapon');
+        assert.ok(sim2.f1.weapon && sim2.f1.weapon.type === 'MERCURY_BOW', 'Attacker should snatch weapon in mid-air');
+
+        // 3. Firing Mercury Bow (Piercing Beam) & throwing empty weapon
+        const sim3 = new Simulation();
+        sim3.f1.equipWeapon({ type: 'MERCURY_BOW', ammo: 1 });
+        sim3.f2.unequipWeapon();
+        sim3.f1.x = -2.0;
+        sim3.f2.x = 2.5;
+        const hpBefore = sim3.f2.hp;
+        // Fire even while f2 holds block -> Mercury Bow pierces guard!
+        sim3.tick({ fire: true }, { block: true });
+        for (let i = 0; i < 12; i++) {
+            sim3.tick({ fire: false }, { block: true });
+        }
+        assert.strictEqual(sim3.f1.weapon.ammo, 0, 'Firing should consume 1 ammo');
+        assert.ok(sim3.f2.hp < hpBefore - 20, 'Mercury Bow should pierce guard and deal full damage');
+
+        // Wait out hitstop + recovery, then press fire with 0 ammo -> throws the empty weapon!
+        for (let i = 0; i < 32; i++) sim3.tick({}, {});
+        sim3.tick({ fire: true }, {});
+        for (let i = 0; i < 8; i++) sim3.tick({}, {});
+        assert.strictEqual(sim3.f1.weapon, null, 'Firing with 0 ammo should throw and unequip the empty weapon');
+    });
+
+    await t.test('P2 Gun-Fu: Scram Cannon homing swarm missiles & I-frame evade break-lock', () => {
+        const sim = new Simulation();
+        for (const w of sim.getWeapons()) sim.removeEntity(w.id);
+        sim.f1.equipWeapon({ type: 'SCRAM_CANNON', ammo: 2 });
+        sim.f2.unequipWeapon();
+        sim.f1.x = -3.0;
+        sim.f2.x = 2.0;
+
+        sim.tick({ fire: true }, {});
+        for (let i = 0; i < 9; i++) sim.tick({}, {});
+        const projs = sim.getProjectiles();
+        assert.strictEqual(projs.length, 3, 'Scram Cannon should launch 3 homing micro-missiles');
+
+        // Let missiles fly and hit stationary f2
+        const hpBefore = sim.f2.hp;
+        for (let i = 0; i < 45; i++) sim.tick({}, {});
+        assert.ok(sim.f2.hp < hpBefore, 'Homing missiles should track and damage target');
+    });
 });

@@ -15,7 +15,9 @@ import {
     STAGE_BOUNDS,
     POISE_CONFIG,
     THROW_TECH_WINDOW,
-    TECH_RECOVERY_WINDOW
+    TECH_RECOVERY_WINDOW,
+    WEAPON_PICKUP_RANGE,
+    WEAPON_SPECS
 } from './Constants.js';
 import { InputBuffer } from './InputBuffer.js';
 import { CollisionSystem } from './CollisionSystem.js';
@@ -67,6 +69,9 @@ export class Fighter {
         this.evadeDir = 'BACK'; // 'BACK' | 'LEFT' | 'RIGHT' | 'FORWARD'
         this.unlockedMoves = new Set(Object.keys(MOVES));
 
+        // P2 Single-Slot Firearm State (null or { id, type, name, ammo, maxAmmo, color })
+        this.weapon = null;
+
         // Flags
         this.isGrounded = true;
         this.isBlocking = false;
@@ -75,6 +80,35 @@ export class Fighter {
 
         // Input
         this.inputBuffer = new InputBuffer();
+    }
+
+    /**
+     * Equip a weapon into the single slot (replaces any existing weapon)
+     */
+    equipWeapon(weaponData) {
+        if (!weaponData) {
+            this.weapon = null;
+            return null;
+        }
+        const spec = WEAPON_SPECS[weaponData.type] || WEAPON_SPECS[weaponData.id] || WEAPON_SPECS.TCTF_PISTOL;
+        this.weapon = {
+            id: weaponData.id || `wpn_${this.id}`,
+            type: spec.id,
+            name: spec.name,
+            ammo: weaponData.ammo !== undefined ? weaponData.ammo : spec.maxAmmo,
+            maxAmmo: spec.maxAmmo,
+            color: spec.color
+        };
+        return this.weapon;
+    }
+
+    /**
+     * Unequip and return the currently held weapon (for disarm or throw)
+     */
+    unequipWeapon() {
+        const w = this.weapon;
+        this.weapon = null;
+        return w;
     }
 
     get facing() {
@@ -143,6 +177,7 @@ export class Fighter {
         this.throwTarget = null;
         this.thrownBy = null;
         this.evadeDir = 'BACK';
+        this.weapon = null;
         this.isGrounded = true;
         this.isBlocking = false;
         this.invincible = false;
@@ -374,14 +409,28 @@ export class Fighter {
             if (entry.button === 'punch') triggered = input.punchJustPressed;
             else if (entry.button === 'kick') triggered = input.kickJustPressed;
             else if (entry.button === 'slide') triggered = input.slideJustPressed;
+            else if (entry.button === 'fire') triggered = input.fireJustPressed;
             else if (entry.button === 'crouch') triggered = input.crouchJustPressed || input.down;
             else if (entry.button === 'punchOrThrow') triggered = input.punchJustPressed || input.throwJustPressed;
 
             if (!triggered) continue;
 
             if (entry.condition(this, input, opponent, ctx)) {
-                const move = MOVES[entry.id];
+                let move = MOVES[entry.id];
                 if (!move) continue;
+
+                // Adapt FIRE_WEAPON frame data to the equipped weapon's spec
+                if (move.id === 'FIRE_WEAPON' && this.weapon) {
+                    const spec = WEAPON_SPECS[this.weapon.type] || WEAPON_SPECS.TCTF_PISTOL;
+                    move = {
+                        ...move,
+                        name: spec.name,
+                        startup: spec.startup,
+                        active: spec.active,
+                        recovery: spec.recovery,
+                        weaponSpec: spec
+                    };
+                }
 
                 if (move.isThrow && opponent) {
                     this.startThrow(move, opponent, simEvents);
@@ -624,6 +673,35 @@ export class Fighter {
 
         const totalFrames = move.startup + move.active + move.recovery;
         const startCancel = move.cancelWindowStart || (move.startup + 1);
+
+        // P2 Firearm Discharge or Weapon Throw trigger on first active frame
+        if (this.stateTimer === move.startup && !this.hasHitThisMove) {
+            if (move.isFirearmMove && this.weapon && this.weapon.ammo > 0) {
+                this.hasHitThisMove = true;
+                this.weapon.ammo = Math.max(0, this.weapon.ammo - 1);
+                if (opponent) this.faceTowards(opponent.x, opponent.z, Math.PI);
+                if (simEvents) {
+                    simEvents.push({
+                        type: 'WEAPON_FIRE_REQUEST',
+                        attacker: this.id,
+                        weaponType: this.weapon.type,
+                        ammoLeft: this.weapon.ammo
+                    });
+                }
+            } else if (move.isWeaponThrow && this.weapon) {
+                this.hasHitThisMove = true;
+                const thrownWpn = this.unequipWeapon();
+                if (opponent) this.faceTowards(opponent.x, opponent.z, Math.PI);
+                if (simEvents && thrownWpn) {
+                    simEvents.push({
+                        type: 'WEAPON_THROW_REQUEST',
+                        attacker: this.id,
+                        weapon: thrownWpn,
+                        move
+                    });
+                }
+            }
+        }
 
         // 1. Animation Cancel into Evade during recovery window
         if (this.stateTimer >= move.startup + move.active && this.tryStartEvade(input, simEvents)) {

@@ -36,6 +36,67 @@ export const POISE_CONFIG = {
 export const THROW_RANGE = 1.38;
 export const THROW_TECH_WINDOW = 10; // frames during which defender can tech a frontal throw
 export const TECH_RECOVERY_WINDOW = 18; // frames before landing where pressing Jump triggers break-fall
+export const WEAPON_PICKUP_RANGE = 1.45; // radius within which a fighter can snatch a ground or mid-air weapon
+
+// P2 Firearms & Gun-Fu Specifications
+export const WEAPON_SPECS = {
+    TCTF_PISTOL: {
+        id: 'TCTF_PISTOL',
+        name: 'TCTF 战术手枪 (Ballistic Pistol)',
+        category: 'BALLISTIC',
+        maxAmmo: 10,
+        fireType: 'HITSCAN',
+        range: 13.5,
+        damage: 9,
+        poiseDamage: 16,
+        hitStun: 12,
+        blockStun: 6,
+        knockback: { x: 1.5, y: 0 },
+        startup: 3,
+        active: 2,
+        recovery: 7,
+        color: 0x00f0ff
+    },
+    SCRAM_CANNON: {
+        id: 'SCRAM_CANNON',
+        name: '蜂群追踪炮 (Scram Cannon)',
+        category: 'ENERGY_HEAVY',
+        maxAmmo: 4,
+        fireType: 'HOMING_SWARM',
+        swarmCount: 3,
+        projectileSpeed: 9.5,
+        turnRate: 0.048,
+        lifetime: 110,
+        damage: 8,
+        poiseDamage: 22,
+        hitStun: 16,
+        blockStun: 8,
+        knockback: { x: 2.2, y: 1.8 },
+        startup: 7,
+        active: 4,
+        recovery: 14,
+        color: 0xff9900
+    },
+    MERCURY_BOW: {
+        id: 'MERCURY_BOW',
+        name: '水银狙击弩 (Mercury Bow)',
+        category: 'ENERGY_HEAVY',
+        maxAmmo: 3,
+        fireType: 'PIERCING_BEAM',
+        range: 18.0,
+        damage: 26,
+        poiseDamage: 65,
+        hitStun: 26,
+        blockStun: 14,
+        knockback: { x: 5.2, y: 3.5 },
+        knockdown: true,
+        piercesGuard: true,
+        startup: 9,
+        active: 3,
+        recovery: 16,
+        color: 0x00ffaa
+    }
+};
 
 // Move definitions (Frame data @ 60fps)
 // startup: frames before hit detection starts
@@ -321,7 +382,56 @@ export const MOVES = {
         poiseDamage: 100,
         knockback: { x: -3.2, y: 4.2 },
         knockdown: true,
+        disarms: true,
         techable: false, // Untechable back ambush
+        cancelTo: []
+    },
+
+    // --- P2 Gun-Fu & Disarm Moves ---
+    DISARM_KICK: {
+        id: 'DISARM_KICK',
+        name: '腾空缴械踢 (Acrobatic Disarm)',
+        startup: 4,
+        active: 8,
+        recovery: 12,
+        damage: 16,
+        poiseDamage: 50,
+        hitStun: 24,
+        blockStun: 10,
+        knockback: { x: 3.6, y: 2.0 },
+        disarms: true,
+        snatchDisarmedWeapon: true, // Auto-snatches the knocked-out weapon in mid-air!
+        velocityImpulse: 10.5,
+        verticalImpulse: 6.2,
+        cancelTo: [],
+        hitbox: { offset: { x: 1.1, y: 1.35, z: 0 }, radius: 0.5 }
+    },
+    FIRE_WEAPON: {
+        id: 'FIRE_WEAPON',
+        name: '战术射击 (Fire Weapon)',
+        isFirearmMove: true,
+        startup: 4,
+        active: 3,
+        recovery: 9,
+        damage: 0,
+        poiseDamage: 0,
+        hitStun: 12,
+        blockStun: 6,
+        knockback: { x: 1.5, y: 0 },
+        cancelTo: []
+    },
+    THROW_WEAPON: {
+        id: 'THROW_WEAPON',
+        name: '掷枪砸击 (Weapon Toss)',
+        isWeaponThrow: true,
+        startup: 4,
+        active: 4,
+        recovery: 10,
+        damage: 14,
+        poiseDamage: 45,
+        hitStun: 22,
+        blockStun: 10,
+        knockback: { x: 3.0, y: 1.5 },
         cancelTo: []
     }
 };
@@ -402,7 +512,14 @@ export const MOVE_TABLE = [
         condition: (f) => f.isGrounded
     },
 
-    // 4. Running Attacks (Run + Jump+Kick / Kick / Punch)
+    // 4. Running Attacks (Run + Jump+Punch = Acrobatic Disarm, Kick = Flying Kick, Punch = Haymaker)
+    {
+        id: 'DISARM_KICK',
+        priority: 83,
+        states: [FIGHTER_STATE.RUN],
+        button: 'punch',
+        condition: (f, input) => input.jump || !f.isGrounded || f.inputBuffer.checkJumpAttack()
+    },
     {
         id: 'FLYING_KICK',
         priority: 82,
@@ -416,6 +533,36 @@ export const MOVE_TABLE = [
         states: [FIGHTER_STATE.RUN],
         button: 'punch',
         condition: (f) => f.isGrounded
+    },
+
+    // 4b. Firearm Actions (Dedicated Fire button, or Punch at medium/long range when armed)
+    {
+        id: 'FIRE_WEAPON',
+        priority: 79,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN, FIGHTER_STATE.CROUCH],
+        button: 'fire',
+        condition: (f) => !!(f.weapon && f.weapon.ammo > 0)
+    },
+    {
+        id: 'THROW_WEAPON',
+        priority: 78,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN, FIGHTER_STATE.CROUCH],
+        button: 'fire',
+        condition: (f) => !!(f.weapon && f.weapon.ammo <= 0)
+    },
+    {
+        id: 'FIRE_WEAPON',
+        priority: 72,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.CROUCH],
+        button: 'punch',
+        condition: (f, input, opp, ctx) => !!(f.weapon && f.weapon.ammo > 0 && ctx.dist > 1.85)
+    },
+    {
+        id: 'THROW_WEAPON',
+        priority: 71,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.CROUCH],
+        button: 'punch',
+        condition: (f, input, opp, ctx) => !!(f.weapon && f.weapon.ammo <= 0 && ctx.dist > 1.85)
     },
 
     // 5. Motion & Crouch Specials

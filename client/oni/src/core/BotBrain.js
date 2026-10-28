@@ -135,8 +135,40 @@ export class BotBrain {
             return input;
         }
 
-        // 6. Medium range: Approach or Dash / Slide
+        // 6. Medium range: Gun-Fu Firearm pressure, Weapon Pickup, or Approach / Slide
         if (dist >= 1.45 && dist < 5.0) {
+            // If armed with ammo, fire bursts at medium range!
+            if (botFighter.weapon && botFighter.weapon.ammo > 0) {
+                const fireChance = this.level === 'hard' ? 0.14 : (this.level === 'normal' ? 0.07 : 0.03);
+                if (this.rand(sim) < fireChance) {
+                    input.fire = true;
+                    return input;
+                }
+            } else if (botFighter.weapon && botFighter.weapon.ammo <= 0) {
+                // Throw empty gun at player!
+                if (this.rand(sim) < 0.25) {
+                    input.fire = true;
+                    return input;
+                }
+            } else if (sim && this.level !== 'easy') {
+                // Unarmed: check if a loaded weapon is lying nearby and go grab it
+                const weapons = sim.getWeapons ? sim.getWeapons() : [];
+                for (let i = 0; i < weapons.length; i++) {
+                    const w = weapons[i];
+                    if (w.ammo > 0) {
+                        const wDist = Math.hypot(w.x - botFighter.x, w.z - botFighter.z);
+                        if (wDist < 1.35) {
+                            input.punch = true; // Pick up weapon
+                            return input;
+                        } else if (wDist < 3.2) {
+                            input.dirX = (w.x - botFighter.x) / wDist;
+                            input.dirZ = (w.z - botFighter.z) / wDist;
+                            return input;
+                        }
+                    }
+                }
+            }
+
             input.dirX = nx;
             input.dirZ = Math.abs(dz) > 0.25 ? nz : 0;
 
@@ -146,7 +178,14 @@ export class BotBrain {
             return input;
         }
 
-        // 7. Long range: Close the gap
+        // 7. Long range: Shoot if armed, or close the gap
+        if (botFighter.weapon && botFighter.weapon.ammo > 0 && dist < 9.5) {
+            const longFireChance = this.level === 'hard' ? 0.12 : 0.05;
+            if (this.rand(sim) < longFireChance) {
+                input.fire = true;
+                return input;
+            }
+        }
         input.dirX = nx;
         input.dirZ = nz;
         return input;

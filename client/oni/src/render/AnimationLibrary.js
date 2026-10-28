@@ -413,6 +413,62 @@ export const ATTACK_ANIMS = {
             { at: 'act', pose: { hipY: -0.35, hipP: -1.15, spP: -1.1, lift: 0.1 } },
             { at: 'rec:0.6', ease: 'out', pose: { hipY: -0.12, hipP: 0, spP: 0.1, lift: 0 } }
         ]
+    },
+    DISARM_KICK: { // Run + Jump + Punch: acrobatic vaulting disarm kick + mid-air weapon snatch
+        trail: 'rFoot',
+        keys: [
+            { at: 'wind', ease: 'out', pose: { lIK: 0, rIK: 0, lift: 0.28, hipP: -0.35, rHP: 1.45, rKB: 1.8, lHP: 0.9, lKB: 1.6, rSP: 1.3, lSP: 0.8 } },
+            {
+                at: 'hit', ease: 'out', pose: {
+                    lIK: 0, rIK: 0, lift: 0.48, hipP: -0.65, spP: -0.25,
+                    rHP: 1.8, rHR: 0.45, rKB: 0.04, rFP: 0.85,
+                    lHP: 1.05, lKB: 2.0,
+                    rSP: 1.75, rEB: 0.2, lSP: -0.4, lSR: 0.95, lEB: 0.5,
+                    fwd: 0.24, turn: 0.25
+                }
+            },
+            { at: 'act', pose: { lift: 0.45, rHP: 1.85, rSP: 1.8 } },
+            { at: 'rec:0.55', ease: 'inout', pose: { lift: 0.1, hipP: -0.1, spP: 0.15, rHP: 0.8, rKB: 1.4, rSP: 1.0, rEB: 1.4 } },
+            { at: 'rec:0.85', ease: 'in', pose: { lIK: 1, rIK: 1, lift: 0, rFP: 0 } }
+        ]
+    },
+    FIRE_WEAPON: { // Tactical two-handed / one-handed gun-fu firing stance with recoil kick
+        trail: 'rFist',
+        keys: [
+            {
+                at: 'wind', ease: 'out', pose: {
+                    hipY: -0.1, hipT: 0.25, spY: 0.35, spP: 0.12,
+                    rSP: 1.52, rSR: -0.05, rSY: 0.22, rEB: 0.08,
+                    lSP: 1.38, lSR: 0.05, lSY: 0.55, lEB: 0.55,
+                    turn: 0.2
+                }
+            },
+            {
+                at: 'hit', ease: 'out', pose: {
+                    hipY: -0.11, hipT: 0.22, spY: 0.28, spP: -0.06, hdP: -0.08,
+                    rSP: 1.72, rSR: -0.04, rSY: 0.22, rEB: 0.18, rWB: -0.25,
+                    lSP: 1.45, lSR: 0.08, lSY: 0.55, lEB: 0.65,
+                    fwd: -0.04, turn: 0.2
+                }
+            },
+            { at: 'act', pose: { rSP: 1.65, spP: -0.02 } },
+            { at: 'rec:0.5', ease: 'inout', pose: { rSP: 1.45, rEB: 0.35, spP: 0.08, fwd: 0 } }
+        ]
+    },
+    THROW_WEAPON: { // Whipping empty gun at opponent's face
+        trail: 'rFist',
+        keys: [
+            { at: 'wind', ease: 'out', pose: { hipT: -0.25, spY: -0.65, rSP: 0.35, rSR: 0.65, rEB: 2.1, lSP: 1.1 } },
+            {
+                at: 'hit', ease: 'out', pose: {
+                    hipT: 0.55, spY: 0.95, spP: 0.28, fwd: 0.18,
+                    rSP: 1.65, rSR: 0.15, rSY: 0.35, rEB: 0.05,
+                    lSP: 0.4, lSR: 0.6, lEB: 2.0, turn: 0.1
+                }
+            },
+            { at: 'act', pose: { rSP: 1.5, fwd: 0.2 } },
+            { at: 'rec:0.5', ease: 'inout', pose: { spY: 0.3, rSP: 0.95, rEB: 1.5, fwd: 0.05 } }
+        ]
     }
 };
 
