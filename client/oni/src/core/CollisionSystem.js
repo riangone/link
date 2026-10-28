@@ -1,9 +1,49 @@
 /**
- * CollisionSystem - Hitbox / Hurtbox / Pushbox Pipeline
- * Pure mathematical intersection checks without physics engine overhead.
+ * CollisionSystem - Hitbox / Hurtbox / Pushbox & Spatial Sector Pipeline
+ * Pure mathematical intersection checks in 3D (supporting arbitrary yaw facingAngle).
  */
 
+import { FIGHTER_STATE } from './Constants.js';
+
 export class CollisionSystem {
+    /**
+     * Get 2D unit forward vector (fx, fz) for a fighter.
+     * If facingAngle is defined and finite, uses (cos(facingAngle), sin(facingAngle));
+     * otherwise falls back to (facingSign, 0).
+     */
+    static getForwardVector(fighter) {
+        if (typeof fighter.facingAngle === 'number' && Number.isFinite(fighter.facingAngle)) {
+            return {
+                fx: Math.cos(fighter.facingAngle),
+                fz: Math.sin(fighter.facingAngle)
+            };
+        }
+        const s = fighter.facing === -1 ? -1 : 1;
+        return { fx: s, fz: 0 };
+    }
+
+    /**
+     * Compute relative spatial sector of `attacker` with respect to `defender`'s facing direction.
+     * Used for context-sensitive throws (Shoulder Throw in FRONT, Head Scissors on SIDE/RUN,
+     * Suplex / Neck Snap from BACK) and directional block validation.
+     * @returns {'FRONT' | 'SIDE' | 'BACK'}
+     */
+    static getRelativeSector(defender, attacker) {
+        const { fx, fz } = this.getForwardVector(defender);
+        const dx = attacker.x - defender.x;
+        const dz = attacker.z - defender.z;
+        const len = Math.hypot(dx, dz);
+        if (len < 0.0001) return 'FRONT';
+
+        const nx = dx / len;
+        const nz = dz / len;
+        const dot = nx * fx + nz * fz; // +1 = directly in front of defender, -1 = directly behind defender
+
+        if (dot >= 0.35) return 'FRONT';
+        if (dot <= -0.35) return 'BACK';
+        return 'SIDE';
+    }
+
     /**
      * Check pushbox overlap and separate two fighters on X/Z plane
      * @param {Object} f1 Fighter 1
@@ -11,6 +51,16 @@ export class CollisionSystem {
      * @param {number} radius Character collision radius
      */
     static resolvePushbox(f1, f2, radius = 0.65) {
+        // Do not push apart during synchronized throw animation
+        if (
+            f1.state === FIGHTER_STATE.THROW ||
+            f2.state === FIGHTER_STATE.THROW ||
+            f1.state === FIGHTER_STATE.BEING_THROWN ||
+            f2.state === FIGHTER_STATE.BEING_THROWN
+        ) {
+            return;
+        }
+
         const dx = f2.x - f1.x;
         const dz = f2.z - f1.z;
         const distSq = dx * dx + dz * dz;
@@ -30,36 +80,52 @@ export class CollisionSystem {
     }
 
     /**
-     * Get world position of fighter's active hitbox
+     * Get world position of fighter's active hitbox, rotated by fighter's yaw facing vector
      */
     static getActiveHitboxWorld(attacker) {
-        if (!attacker.currentMove) return null;
+        if (!attacker.currentMove || attacker.currentMove.isThrow) return null;
         const move = attacker.currentMove;
-        const frameInMove = attacker.stateTimer;
+        if (!move.hitbox) return null;
 
-        // Is move in active frames?
+        const frameInMove = attacker.stateTimer;
         const start = move.startup;
         const end = move.startup + move.active;
         if (frameInMove < start || frameInMove >= end) {
             return null;
         }
 
-        const facingSign = attacker.facing; // +1 or -1
+        const { fx, fz } = this.getForwardVector(attacker);
         const offset = move.hitbox.offset;
 
+        // Local offset.x is forward, offset.z is lateral right
+        const worldX = attacker.x + offset.x * fx - offset.z * fz;
+        const worldZ = attacker.z + offset.x * fz + offset.z * fx;
+
         return {
-            x: attacker.x + offset.x * facingSign,
+            x: worldX,
             y: attacker.y + offset.y,
-            z: attacker.z + offset.z,
+            z: worldZ,
             radius: move.hitbox.radius,
             move: move
         };
     }
 
     /**
-     * Get defender's hurtbox spheres
+     * Get defender's hurtbox spheres (adapts to standing, crouching, or knocked down on ground)
      */
     static getHurtboxesWorld(defender) {
+        if (defender.state === FIGHTER_STATE.KNOCKED_DOWN) {
+            return [
+                { x: defender.x, y: defender.y + 0.28, z: defender.z, radius: 0.45, part: 'grounded' }
+            ];
+        }
+        if (defender.state === FIGHTER_STATE.CROUCH) {
+            return [
+                { x: defender.x, y: defender.y + 1.05, z: defender.z, radius: 0.30, part: 'head' },
+                { x: defender.x, y: defender.y + 0.72, z: defender.z, radius: 0.36, part: 'torso' },
+                { x: defender.x, y: defender.y + 0.38, z: defender.z, radius: 0.34, part: 'legs' }
+            ];
+        }
         return [
             // Head
             { x: defender.x, y: defender.y + 1.55, z: defender.z, radius: 0.28, part: 'head' },
@@ -72,19 +138,30 @@ export class CollisionSystem {
 
     /**
      * Check if attacker's active hitbox intersects defender's hurtboxes
-     * @returns {Object|null} Collision result { hitPoint, move, isBlock, hurtPart }
+     * @returns {Object|null} Collision result { hitPoint, move, isBlock, hurtPart, isJuggle }
      */
     static checkHit(attacker, defender) {
-        // Can't hit if defender is in invincible wakeup or already knocked down/dead
-        if (defender.invincible || defender.hp <= 0 || defender.state === 'KNOCKED_DOWN' || defender.state === 'WAKEUP') {
+        if (
+            defender.invincible ||
+            defender.hp <= 0 ||
+            defender.state === FIGHTER_STATE.WAKEUP ||
+            defender.state === FIGHTER_STATE.TECH_RECOVERY ||
+            defender.state === FIGHTER_STATE.BEING_THROWN
+        ) {
             return null;
         }
 
         const hitbox = this.getActiveHitboxWorld(attacker);
         if (!hitbox) return null;
 
-        // Has this move already hit during this execution?
         if (attacker.hasHitThisMove) return null;
+
+        // Grounded opponents can only be hit by moves with `hitsGrounded` (e.g. Ground Stomp)
+        // UNLESS they are still airborne (juggle physics!)
+        const isGroundedDown = defender.state === FIGHTER_STATE.KNOCKED_DOWN && defender.y <= 0.12;
+        if (isGroundedDown && !hitbox.move.hitsGrounded) {
+            return null;
+        }
 
         const hurtboxes = this.getHurtboxesWorld(defender);
 
@@ -96,23 +173,25 @@ export class CollisionSystem {
             const rSum = hitbox.radius + hurt.radius;
 
             if (dx * dx + dy * dy + dz * dz <= rSum * rSum) {
-                // Intersected!
                 const hitPoint = {
                     x: (hitbox.x + hurt.x) * 0.5,
                     y: (hitbox.y + hurt.y) * 0.5,
                     z: (hitbox.z + hurt.z) * 0.5
                 };
 
-                // Check block: is defender actively blocking or walking back?
-                const isFacingAttacker = (defender.facing === 1 && attacker.x > defender.x) ||
-                                         (defender.facing === -1 && attacker.x < defender.x);
-                const isBlock = defender.isBlocking && isFacingAttacker && !hitbox.move.isLow;
+                // Check block: defender must be blocking AND facing attacker (in FRONT sector),
+                // and low sweeps break standing high guards unless crouching.
+                const sector = this.getRelativeSector(defender, attacker);
+                const isFacingAttacker = sector === 'FRONT';
+                const lowGuardBreak = hitbox.move.isLow && defender.state !== FIGHTER_STATE.CROUCH;
+                const isBlock = defender.isBlocking && isFacingAttacker && !lowGuardBreak && !isGroundedDown;
 
                 return {
                     hitPoint,
                     move: hitbox.move,
                     isBlock,
-                    hurtPart: hurt.part
+                    hurtPart: hurt.part,
+                    isJuggle: !defender.isGrounded && defender.y > 0.12
                 };
             }
         }

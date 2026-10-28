@@ -23,6 +23,8 @@ function init() {
     const container = document.getElementById('canvas-container');
     const p1HpFill = document.getElementById('p1-hp-fill');
     const p2HpFill = document.getElementById('p2-hp-fill');
+    const p1PoiseFill = document.getElementById('p1-poise-fill');
+    const p2PoiseFill = document.getElementById('p2-poise-fill');
     const p1HpText = document.getElementById('p1-hp-text');
     const p2HpText = document.getElementById('p2-hp-text');
     const roundTimerEl = document.getElementById('round-timer');
@@ -91,7 +93,7 @@ function init() {
     setCam(threeScene.camMode);
 
     // Touch Virtual Joystick & Buttons
-    const touchState = { punch: false, kick: false, block: false, slide: false };
+    const touchState = { punch: false, kick: false, block: false, slide: false, jump: false, crouch: false, throwBtn: false };
     const setupTouchBtn = (id, key) => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -112,6 +114,7 @@ function init() {
     setupTouchBtn('btn-kick', 'kick');
     setupTouchBtn('btn-slide', 'slide');
     setupTouchBtn('btn-block', 'block');
+    setupTouchBtn('btn-jump', 'jump');
 
     // Virtual Joystick logic (supports touch & mouse drag)
     let touchDirX = 0;
@@ -210,11 +213,12 @@ function init() {
         const punch = !!(keysDown['KeyJ'] || keysDown['KeyZ'] || touchState.punch);
         const kick = !!(keysDown['KeyK'] || keysDown['KeyX'] || touchState.kick);
         const block = !!(keysDown['KeyL'] || keysDown['KeyC'] || touchState.block);
-        const jump = !!keysDown['Space'];
-
+        const jump = !!(keysDown['Space'] || touchState.jump);
+        const crouch = !!(keysDown['ShiftLeft'] || keysDown['ShiftRight'] || touchState.crouch);
         const slide = !!(keysDown['KeyI'] || keysDown['KeyV'] || touchState.slide);
+        const throwBtn = !!(keysDown['KeyU'] || keysDown['KeyG'] || touchState.throwBtn || (punch && kick));
 
-        return { dirX, dirZ, down, punch, kick, block, jump, slide };
+        return { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn };
     }
 
     // Match State
@@ -273,6 +277,15 @@ function init() {
     btnRematch.addEventListener('click', startFight);
 
     // Event Dispatcher
+    function showActionNotice(text) {
+        comboNotice.textContent = text;
+        comboNotice.classList.add('show');
+        clearTimeout(comboNotice.hideTimer);
+        comboNotice.hideTimer = setTimeout(() => {
+            comboNotice.classList.remove('show');
+        }, 1200);
+    }
+
     function processSimEvents(events) {
         for (const ev of events) {
             if (ev.type === 'HIT') {
@@ -281,22 +294,28 @@ function init() {
 
                 // Heavy impacts produce shockwaves & camera shake
                 if (!ev.blocked) threeScene.hitFlash(ev.knockdown ? 0.22 : 0.08);
-                if (ev.knockdown) {
+                if (ev.knockdown || ev.poiseBroken || ev.isThrow) {
                     threeScene.addTrauma(0.45);
                     vfx.spawnShockwave(ev.hitPoint.x, 0.05, ev.hitPoint.z, ev.attacker === 'p1' ? 0x00f0ff : 0xff0055);
                 } else {
                     threeScene.addTrauma(0.18);
                 }
 
-                // Combo Notice
-                if (ev.combo >= 2) {
-                    comboNotice.textContent = `${ev.combo} HITS!`;
-                    comboNotice.classList.add('show');
-                    clearTimeout(comboNotice.hideTimer);
-                    comboNotice.hideTimer = setTimeout(() => {
-                        comboNotice.classList.remove('show');
-                    }, 1200);
+                // Combo or special state notice
+                if (ev.poiseBroken) {
+                    showActionNotice('STUNNED! 破防眩晕!');
+                } else if (ev.isThrow) {
+                    showActionNotice(`${ev.move.name}!`);
+                } else if (ev.combo >= 2) {
+                    showActionNotice(`${ev.combo} HITS!`);
                 }
+            } else if (ev.type === 'THROW_TECH') {
+                vfx.spawnShockwave(ev.x, 0.9, ev.z, 0xffe600);
+                threeScene.addTrauma(0.28);
+                showActionNotice('THROW TECH! 拆投!');
+            } else if (ev.type === 'TECH_RECOVERY') {
+                vfx.spawnShockwave(ev.x, 0.15, ev.z, 0x00ff88);
+                showActionNotice('UKEMI! 受身!');
             } else if (ev.type === 'KO') {
                 koBanner.style.display = 'block';
                 threeScene.addTrauma(0.65);
@@ -340,7 +359,7 @@ function init() {
                 if (isMultiplayer && myRole === 'host') {
                     p2Input = remoteInput;
                 } else {
-                    p2Input = botBrain.think(sim.f2, sim.f1);
+                    p2Input = botBrain.think(sim.f2, sim.f1, sim);
                 }
 
                 // Tick simulation
@@ -366,6 +385,8 @@ function init() {
         // Update HUD
         p1HpFill.style.width = `${Math.max(0, (sim.f1.hp / sim.f1.maxHp) * 100)}%`;
         p2HpFill.style.width = `${Math.max(0, (sim.f2.hp / sim.f2.maxHp) * 100)}%`;
+        if (p1PoiseFill) p1PoiseFill.style.width = `${Math.max(0, (sim.f1.poise / sim.f1.maxPoise) * 100)}%`;
+        if (p2PoiseFill) p2PoiseFill.style.width = `${Math.max(0, (sim.f2.poise / sim.f2.maxPoise) * 100)}%`;
         p1HpText.textContent = `${Math.ceil(sim.f1.hp)} / ${sim.f1.maxHp}`;
         p2HpText.textContent = `${Math.ceil(sim.f2.hp)} / ${sim.f2.maxHp}`;
         roundTimerEl.textContent = Math.ceil(sim.roundTimer / 60);

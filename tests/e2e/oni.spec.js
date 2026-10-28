@@ -9,6 +9,8 @@ test.describe('Oni Combat 3D Fighting Game', () => {
     test.afterAll(async () => { dev && await dev.close(); });
 
     test('Loads 3D arena, starts fight, and simulates combat', async ({ page }) => {
+        // software-rendered WebGL in CI spends ~20s compiling shaders before the start button responds
+        test.setTimeout(60000);
         const errors = [];
         page.on('pageerror', e => errors.push(String(e)));
 

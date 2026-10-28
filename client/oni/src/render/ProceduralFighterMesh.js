@@ -1,39 +1,52 @@
 /**
- * ProceduralFighterMesh - Articulated anime-proportioned rig (render adapter, "dumb terminal")
+ * ProceduralFighterMesh - animation driver for one fighter (render adapter, "dumb terminal")
  *
  * Responsibilities:
- *  - Build a stylised humanoid from primitives (no external assets)
- *  - Consume a read-only fighter snapshot, resolve a semantic pose via AnimationLibrary,
- *    smooth it, and map semantics -> Three.js joint rotations in ONE place (applyPose)
- *  - Ground-lock feet, mirror the rig so both fighters show their near side to camera,
- *    and draw strike trails / hit flashes for readability
+ *  - Own a CharacterModel (the look) and place it in the world from the read-only fighter snapshot
+ *  - Resolve a semantic target pose (AnimationLibrary), run it through per-joint springs
+ *    (overshoot, follow-through, overlapping action) and map semantics -> joints in ONE place (applyPose)
+ *  - Two-bone leg IK: planted feet stay on the floor while the pelvis drives (weight shift, knee flex)
+ *  - Secondary motion: gaze stabilisation, hair sway, hit impulses; strike trails / hit flash
  */
 
 import * as THREE from '../../vendor/three.module.js';
 import { FIGHTER_STATE } from '../core/Constants.js';
-import { POSE_KEYS, makePose, resolvePose, ATTACK_ANIMS } from './AnimationLibrary.js';
+import { POSE_KEYS, makePose, resolvePose, ATTACK_ANIMS, GAIT } from './AnimationLibrary.js';
+import { CharacterModel, SIDE_L, SIDE_R } from './CharacterModel.js';
 
-const CAM_TURN = 0.38;          // rad the stance opens toward the camera at turn = 1
-const SIDE_L = 1, SIDE_R = -1;  // local +X is the character's left
+const CAM_TURN = 0.38; // rad the stance opens toward the camera at turn = 1
 
 // [angular frequency rad/s, damping ratio] per semantic key at full speed (attack)
 const SPRING_DEFAULT = [46, 0.62];
 const SPRING = {
-    hipY: [44, 0.7], hipP: [44, 0.72], hipT: [48, 0.65], hipR: [40, 0.7],
-    spP: [50, 0.6], spY: [52, 0.55], spR: [44, 0.6],
-    hdP: [30, 0.5], hdY: [30, 0.5],
-    lSP: [42, 0.45], lSR: [40, 0.5], lEB: [46, 0.5],
-    rSP: [42, 0.45], rSR: [40, 0.5], rEB: [46, 0.5],
-    lHP: [50, 0.7], lHR: [48, 0.75], lKB: [56, 0.72],
-    rHP: [50, 0.62], rHR: [48, 0.7], rKB: [56, 0.65],
-    fwd: [40, 0.8], lift: [42, 0.8], spin: [46, 0.85], turn: [20, 0.9]
+    hipY: [40, 0.62], hipP: [42, 0.7], hipT: [40, 0.58], hipR: [36, 0.6], hipS: [30, 0.7], fwd: [38, 0.7],
+    spP: [44, 0.55], spY: [42, 0.5], spR: [38, 0.55],
+    hdP: [26, 0.5], hdY: [26, 0.5],
+    lSP: [38, 0.42], lSR: [36, 0.48], lSY: [36, 0.5], lEB: [44, 0.45], lWB: [30, 0.4],
+    rSP: [38, 0.42], rSR: [36, 0.48], rSY: [36, 0.5], rEB: [44, 0.45], rWB: [30, 0.4],
+    lHP: [48, 0.62], lHR: [46, 0.68], lKB: [54, 0.62],
+    rHP: [48, 0.58], rHR: [46, 0.65], rKB: [54, 0.6],
+    lift: [40, 0.75], spin: [42, 0.82], turn: [18, 0.9]
 };
+// feet/IK weights: fast and critically damped (no foot skating, no wobble); not slowed in idle
+const FOOT_SPRING = [64, 1.0];
+const FOOT_KEYS = new Set(['lFx', 'lFy', 'lFz', 'lFY', 'lFP', 'rFx', 'rFy', 'rFz', 'rFY', 'rFP', 'lIK', 'rIK']);
 
 function wrapAngle(a) {
     while (a > Math.PI) a -= Math.PI * 2;
     while (a < -Math.PI) a += Math.PI * 2;
     return a;
 }
+
+// scratch objects
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+const _pole = new THREE.Vector3(), _hip = new THREE.Vector3();
+const _bx = new THREE.Vector3(), _by = new THREE.Vector3(), _bz = new THREE.Vector3();
+const _m4 = new THREE.Matrix4();
+const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
+const _qInv = new THREE.Quaternion();
+const _e = new THREE.Euler();
+const AX_X = new THREE.Vector3(1, 0, 0), AX_Y = new THREE.Vector3(0, 1, 0);
 
 export class ProceduralFighterMesh {
     constructor(scene, isP1 = true) {
@@ -43,190 +56,35 @@ export class ProceduralFighterMesh {
         this.root = new THREE.Group();
         this.scene.add(this.root);
 
-        this.palette = isP1
-            ? { suit: 0x1c2236, armor: 0xe9eef7, trim: 0x2b3350, accent: 0x18e8ff, skin: 0xf3cfb3, hair: 0x9046ff, glove: 0x23283a }
-            : { suit: 0x17151c, armor: 0x4a4f5e, trim: 0x2a2b33, accent: 0xff2a5c, skin: 0x2e2a36, hair: 0x15151b, glove: 0x1d1c22 };
+        this.model = new CharacterModel(isP1);
+        this.body = this.model.root;
+        this.body.scale.setScalar(isP1 ? 1.0 : 1.06); // syndicate trooper is slightly bigger
+        this.root.add(this.body);
+        const m = this.model;
+        this.pelvis = m.pelvis; this.spine = m.spine; this.chest = m.chest;
+        this.neck = m.neck; this.head = m.head; this.arms = m.arms; this.legs = m.legs;
+        this.meshes = m.meshes;
+        this.dims = m.dims;
+        this.accent = m.p.accent;
 
-        this.buildMaterials();
-        this.buildRig();
         this.buildGroundDecal();
         this.buildTrail();
 
         this.pose = makePose();
-        this.vel = makePose();         // joint angular velocities for spring dynamics
-        this.camYaw = 0;               // set by game loop; used to open stance toward the viewer
+        this.vel = makePose();         // spring velocities
         this.target = makePose();
+        this.camYaw = 0;               // set by game loop; used to open stance toward the viewer
         this.loco = { phase: 0 };
         this.lastTime = null;
         this.lastHp = null;
         this.flash = 0;
         this.lastX = 0;
         this.lastZ = 0;
+        this.hair = { lag: null, vel: new THREE.Vector3(), rx: 0, rz: 0 };
     }
 
     // ------------------------------------------------------------------ build
-    buildMaterials() {
-        const p = this.palette;
-        this.matSuit = new THREE.MeshStandardMaterial({ color: p.suit, roughness: 0.62, metalness: 0.15 });
-        this.matArmor = new THREE.MeshPhysicalMaterial({
-            color: p.armor, roughness: 0.28, metalness: this.isP1 ? 0.15 : 0.75,
-            clearcoat: 1.0, clearcoatRoughness: 0.15
-        });
-        this.matTrim = new THREE.MeshStandardMaterial({ color: p.trim, roughness: 0.4, metalness: 0.6 });
-        this.matAccent = new THREE.MeshStandardMaterial({
-            color: p.accent, emissive: p.accent, emissiveIntensity: 2.2, roughness: 0.3
-        });
-        this.matSkin = new THREE.MeshStandardMaterial({ color: p.skin, roughness: 0.55 });
-        this.matHair = new THREE.MeshStandardMaterial({
-            color: p.hair, roughness: 0.35, metalness: 0.1,
-            emissive: this.isP1 ? 0x3a0f78 : 0x000000, emissiveIntensity: 0.6
-        });
-        this.matGlove = new THREE.MeshStandardMaterial({ color: p.glove, roughness: 0.5, metalness: 0.3 });
-        this.matEye = new THREE.MeshBasicMaterial({ color: this.isP1 ? 0x1a1030 : p.accent });
-        this.matFlash = new THREE.MeshBasicMaterial({ color: 0xffffff });
-        this.meshes = [];
-    }
-
-    add(parent, geo, mat, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1) {
-        const m = new THREE.Mesh(geo, mat);
-        m.position.set(x, y, z);
-        m.scale.set(sx, sy, sz);
-        m.castShadow = true;
-        m.userData.baseMat = mat;
-        parent.add(m);
-        this.meshes.push(m);
-        return m;
-    }
-
-    sphere(r, w = 16, h = 12) { return new THREE.SphereGeometry(r, w, h); }
-
-    /** tapered limb hanging down -Y from the joint origin */
-    limb(parent, rTop, rBot, len, mat) {
-        const g = new THREE.CylinderGeometry(rTop, rBot, len, 14, 1);
-        g.translate(0, -len / 2, 0);
-        return this.add(parent, g, mat);
-    }
-
-    joint(parent, x, y, z) {
-        const g = new THREE.Group();
-        g.position.set(x, y, z);
-        parent.add(g);
-        return g;
-    }
-
-    buildRig() {
-        const P1 = this.isP1;
-        const s = P1 ? 1.0 : 1.06; // syndicate trooper is slightly bulkier
-        this.body = new THREE.Group();
-        this.body.scale.setScalar(s);
-        this.root.add(this.body);
-
-        // ---------------- pelvis
-        this.pelvis = this.joint(this.body, 0, 1.0, 0);
-        this.add(this.pelvis, this.sphere(0.13), this.matSuit, 0, -0.01, 0, 1.25, 0.85, 0.95);
-        this.add(this.pelvis, new THREE.CylinderGeometry(0.158, 0.165, 0.055, 20), this.matTrim, 0, 0.055, 0);
-        this.add(this.pelvis, new THREE.BoxGeometry(0.07, 0.04, 0.02), this.matAccent, 0, 0.055, 0.16);
-
-        // ---------------- spine / chest
-        this.spine = this.joint(this.pelvis, 0, 0.06, 0);
-        this.limb(this.spine, 0.118, 0.128, 0.2, this.matSuit).position.y = 0.2;
-        this.chest = this.joint(this.spine, 0, 0.18, 0);
-        this.add(this.chest, this.sphere(0.17), this.matSuit, 0, 0.12, 0, 1.12, 1.0, 0.8);
-        // front chest plate (front hemisphere) + back pack
-        const plate = new THREE.SphereGeometry(0.175, 18, 12, 0, Math.PI, 0, Math.PI * 0.62);
-        this.add(this.chest, plate, this.matArmor, 0, 0.14, 0.012, 1.1, 0.95, 0.8);
-        this.add(this.chest, new THREE.BoxGeometry(0.2, 0.2, 0.08), this.matTrim, 0, 0.12, -0.14);
-        this.add(this.chest, new THREE.CircleGeometry(0.03, 16), this.matAccent, 0, 0.1, 0.152);
-        this.add(this.chest, new THREE.BoxGeometry(0.012, 0.16, 0.012), this.matAccent, 0.06, 0.12, -0.18);
-        this.add(this.chest, new THREE.BoxGeometry(0.012, 0.16, 0.012), this.matAccent, -0.06, 0.12, -0.18);
-
-        // ---------------- neck / head
-        this.add(this.chest, new THREE.CylinderGeometry(0.042, 0.05, 0.1, 12), this.matSkin, 0, 0.3, 0);
-        this.head = this.joint(this.chest, 0, 0.33, 0);
-        this.add(this.head, this.sphere(0.102, 20, 16), this.matSkin, 0, 0.1, 0.005, 0.92, 1.06, 1.0);
-        if (P1) this.buildKonokoHair(); else this.buildTrooperHelmet();
-
-        // ---------------- arms
-        this.arms = {};
-        for (const side of [SIDE_L, SIDE_R]) {
-            const key = side === SIDE_L ? 'l' : 'r';
-            const sh = this.joint(this.chest, 0.205 * side, 0.21, 0);
-            const pad = new THREE.SphereGeometry(0.082, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55);
-            this.add(sh, pad, this.matArmor, 0.012 * side, 0.01, 0, 1.0, 0.9, 1.05);
-            this.limb(sh, 0.05, 0.042, 0.28, this.matSuit);
-            const el = this.joint(sh, 0, -0.28, 0);
-            this.add(el, this.sphere(0.044, 10, 8), this.matTrim);
-            this.limb(el, 0.047, 0.04, 0.25, this.matArmor);
-            this.add(el, new THREE.BoxGeometry(0.012, 0.16, 0.012), this.matAccent, 0.045 * side, -0.14, 0);
-            const fist = this.joint(el, 0, -0.275, 0);
-            this.add(fist, this.sphere(0.052, 12, 10), this.matGlove, 0, 0, 0.004, 0.95, 1.1, 1.12);
-            this.add(fist, new THREE.BoxGeometry(0.07, 0.022, 0.03), this.matAccent, 0, -0.025, 0.04);
-            const tip = this.joint(fist, 0, -0.05, 0);
-            this.arms[key] = { sh, el, fist, tip };
-        }
-
-        // ---------------- legs
-        this.legs = {};
-        for (const side of [SIDE_L, SIDE_R]) {
-            const key = side === SIDE_L ? 'l' : 'r';
-            const hip = this.joint(this.pelvis, 0.09 * side, -0.05, 0);
-            this.limb(hip, 0.078, 0.056, 0.43, this.matSuit);
-            this.add(hip, new THREE.BoxGeometry(0.012, 0.26, 0.014), this.matAccent, 0.07 * side, -0.2, 0);
-            const knee = this.joint(hip, 0, -0.43, 0);
-            this.add(knee, new THREE.SphereGeometry(0.064, 12, 10, 0, Math.PI), this.matArmor, 0, 0.01, 0.008, 1, 1.15, 1);
-            this.limb(knee, 0.058, 0.044, 0.41, this.matArmor);
-            const ankle = this.joint(knee, 0, -0.41, 0);
-            this.add(ankle, this.sphere(0.06, 12, 8), this.matTrim, 0, -0.03, 0.045, 0.95, 0.72, 1.9);
-            this.add(ankle, new THREE.BoxGeometry(0.1, 0.012, 0.2), this.matAccent, 0, -0.068, 0.045);
-            const sole = this.joint(ankle, 0, -0.072, 0.045);
-            const toe = this.joint(ankle, 0, -0.05, 0.16);
-            this.legs[key] = { hip, knee, ankle, sole, toe };
-        }
-    }
-
-    buildKonokoHair() {
-        const h = this.head;
-        const hair = this.matHair;
-        // skull cap (top + back), leaves the face open
-        const cap = new THREE.SphereGeometry(0.118, 22, 16, 0, Math.PI * 2, 0, Math.PI * 0.58);
-        this.add(h, cap, hair, 0, 0.115, -0.006, 1.0, 1.06, 1.08);
-        const back = new THREE.SphereGeometry(0.12, 18, 14, Math.PI, Math.PI, 0, Math.PI * 0.78);
-        this.add(h, back, hair, 0, 0.1, -0.01, 1.04, 1.12, 1.1);
-        // jagged anime bangs
-        const bang = new THREE.ConeGeometry(0.026, 0.11, 6);
-        bang.rotateX(Math.PI);
-        const xs = [-0.07, -0.035, 0.0, 0.035, 0.07];
-        xs.forEach((x, i) => {
-            const m = this.add(h, bang, hair, x, 0.16, 0.088 - Math.abs(x) * 0.25, 1, 0.8 + (i % 2) * 0.35, 1);
-            m.rotation.x = -0.35;
-            m.rotation.z = -x * 2.2;
-        });
-        // side locks framing the face (bob cut)
-        const lock = new THREE.ConeGeometry(0.035, 0.2, 6);
-        lock.rotateX(Math.PI);
-        for (const sx of [1, -1]) {
-            const m = this.add(h, lock, hair, 0.098 * sx, 0.06, 0.03, 1, 1, 0.8);
-            m.rotation.z = sx * 0.12;
-        }
-        // eyes + neon head-set
-        for (const sx of [1, -1]) {
-            this.add(h, this.sphere(0.014, 8, 6), this.matEye, 0.035 * sx, 0.11, 0.092, 1.1, 1.3, 0.5);
-        }
-        this.add(h, new THREE.TorusGeometry(0.112, 0.008, 6, 20, Math.PI), this.matAccent, 0, 0.12, -0.01).rotation.set(0, Math.PI / 2, Math.PI / 2);
-    }
-
-    buildTrooperHelmet() {
-        const h = this.head;
-        this.add(h, this.sphere(0.122, 20, 16), this.matArmor, 0, 0.11, -0.005, 1.0, 1.04, 1.08);
-        // glowing visor band
-        const visor = new THREE.CylinderGeometry(0.118, 0.118, 0.04, 20, 1, true, -Math.PI * 0.42, Math.PI * 0.84);
-        this.add(h, visor, this.matAccent, 0, 0.115, 0.012, 1.0, 1, 1.08);
-        this.add(h, new THREE.BoxGeometry(0.11, 0.05, 0.05), this.matTrim, 0, 0.04, 0.09);   // respirator
-        this.add(h, new THREE.BoxGeometry(0.02, 0.09, 0.05), this.matTrim, 0, 0.22, -0.02); // crest
-    }
-
     buildGroundDecal() {
-        // soft contact shadow + thin team ring
         const c = document.createElement('canvas');
         c.width = c.height = 128;
         const g = c.getContext('2d');
@@ -235,10 +93,9 @@ export class ProceduralFighterMesh {
         grd.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = grd;
         g.fillRect(0, 0, 128, 128);
-        const shadowTex = new THREE.CanvasTexture(c);
         this.blob = new THREE.Mesh(
             new THREE.PlaneGeometry(1.1, 1.1),
-            new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
+            new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })
         );
         this.blob.rotation.x = -Math.PI / 2;
         this.blob.renderOrder = 1;
@@ -247,7 +104,7 @@ export class ProceduralFighterMesh {
         this.ring = new THREE.Mesh(
             new THREE.RingGeometry(0.44, 0.47, 48),
             new THREE.MeshBasicMaterial({
-                color: this.palette.accent, transparent: true, opacity: 0.55,
+                color: this.accent, transparent: true, opacity: 0.55,
                 blending: THREE.AdditiveBlending, depthWrite: false
             })
         );
@@ -275,8 +132,8 @@ export class ProceduralFighterMesh {
         }));
         this.trailMesh.frustumCulled = false;
         this.scene.add(this.trailMesh);
-        this.trailSamples = []; // {tip: Vector3, base: Vector3, age}
-        this.trailColor = new THREE.Color(this.palette.accent);
+        this.trailSamples = [];
+        this.trailColor = new THREE.Color(this.accent);
     }
 
     // ------------------------------------------------------------------ per-frame
@@ -285,50 +142,66 @@ export class ProceduralFighterMesh {
             : (this.lastTime === null ? 1 / 60 : Math.min(0.1, Math.max(0, timeSeconds - this.lastTime)));
         this.lastTime = timeSeconds;
 
-        // locomotion phase advances with distance travelled -> no foot sliding
+        // gait phase advances with distance travelled -> planted feet do not slide
         const moved = Math.hypot(fighter.x - this.lastX, fighter.z - this.lastZ);
         this.lastX = fighter.x; this.lastZ = fighter.z;
-        if (fighter.state === FIGHTER_STATE.RUN) this.loco.phase += moved * 4.2 + dt * 2;
+        if (fighter.state === FIGHTER_STATE.RUN) this.loco.phase += moved * GAIT.RUN.perMeter;
         else if (fighter.state === FIGHTER_STATE.WALK) {
             const dir = Math.sign(fighter.vx * fighter.facing) || 1;
-            this.loco.phase += dir * (moved * 6.0 + dt * 1.5);
+            this.loco.phase += dir * moved * GAIT.WALK.perMeter;
         }
 
         resolvePose(this.target, fighter, this.loco, timeSeconds);
-
+        this.detectHit(fighter);
         this.integrateSprings(fighter.state, dt);
 
         this.applyRoot(fighter);
-        this.applyPose(this.pose);
-        this.groundLock(fighter, this.target.noLock);
+        this.applyPose(this.pose, !this.target.gait);
+        this.updateHair(dt);
         this.updateDecals(fighter);
         this.updateTrail(fighter, dt);
-        this.updateFlash(fighter, dt);
+        this.updateFlash(dt);
+    }
+
+    /** Taking damage: white flash + a physical jolt injected into the spring velocities. */
+    detectHit(f) {
+        if (this.lastHp !== null && f.hp < this.lastHp) {
+            this.flash = 0.09;
+            const V = this.vel;
+            V.spP -= 9; V.hdP -= 14; V.spY += 5; V.fwd -= 2.2; V.hipY -= 1.2;
+            V.lSR += 8; V.rSR += 8; V.lEB -= 10; V.rEB -= 10;
+        }
+        this.lastHp = f.hp;
     }
 
     /**
-     * Second-order (mass-spring-damper) joint dynamics.
-     * Underdamped arms whip and overshoot, the torso leads and the head/arms trail it
-     * (overlapping action), legs stay firmer so feet do not wobble.
+     * Second-order (mass-spring-damper) joint dynamics. Underdamped arms whip and overshoot,
+     * the torso leads and head/arms trail it (overlapping action), feet are critically damped.
      */
     integrateSprings(state, dt) {
         const attack = state === FIGHTER_STATE.ATTACK;
         const hurt = state === FIGHTER_STATE.HIT_STUN;
-        const speed = attack ? 1.0 : (hurt ? 0.9 : 0.55);
+        const speed = attack ? 1.0 : (hurt ? 0.9 : 0.6);
         const steps = Math.max(1, Math.ceil(dt / (1 / 240)));
         const h = dt / steps;
         const P = this.pose, V = this.vel, T = this.target;
-        for (let i = 0; i < steps; i++) {
-            for (const k of POSE_KEYS) {
-                const [w0, z] = SPRING[k] || SPRING_DEFAULT;
-                const w = w0 * speed;
-                let err = T[k] - P[k];
-                if (k === 'spin') err = wrapAngle(err);
-                V[k] += (w * w * err - 2 * z * w * V[k]) * h;
-                P[k] += V[k] * h;
+        for (const k of POSE_KEYS) {
+            const foot = FOOT_KEYS.has(k);
+            const [w0, z] = foot ? FOOT_SPRING : (SPRING[k] || SPRING_DEFAULT);
+            const w = foot ? w0 : w0 * speed;
+            const ww = w * w, c = 2 * z * w;
+            const target = T[k];
+            let p = P[k], v = V[k];
+            for (let i = 0; i < steps; i++) {
+                const err = k === 'spin' ? wrapAngle(target - p) : target - p;
+                v += (ww * err - c * v) * h;
+                p += v * h;
             }
+            P[k] = p; V[k] = v;
         }
         P.spin = wrapAngle(P.spin);
+        P.lIK = Math.max(0, Math.min(1, P.lIK));
+        P.rIK = Math.max(0, Math.min(1, P.rIK));
     }
 
     applyRoot(f) {
@@ -338,52 +211,131 @@ export class ProceduralFighterMesh {
         this.root.scale.x = facing;
         // open the stance toward the viewer only when the camera looks from the side (+Z)
         const toCam = Math.max(0, Math.cos(this.camYaw));
-        this.root.rotation.y = facing * (Math.PI / 2 - CAM_TURN * p.turn * toCam) + facing * p.spin;
-        this.root.position.set(f.x + facing * p.fwd, f.y + p.lift, f.z);
+        let baseRotY = facing * (Math.PI / 2 - CAM_TURN * p.turn * toCam);
+        if (typeof f.facingAngle === 'number' && Number.isFinite(f.facingAngle)) {
+            const worldYaw = Math.PI / 2 - f.facingAngle;
+            baseRotY = worldYaw - facing * CAM_TURN * p.turn * toCam;
+        }
+        this.root.rotation.y = baseRotY + facing * p.spin;
+        this.root.position.set(f.x, f.y + Math.max(-0.05, p.lift), f.z);
     }
 
-    /** The single place where semantic angles become Three.js rotations. */
-    applyPose(p) {
-        this.pelvis.position.y = 1.0 + p.hipY;
+    /** The single place where semantic values become joint transforms. */
+    applyPose(p, autoStep) {
+        const d = this.dims;
+        this.pelvis.position.set(p.hipS, d.pelvisY + p.hipY, p.fwd);
         this.pelvis.rotation.set(p.hipP, p.hipT, p.hipR);
         this.spine.rotation.set(p.spP * 0.45, p.spY * 0.45, p.spR * 0.5);
-        this.chest.rotation.set(p.spP * 0.55, p.spY * 0.55, p.spR * 0.5);
-        this.head.rotation.set(p.hdP - p.spP * 0.5, p.hdY - p.spY * 0.6, 0);
+        this.chest.rotation.set(p.spP * 0.4, p.spY * 0.45, p.spR * 0.5);
+        // neck + head: keep the eyes on the opponent (gaze stabilisation) and add the authored offset
+        const torsoP = p.hipP + p.spP * 0.85, torsoY = p.hipT + p.spY * 0.9;
+        this.neck.rotation.set(-torsoP * 0.3 + p.hdP * 0.3, -torsoY * 0.35 + p.hdY * 0.4, -p.spR * 0.3);
+        this.head.rotation.set(-torsoP * 0.35 + p.hdP * 0.7, -torsoY * 0.4 + p.hdY * 0.6, -p.spR * 0.3 - p.hipR * 0.5);
 
-        const L = this.arms.l, R = this.arms.r;
-        L.sh.rotation.set(-p.lSP, 0, p.lSR * SIDE_L);
-        R.sh.rotation.set(-p.rSP, 0, p.rSR * SIDE_R);
-        L.el.rotation.set(-p.lEB, 0, 0);
-        R.el.rotation.set(-p.rEB, 0, 0);
+        this.applyArm(this.arms.l, SIDE_L, p.lSP, p.lSR, p.lSY, p.lEB, p.lWB);
+        this.applyArm(this.arms.r, SIDE_R, p.rSP, p.rSR, p.rSY, p.rEB, p.rWB);
 
-        const LL = this.legs.l, RL = this.legs.r;
-        LL.hip.rotation.set(-p.lHP, 0, p.lHR * SIDE_L);
-        RL.hip.rotation.set(-p.rHP, 0, p.rHR * SIDE_R);
-        LL.knee.rotation.set(p.lKB, 0, 0);
-        RL.knee.rotation.set(p.rKB, 0, 0);
-        // keep soles roughly parallel to the floor (clamped so kicks still point the toes)
-        const flat = (hp, kb) => Math.max(-0.8, Math.min(0.8, hp - kb - p.hipP));
-        LL.ankle.rotation.set(flat(p.lHP, p.lKB), 0, 0);
-        RL.ankle.rotation.set(flat(p.rHP, p.rKB), 0, 0);
+        this.pelvis.updateMatrix();
+        const sL = autoStep ? Math.min(0.09, Math.hypot(this.vel.lFx, this.vel.lFz) * 0.035) : 0;
+        const sR = autoStep ? Math.min(0.09, Math.hypot(this.vel.rFx, this.vel.rFz) * 0.035) : 0;
+        this.applyLeg(this.legs.l, SIDE_L, p.lHP, p.lHR, p.lKB, p.lFx, p.lFy + sL, p.lFz, p.lFY, p.lFP, p.lIK);
+        this.applyLeg(this.legs.r, SIDE_R, p.rHP, p.rHR, p.rKB, p.rFx, p.rFy + sR, p.rFz, p.rFY, p.rFP, p.rIK);
     }
 
-    /** Plant the lowest foot on the floor so stances never float or sink. */
-    groundLock(f, noLock) {
-        if (noLock || !f.isGrounded || f.y > 0.001) return;
+    applyArm(A, side, SP, SR, SY, EB, WB) {
+        A.sh.rotation.set(-SP, -SY * side, SR * side);   // order YXZ: roll, pitch, then swing in parent
+        A.el.rotation.set(-EB, 0, 0);
+        A.fist.rotation.set(-WB, 0, 0);
+    }
+
+    /**
+     * Leg = blend(FK angles, analytic two-bone IK to a foot target) by weight w.
+     * IK is solved in pelvis space; the knee tracks over the toes; the sole stays flat
+     * (or pivots on the ball of the foot when the heel is raised).
+     */
+    applyLeg(L, side, HP, HR, KB, Fx, Fy, Fz, FY, FP, w) {
+        const d = this.dims;
+        _e.set(-HP, 0, HR * side);
+        const qFK = _q1.setFromEuler(_e);
+        let knee = KB;
+        L.hip.quaternion.copy(qFK);
+
+        if (w > 0.001) {
+            const yaw = FY * side;
+            const cy = Math.cos(yaw), sy = Math.sin(yaw);
+            const heel = Math.max(0, FP);
+            // ball of the foot stays on the target; ankle rises as the heel lifts
+            const ballZ = d.toeZ;
+            const ax = side * Fx + sy * ballZ, az = Fz + cy * ballZ; // ball position
+            const ry = -d.ankleH * Math.cos(heel) - ballZ * Math.sin(heel);
+            const rz = -d.ankleH * Math.sin(heel) + ballZ * Math.cos(heel);
+            const target = _v1.set(ax - sy * rz, Fy - ry, az - cy * rz);
+
+            // hip joint position (body space) and direction to target in pelvis space
+            _hip.copy(L.hip.position).applyMatrix4(this.pelvis.matrix);
+            _qInv.copy(this.pelvis.quaternion).invert();
+            const dir = _v2.subVectors(target, _hip).applyQuaternion(_qInv);
+            _pole.set(sy + side * 0.12, 0, cy).applyQuaternion(_qInv);
+
+            const a = d.thigh, b = d.shin;
+            const len = Math.max(0.05, Math.min(a + b - 1e-4, dir.length()));
+            const dn = dir.normalize();
+            const cosA = Math.max(-1, Math.min(1, (a * a + len * len - b * b) / (2 * a * len)));
+            const cosK = Math.max(-1, Math.min(1, (a * a + b * b - len * len) / (2 * a * b)));
+            const alpha = Math.acos(cosA);
+            const kneeIK = Math.PI - Math.acos(cosK);
+            const pp = _pole.addScaledVector(dn, -_pole.dot(dn));
+            if (pp.lengthSq() < 1e-6) pp.set(0, 0, 1);
+            pp.normalize();
+            const ca = Math.cos(alpha), sa = Math.sin(alpha);
+            _by.copy(dn).multiplyScalar(-ca).addScaledVector(pp, -sa);    // -thigh direction
+            _bz.copy(pp).multiplyScalar(ca).addScaledVector(dn, -sa);     // knee-forward
+            _bx.crossVectors(_by, _bz);
+            const qIK = _q2.setFromRotationMatrix(_m4.makeBasis(_bx, _by, _bz));
+
+            L.hip.quaternion.copy(qFK).slerp(qIK, w);
+            knee = KB + (kneeIK - KB) * w;
+            L.knee.rotation.set(knee, 0, 0);
+
+            // foot orientation: flat on the floor, yawed, pitched by heel lift (body space)
+            const qFoot = _q3.setFromAxisAngle(AX_Y, yaw).multiply(_q2.setFromAxisAngle(AX_X, heel));
+            const qShin = _q1.copy(this.pelvis.quaternion).multiply(L.hip.quaternion).multiply(L.knee.quaternion);
+            const qAnkleIK = qShin.invert().multiply(qFoot);
+            const qAnkleFK = _q2.setFromAxisAngle(AX_X, FP);
+            L.ankle.quaternion.copy(qAnkleFK).slerp(qAnkleIK, w);
+            return;
+        }
+        L.knee.rotation.set(knee, 0, 0);
+        L.ankle.quaternion.setFromAxisAngle(AX_X, FP);
+    }
+
+    /** Hair follows a lagging point: swings back on lunges, bounces on landings. */
+    updateHair(dt) {
+        const sway = this.model.hairSway;
+        if (!sway || dt <= 0) return;
         this.root.updateMatrixWorld(true);
-        const v = ProceduralFighterMesh._v || (ProceduralFighterMesh._v = new THREE.Vector3());
-        let minY = Infinity;
-        for (const leg of [this.legs.l, this.legs.r]) {
-            minY = Math.min(minY, leg.sole.getWorldPosition(v).y, leg.toe.getWorldPosition(v).y - 0.01);
+        const pos = sway.getWorldPosition(_v1);
+        const H = this.hair;
+        if (!H.lag) { H.lag = pos.clone(); return; }
+        const steps = Math.max(1, Math.ceil(dt / (1 / 240)));
+        const h = dt / steps, w = 22, z = 0.32;
+        for (let i = 0; i < steps; i++) {
+            _v2.subVectors(pos, H.lag);
+            H.vel.addScaledVector(_v2, w * w * h).addScaledVector(H.vel, -2 * z * w * h);
+            H.lag.addScaledVector(H.vel, h);
         }
-        const offset = minY - f.y;
-        if (Math.abs(offset) < 0.5) {
-            this.pelvis.position.y -= offset / this.body.scale.y;
-        }
+        // lag offset in head space
+        _v2.subVectors(H.lag, pos);
+        sway.parent.getWorldQuaternion(_q1).invert();
+        _v2.applyQuaternion(_q1);
+        const s = 1 / this.body.scale.x;
+        const tx = Math.max(-0.7, Math.min(0.7, -_v2.z * 9 * s));
+        const tz = Math.max(-0.6, Math.min(0.6, _v2.x * 9 * s));
+        sway.rotation.set(tx, 0, tz);
     }
 
     updateDecals(f) {
-        const h = Math.max(0, f.y);
+        const h = Math.max(0, f.y + this.pose.lift);
         const k = 1 / (1 + h * 1.5);
         this.blob.position.set(f.x, 0.012, f.z);
         this.blob.scale.setScalar(0.8 + k * 0.4);
@@ -393,7 +345,7 @@ export class ProceduralFighterMesh {
 
     updateTrail(f, dt) {
         const n = this.TRAIL_N;
-        const move = f.state === FIGHTER_STATE.ATTACK ? f.currentMove : null;
+        const move = (f.state === FIGHTER_STATE.ATTACK || f.state === FIGHTER_STATE.THROW) ? f.currentMove : null;
         const anim = move ? ATTACK_ANIMS[move.id] : null;
         let emitting = false;
         if (anim) {
@@ -441,13 +393,12 @@ export class ProceduralFighterMesh {
         this.trailMesh.visible = samples.length > 1;
     }
 
-    updateFlash(f, dt) {
-        if (this.lastHp !== null && f.hp < this.lastHp) this.flash = 0.09;
-        this.lastHp = f.hp;
+    updateFlash(dt) {
         const on = this.flash > 0;
         if (on) this.flash -= dt;
         if (on !== this._flashOn) {
             this._flashOn = on;
+            if (!this.matFlash) this.matFlash = new THREE.MeshBasicMaterial({ color: 0xffffff });
             for (const m of this.meshes) m.material = on ? this.matFlash : m.userData.baseMat;
         }
     }

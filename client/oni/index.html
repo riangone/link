@@ -23,6 +23,9 @@
                     <div class="hp-bar-bg">
                         <div id="p1-hp-fill" class="hp-bar-fill" style="width: 100%;"></div>
                     </div>
+                    <div class="poise-bar-bg" title="韧性条 (Poise) - 耗尽进入眩晕可被正面抓投">
+                        <div id="p1-poise-fill" class="poise-bar-fill" style="width: 100%;"></div>
+                    </div>
                 </div>
 
                 <div class="timer-box">
@@ -37,6 +40,9 @@
                     </div>
                     <div class="hp-bar-bg">
                         <div id="p2-hp-fill" class="hp-bar-fill" style="width: 100%;"></div>
+                    </div>
+                    <div class="poise-bar-bg" title="韧性条 (Poise) - 耗尽进入眩晕可被正面抓投">
+                        <div id="p2-poise-fill" class="poise-bar-fill" style="width: 100%;"></div>
                     </div>
                 </div>
 
@@ -58,19 +64,20 @@
             <!-- Bottom Command HUD -->
             <div class="controls-hud" id="controls-hud">
                 <div class="command-box moves-panel" id="moves-panel">
-                    <strong id="hud-cmd-title">⚡ 战术指令 (出招表)</strong>
+                    <strong id="hud-cmd-title">⚡ 战术指令 (Oni 出招表)</strong>
                     <div class="cmd-list">
-                        <span><strong>A / D</strong> 左右移动 (双击快速前冲)</span>
-                        <span><strong>W / S</strong> 3D 轴向走位</span>
-                        <span><strong>J / Z</strong> 刺拳 (连按发动三连直拳)</span>
-                        <span><strong>K / X</strong> 踢腿 · <strong>I / V</strong> 疾风滑铲</span>
-                        <span><strong>S + D + J</strong> 升龙破空拳 (下前拳·击飞)</span>
-                        <span><strong>L / C</strong> 格挡受击 (减免80%伤害)</span>
+                        <span><strong>WASD</strong> 移动 · <strong>双击方向</strong> 疾跑/全向翻滚闪避(无敌帧)</span>
+                        <span><strong>J-J-K</strong> 刺拳-直拳-旋踢 · <strong>K-K-K</strong> 三段重踢连段</span>
+                        <span><strong>疾跑 + J / K / C</strong> 冲刺穿心拳 / 疾风飞踢 / 滑铲扫堂</span>
+                        <span><strong>后退 + J / K</strong> 背身后摆拳 / 倒挂金钩 · <strong>倒地旁 K</strong> 踩踏</span>
+                        <span><strong>S+D+J</strong> 升龙拳 · <strong>Shift(蹲)+Space(跳)+K</strong> 旋风升龙腿</span>
+                        <span><strong>U / G / J+K</strong> 贴身抓投 (正面过肩摔 / 背身过桥摔 / 拆投)</span>
+                        <span><strong>倒地瞬间 Space</strong> 受身弹起 · <strong>后退 / L</strong> 格挡</span>
                         <span><strong>1-4</strong> 切换视角 · <strong>拖动</strong> 旋转 · <strong>滚轮</strong> 缩放 · <strong>0/双击</strong> 复位</span>
                     </div>
                 </div>
                 <div class="mobile-tip-bar" id="mobile-tip-bar">
-                    🕹️ 摇杆移动/双击前冲 · P刺拳 · K踢腿 · ⚡滑铲 · B格挡
+                    🕹️ 双击方向疾跑/翻滚 · P拳 · K腿 · ⚡滑铲 · B防/跳 · P+K抓投
                 </div>
                 <div class="command-box status-panel">
                     <strong id="mode-status-text">🤖 人机战模式</strong>

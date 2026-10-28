@@ -120,6 +120,26 @@ body {
     float: right;
 }
 
+.poise-bar-bg {
+    width: 100%;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 230, 0, 0.35);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.poise-bar-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #ffe600, #ff9900);
+    transition: width 0.12s ease-out;
+}
+
+.fighter-card.p2 .poise-bar-fill {
+    float: right;
+}
+
 .hp-bar-chip {
     position: absolute;
     top: 0;
