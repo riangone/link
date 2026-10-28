@@ -387,81 +387,293 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================================
-    // Picker
+    // Picker, Match Options (loot / game speed) & Tank Garage
     // ==========================================================
+    const AP = window.ArmorParts;
+    const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const partIcons = (cfg) => AP.SLOTS.map((sl) => { const p = AP.find(sl, cfg && cfg[sl]); return p && p.id !== 'std' ? p.icon : ''; }).join('');
     let myPick = TYPES.includes(localStorage.getItem('armor-pick')) ? localStorage.getItem('armor-pick') : 'balance';
-    let oppPick = null;
+    let oppPick = null, oppCfg = null;
+    const myCfg = (core) => AP.buildFor(core || myPick);
     const pickCanvases = [];
-    TYPES.forEach((t) => {
-        const T = TANKS[t];
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'pick';
-        b.dataset.type = t;
-        b.style.setProperty('--c', T.col);
-        const cv = document.createElement('canvas');
-        cv.width = cv.height = 112;
-        pickCanvases.push({ cv, t });
-        const bar = (k, v) => `<div class="pk-bar" title="${L(k)}"><i style="width:${Math.round(clamp(v, 0.08, 1) * 100)}%"></i></div>`;
-        const dps = T.dmg / T.rl * 60;
-        b.appendChild(cv);
-        b.insertAdjacentHTML('beforeend',
-            `<span class="pk-name">${T.name}</span><span class="pk-type">${T.icon} ${L('t_' + t)}</span>` +
-            `<div class="pk-stats">${bar('bar_hp', T.hp / 140)}${bar('bar_spd', (T.spd - 1.2) / 1.4)}${bar('bar_pow', T.dmg / 32)}</div>` +
-            `<span class="pk-sp">${L('s_' + t)}</span>` +
-            (ADV[t] ? `<span class="pk-adv">${L('adv', { x: TANKS[ADV[t]].icon + L('t_' + ADV[t]) })}</span>` : `<span class="pk-adv">&nbsp;</span>`));
-        b.title = `${T.name} · DPS ${dps.toFixed(0)}`;
-        b.addEventListener('click', () => {
-            myPick = t;
-            localStorage.setItem('armor-pick', t);
-            refreshPicker();
-            syncPick();
-        });
-        pickerEl.appendChild(b);
+
+    // Match options: itemsOn (loot on/off), speedKey ('slow' | 'normal' | 'fast')
+    const SPEED_KEYS = ['slow', 'normal', 'fast'];
+    const SPEED_MUL = { slow: 0.72, normal: 1.0, fast: 1.25 };
+    let optItems = localStorage.getItem('armor-items') !== '0';
+    let optSpeed = SPEED_KEYS.includes(localStorage.getItem('armor-speed')) ? localStorage.getItem('armor-speed') : 'normal';
+    const optItemsBtn = $('opt-items-btn'), optSpeedBtn = $('opt-speed-btn');
+    const garageBtn = $('garage-btn'), garageScreen = $('garage-screen'), garageBody = $('garage-body'), garageClose = $('garage-close');
+
+    function refreshOptsUi() {
+        const isClient = myRole === 'client';
+        if (optItemsBtn) {
+            optItemsBtn.textContent = `${L('opt_items')}: ${L(optItems ? 'opt_on' : 'opt_off')}`;
+            optItemsBtn.classList.toggle('off', !optItems);
+            optItemsBtn.disabled = isClient;
+        }
+        if (optSpeedBtn) {
+            optSpeedBtn.textContent = `${L('opt_speed')}: ${L('spd_' + optSpeed)}`;
+            optSpeedBtn.disabled = isClient;
+        }
+        if (garageBtn) {
+            const b = AP.build(myCfg());
+            garageBtn.innerHTML = L('garage_btn', { name: esc(b.nick || b.name) });
+        }
+    }
+    if (optItemsBtn) optItemsBtn.addEventListener('click', () => {
+        if (myRole === 'client') return;
+        optItems = !optItems;
+        localStorage.setItem('armor-items', optItems ? '1' : '0');
+        refreshOptsUi();
+        syncPick();
     });
+    if (optSpeedBtn) optSpeedBtn.addEventListener('click', () => {
+        if (myRole === 'client') return;
+        optSpeed = SPEED_KEYS[(SPEED_KEYS.indexOf(optSpeed) + 1) % SPEED_KEYS.length];
+        localStorage.setItem('armor-speed', optSpeed);
+        refreshOptsUi();
+        syncPick();
+    });
+
+    function buildPicker() {
+        pickerEl.innerHTML = '';
+        pickCanvases.length = 0;
+        TYPES.forEach((t) => {
+            const B = AP.build(myCfg(t));
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'pick';
+            b.dataset.type = t;
+            b.style.setProperty('--c', B.col);
+            const cv = document.createElement('canvas');
+            cv.width = cv.height = 112;
+            pickCanvases.push({ cv, t, B });
+            const bar = (k, v) => `<div class="pk-bar" title="${L(k)}"><i style="width:${Math.round(clamp(v, 0.08, 1) * 100)}%"></i></div>`;
+            const [bHp, bSpd, bPow] = AP.bars(B);
+            const dps = B.dmg / B.rl * 60;
+            const icons = partIcons(B.cfg);
+            b.appendChild(cv);
+            b.insertAdjacentHTML('beforeend',
+                (icons ? `<span class="pk-mod" title="${esc(L('pk_mod_title'))}">🔧${icons}</span>` : '') +
+                `<span class="pk-name">${esc(B.nick || B.name)}</span><span class="pk-type">${B.icon} ${L('t_' + t)}</span>` +
+                `<div class="pk-stats">${bar('bar_hp', bHp)}${bar('bar_spd', bSpd)}${bar('bar_pow', bPow)}</div>` +
+                `<span class="pk-sp">${L('s_' + t)}</span>` +
+                (ADV[t] ? `<span class="pk-adv">${L('adv', { x: TANKS[ADV[t]].icon + L('t_' + ADV[t]) })}</span>` : `<span class="pk-adv">&nbsp;</span>`));
+            b.title = `${B.name} · DPS ${dps.toFixed(0)}`;
+            b.addEventListener('click', () => {
+                myPick = t;
+                localStorage.setItem('armor-pick', t);
+                refreshPicker();
+                syncPick();
+            });
+            pickerEl.appendChild(b);
+        });
+        refreshPicker();
+    }
     function refreshPicker() {
         pickerEl.querySelectorAll('.pick').forEach((b) => b.classList.toggle('on', b.dataset.type === myPick));
-        if (myRole === 'host') picks[0] = myPick;
-        oppPickEl.textContent = oppPick ? L('opp_picked', { name: `${TANKS[oppPick].icon} ${TANKS[oppPick].name} (${L('t_' + oppPick)})` }) : L('opp_choosing');
+        if (myRole === 'host') picks[0] = myCfg();
+        refreshOptsUi();
+        if (!oppPick) { oppPickEl.textContent = L('opp_choosing'); return; }
+        const ob = oppCfg ? AP.build(oppCfg) : TANKS[oppPick];
+        const oi = oppCfg ? partIcons(oppCfg) : '';
+        const nm = ob.nick ? `${esc(ob.nick)} (${ob.name})` : ob.name;
+        oppPickEl.innerHTML = esc(L('opp_picked', { name: `${TANKS[oppPick].icon} ${nm} (${L('t_' + oppPick)})` })) +
+            (oi ? ` <span class="mu mod">🔧${oi}</span>` : '');
     }
+
+    // ---- Tank Garage UI ----
+    let prevScreenBeforeGarage = null;
+    function openGarage(coreArg) {
+        if (!garageScreen || !garageBody) return;
+        prevScreenBeforeGarage = [lobbyScreen, readyScreen, gameoverScreen].find((s) => !s.classList.contains('hidden')) || readyScreen;
+        showScreen(garageScreen);
+        let core = AP.isCore(coreArg) ? coreArg : myPick;
+        let cfg = AP.buildFor(core);
+        let msgTimer = 0;
+
+        garageBody.innerHTML =
+            `<p class="g-note">${L('gar_intro', { cap: AP.CAP })}</p>` +
+            `<div class="gar-cores"></div>` +
+            `<div class="gar-head">` +
+            `<canvas class="gar-prev" width="128" height="128"></canvas>` +
+            `<div class="gar-info"><div class="gar-name"></div><div class="gar-type"></div>` +
+            `<div class="gar-energy"></div><div class="gar-bars"></div></div>` +
+            `</div>` +
+            `<div class="gar-msg" aria-live="polite"></div>` +
+            `<div class="gar-slots"></div>` +
+            `<h4>${L('gar_look_h')}</h4>` +
+            `<div class="gar-cols"></div>` +
+            `<label class="gar-nick"><span>${L('gar_name')}</span><input maxlength="${AP.NAME_MAX}" placeholder="${esc(L('gar_name_ph'))}"></label>` +
+            `<div class="gar-actions"><button type="button" class="btn btn-secondary gar-reset">${L('gar_reset')}</button>` +
+            `<button type="button" class="btn btn-primary gar-done">${L('gar_done')}</button></div>`;
+
+        const q = (sel) => garageBody.querySelector(sel);
+        const cv = q('.gar-prev'), nick = q('.gar-nick input');
+        const barKeys = ['bar_hp', 'bar_spd', 'bar_pow'];
+
+        function say(html, cls) {
+            const m = q('.gar-msg');
+            m.innerHTML = html;
+            m.className = 'gar-msg show ' + (cls || '');
+            clearTimeout(msgTimer);
+            msgTimer = setTimeout(() => { m.className = 'gar-msg'; }, 2400);
+        }
+        function save() {
+            cfg = AP.saveBuild(cfg);
+            myPick = cfg.core;
+            localStorage.setItem('armor-pick', myPick);
+            buildPicker();
+            if (channelOpen) syncPick();
+        }
+        function renderCores() {
+            q('.gar-cores').innerHTML = AP.CORE_IDS.map((c) =>
+                `<button type="button" class="gar-core${c === core ? ' on' : ''}" data-core="${c}">${TANKS[c].icon}<small>${TANKS[c].name}</small></button>`
+            ).join('');
+        }
+        function renderHead() {
+            const b = AP.build(cfg), base = AP.build(AP.defaultCfg(core));
+            q('.gar-name').textContent = b.nick || b.name;
+            q('.gar-type').innerHTML = `${b.icon} ${esc(L('t_' + core))} · ${esc(L('s_' + core))}`;
+            const used = AP.cost(cfg);
+            let pips = '';
+            for (let i = 0; i < AP.CAP; i++) pips += `<i class="${i < used ? 'on' : ''}"></i>`;
+            q('.gar-energy').innerHTML = `<span>${L('gar_energy')}</span><span class="pips">${pips}</span><b>${used}/${AP.CAP}</b>`;
+            const nb = AP.bars(b), ob = AP.bars(base);
+            q('.gar-bars').innerHTML = nb.map((v, i) => {
+                const d = v - ob[i], arrow = d > 0.02 ? '<em class="up">▲</em>' : d < -0.02 ? '<em class="down">▼</em>' : '<em></em>';
+                return `<div class="gb"><span>${L(barKeys[i])}</span><span class="gb-track">` +
+                    `<i class="gb-base" style="width:${Math.round(ob[i] * 100)}%"></i>` +
+                    `<i class="gb-now" style="width:${Math.round(v * 100)}%;background:${b.col}"></i></span>${arrow}</div>`;
+            }).join('');
+            const g = cv.getContext('2d');
+            g.setTransform(1, 0, 0, 1, 0, 0);
+            g.clearRect(0, 0, cv.width, cv.height);
+            g.translate(64, 66); g.scale(1.85, 1.85);
+            drawTank(g, b, OWNER[myIdx || 0], -Math.PI / 2, -Math.PI / 4, 0, {});
+        }
+        function renderSlots() {
+            const used = AP.cost(cfg);
+            q('.gar-slots').innerHTML = AP.SLOTS.map((slot) => {
+                const cards = AP.PARTS[slot].map((p) => {
+                    const on = cfg[slot] === p.id;
+                    const cur = AP.find(slot, cfg[slot]).cost;
+                    const tooMuch = !on && used - cur + p.cost > AP.CAP;
+                    const costStr = '⚡'.repeat(p.cost) || L('gar_free');
+                    const pname = p.id === 'std' ? L('p_std_n') : L(`part_${slot}_${p.id}`);
+                    const desc = p.id === 'std'
+                        ? `<span class="pg">${L('p_std_g')}</span>`
+                        : `<span class="pg">✓ ${L(`part_${slot}_${p.id}_g`)}</span><span class="pb">✗ ${L(`part_${slot}_${p.id}_b`)}</span>`;
+                    return `<button type="button" class="gp${on ? ' on' : ''}${tooMuch ? ' heavy' : ''}" data-slot="${slot}" data-id="${p.id}">` +
+                        `<span class="gp-top"><span class="gp-ic">${p.icon}</span><b>${pname}</b><span class="gp-cost">${costStr}</span></span>${desc}</button>`;
+                }).join('');
+                return `<h4>${L('slot_' + slot)} <small>${L('slot_' + slot + '_note')}</small></h4><div class="gar-parts">${cards}</div>`;
+            }).join('');
+        }
+        function renderCols() {
+            let sw = `<button type="button" class="gc${cfg.col < 0 ? ' on' : ''}" data-col="-1" title="${esc(L('gar_col_default'))}" style="--a:${TANKS[core].col}"></button>`;
+            AP.COLORS.forEach((c, i) => {
+                sw += `<button type="button" class="gc${cfg.col === i ? ' on' : ''}" data-col="${i}" style="--a:${c}"></button>`;
+            });
+            q('.gar-cols').innerHTML = sw;
+        }
+        function renderAll() {
+            renderCores(); renderHead(); renderSlots(); renderCols();
+            nick.value = cfg.name;
+        }
+        garageBody.onclick = (e) => {
+            const c = e.target.closest('.gar-core');
+            if (c) {
+                core = c.dataset.core;
+                cfg = AP.buildFor(core);
+                save();
+                renderAll();
+                return;
+            }
+            const gp = e.target.closest('.gp');
+            if (gp) {
+                const slot = gp.dataset.slot, p = AP.find(slot, gp.dataset.id);
+                if (!p || cfg[slot] === p.id) return;
+                const next = Object.assign({}, cfg, { [slot]: p.id });
+                if (AP.cost(next) > AP.CAP) { say(L('gar_over'), 'warn'); return; }
+                cfg = next;
+                save();
+                renderHead(); renderSlots();
+                say(L('gar_saved'), 'good');
+                return;
+            }
+            const gc = e.target.closest('.gc');
+            if (gc) {
+                cfg.col = Number(gc.dataset.col);
+                save(); renderHead(); renderCols();
+                return;
+            }
+            if (e.target.closest('.gar-reset')) {
+                cfg = AP.defaultCfg(core);
+                save(); renderAll();
+                say(L('gar_saved'), 'good');
+                return;
+            }
+            if (e.target.closest('.gar-done')) closeGarage();
+        };
+        nick.onchange = () => {
+            cfg.name = nick.value;
+            save();
+            nick.value = cfg.name;
+            renderHead();
+        };
+        renderAll();
+    }
+    function closeGarage() {
+        if (!garageScreen || garageScreen.classList.contains('hidden')) return;
+        showScreen(prevScreenBeforeGarage || readyScreen);
+    }
+    if (garageBtn) garageBtn.addEventListener('click', () => openGarage(myPick));
+    if (garageClose) garageClose.addEventListener('click', closeGarage);
+    buildPicker();
 
     // ==========================================================
     // Host simulation
     // ==========================================================
     let S = null;              // host authoritative state
     let net = null, netAt = 0; // client: last received state
-    const picks = [myPick, 'balance'];
+    const picks = [myCfg(), AP.defaultCfg('balance')];
     const inputs = [{ x: 0, y: 0, f: false, ax: null, ay: null }, { x: 0, y: 0, f: false, ax: null, ay: null }];
     const lastSeq = [{ d: null, s: null }, { d: null, s: null }];
-    let evId = 0, frame = 0, hostLoop = null;
+    let evId = 0, frame = 0, hostLoop = null, simAcc = 0;
     let mapSeed = 0;
     let inputOverride = null;          // test hook: scripted input for the host's tank
 
-    function mkTank(i, type) {
-        const T = TANKS[type], st = START[i];
+    function mkTank(i, rawCfg) {
+        const B = AP.build(rawCfg), st = START[i];
         return {
-            type, x: st.x, y: st.y, vx: 0, vy: 0, ba: st.a, ta: st.a, hp: T.hp, sp: 0,
+            type: B.type, b: B, x: st.x, y: st.y, vx: 0, vy: 0, ba: st.a, ta: st.a, hp: B.hp, sp: 0,
             dash: 0, ddx: 0, ddy: 0, dcd: 0, cd: 30, fx: 0, boost: 0, arm: 0, hitT: 0,
             w: 0, ammo: 0, sh: 0, shT: 0, ip: 0, ipCd: 0, ap: 0, pw: 0          // gear: weapon 1 mg / 2 missile
         };
     }
     function startMatch() {
-        if (GameBot.enabled) picks[1] = botPickType();
+        picks[0] = myCfg();
+        if (GameBot.enabled) picks[1] = botPickCfg();
         mapSeed = Math.floor(Math.random() * MAPS.length);
-        S = { ph: 'ready', pt: 0, rd: 0, sc: [0, 0], tp: [picks[0], picks[1]], mp: 0, cr: [], tanks: null, bl: [], it: [], dr: [], itT: 0, itId: 0, events: [], fin: null, zr: ZONE_MAX, bt: 0 };
+        const cf = [AP.sanitize(picks[0]).cfg, AP.sanitize(picks[1]).cfg];
+        S = { ph: 'ready', pt: 0, rd: 0, sc: [0, 0], tp: [cf[0].core, cf[1].core], cf, opt: { items: optItems, spd: optSpeed }, mp: 0, cr: [], tanks: null, bl: [], it: [], dr: [], itT: 0, itId: 0, events: [], fin: null, zr: ZONE_MAX, bt: 0 };
         lastSeq[0] = { d: null, s: null }; lastSeq[1] = { d: null, s: null };
+        simAcc = 0;
         startRound();
         hideOverlay();
         clearInterval(hostLoop);
-        hostLoop = setInterval(hostTick, 1000 / 60);
+        hostLoop = setInterval(hostLoopStep, 1000 / 60);
         broadcast();
     }
     function startRound() {
         S.rd++;
-        S.ph = 'ready'; S.pt = 0; S.bt = 0; S.fin = null; S.zr = ZONE_MAX; S.bl = []; S.it = []; S.dr = []; S.itT = ITEM_FIRST;
+        S.ph = 'ready'; S.pt = 0; S.bt = 0; S.fin = null; S.zr = ZONE_MAX; S.bl = []; S.it = []; S.dr = [];
+        S.itT = S.opt && !S.opt.items ? 1e9 : ITEM_FIRST;
         S.mp = (mapSeed + S.rd - 1) % MAPS.length;
         S.cr = new Array(MAP_RECTS[S.mp].nCrates).fill(CRATE_HP);
-        S.tanks = [mkTank(0, S.tp[0]), mkTank(1, S.tp[1])];
+        S.tanks = [mkTank(0, S.cf[0]), mkTank(1, S.cf[1])];
         bot.reset();
     }
     function emit(ev) {
@@ -473,14 +685,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function hostAction(i, k) {
         if (!S || S.ph !== 'battle') return;
-        const t = S.tanks[i], T = TANKS[t.type];
+        const t = S.tanks[i], T = t.b || TANKS[t.type];
         if (t.hp <= 0) return;
         if (k === 'd') {
             if (t.dcd > 0) return;
             let dx = inputs[i].x, dy = inputs[i].y;
             const m = Math.hypot(dx, dy);
             if (m < 0.2) { dx = Math.cos(t.ba); dy = Math.sin(t.ba); } else { dx /= m; dy /= m; }
-            t.dash = DASH_T; t.ddx = dx; t.ddy = dy; t.dcd = DASH_CD;
+            t.dash = DASH_T; t.ddx = dx; t.ddy = dy; t.dcd = T.dcd || DASH_CD;
             emit({ k: 'dash', i, x: t.x, y: t.y });
         } else if (k === 's') {
             if (t.sp < 100) return;
@@ -493,7 +705,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function fire(i) {
-        const t = S.tanks[i], T = TANKS[t.type];
+        const t = S.tanks[i], T = t.b || TANKS[t.type];
         const rail = t.arm > 0;
         if (!rail && t.w && t.ammo > 0) { fireGear(i); return; }
         t.cd = rail ? T.rl : Math.round(T.rl * (t.type === 'rapid' && t.fx > 0 ? 0.5 : 1));
@@ -511,7 +723,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /** Machine gun / missile launcher: replaces the main gun while ammo lasts. */
     function fireGear(i) {
-        const t = S.tanks[i], T = TANKS[t.type];
+        const t = S.tanks[i], T = t.b || TANKS[t.type];
         const mg = t.w === 1;
         t.cd = mg ? MG.rl : MSL.rl;
         const a = t.ta + (mg ? rnd(-MG.spread, MG.spread) : 0);
@@ -550,6 +762,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     /** Fair drop: the same item at a spot and at its 180° twin. */
     function spawnLoot() {
+        if (S.opt && !S.opt.items) return;
         if (S.it.length > ITEM_MAX - 2) return;
         const lim = S.zr < ZONE_MAX ? S.zr * 0.8 : 1e9;
         for (let tries = 0; tries < 40; tries++) {
@@ -566,7 +779,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     /** Hand item `k` to tank `i`. Returns the item actually granted (🎁 rolls another). */
     function giveItem(i, k) {
-        const t = S.tanks[i], T = TANKS[t.type];
+        const t = S.tanks[i], T = t.b || TANKS[t.type];
         if (k === 'box') k = rollItem('box');
         switch (k) {
             case 'hp': t.hp = Math.min(T.hp, t.hp + 35); break;
@@ -589,12 +802,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return k;
     }
     function stepLoot() {
-        if (--S.itT <= 0) { spawnLoot(); S.itT = Math.round(rnd(ITEM_GAP[0], ITEM_GAP[1])); }
+        if ((!S.opt || S.opt.items) && --S.itT <= 0) { spawnLoot(); S.itT = Math.round(rnd(ITEM_GAP[0], ITEM_GAP[1])); }
         for (const it of S.it) {
             if (--it.life <= 0) { it.dead = true; continue; }
             for (let i = 0; i < 2; i++) {
-                const t = S.tanks[i];
-                if (t.hp <= 0 || Math.hypot(t.x - it.x, t.y - it.y) > TANKS[t.type].r + 14) continue;
+                const t = S.tanks[i], T = t.b || TANKS[t.type];
+                if (t.hp <= 0 || Math.hypot(t.x - it.x, t.y - it.y) > T.r + 14) continue;
                 const got = giveItem(i, it.k);
                 emit({ k: 'pick', i, x: it.x, y: it.y, it: it.k, got });
                 it.dead = true; break;
@@ -662,7 +875,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (S.cr[ci] === 0) {
             const r = MAP_RECTS[S.mp].find((q) => q.ci === ci);
             emit({ k: 'crate', x: r.x + r.w / 2, y: r.y + r.h / 2 });
-            if (Math.random() < CRATE_DROP && S.it.length < ITEM_MAX) addItem(rollItem(), r.x + r.w / 2, r.y + r.h / 2);
+            if ((!S.opt || S.opt.items) && Math.random() < CRATE_DROP && S.it.length < ITEM_MAX) addItem(rollItem(), r.x + r.w / 2, r.y + r.h / 2);
         }
     }
     /** Shell from owner b.o bursts at (x, y). Splash (heavy) only ever reaches the *other* tank. */
@@ -670,9 +883,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const R = SPLASH[b.k] || 0;
         emit({ k: R ? 'blast' : 'spark', x, y });
         if (!R) return;
-        const foe = 1 - b.o, t = S.tanks[foe];
+        const foe = 1 - b.o, t = S.tanks[foe], T = t.b || TANKS[t.type];
         if (direct !== foe) {
-            const d = Math.hypot(t.x - x, t.y - y) - TANKS[t.type].r;
+            const d = Math.hypot(t.x - x, t.y - y) - T.r;
             if (d < R) hurt(foe, b.o, b.dmg * 0.5 * (1 - Math.max(0, d) / R * 0.6), t.x, t.y);
         }
         for (const r of MAP_RECTS[S.mp]) {
@@ -698,9 +911,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 b.x += b.vx / n; b.y += b.vy / n;
                 for (let i = 0; i < 2; i++) {
                     if (i === b.o) continue;              // ← own shells never hit their owner
-                    const t = S.tanks[i];
+                    const t = S.tanks[i], T = t.b || TANKS[t.type];
                     if (t.hp <= 0) continue;
-                    if (Math.hypot(t.x - b.x, t.y - b.y) < TANKS[t.type].r + 3) {
+                    if (Math.hypot(t.x - b.x, t.y - b.y) < T.r + 3) {
                         hurt(i, b.o, b.dmg, b.x, b.y);
                         impact(b, b.x, b.y, i);
                         b.dead = true; break;
@@ -749,7 +962,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function stepTank(i) {
-        const t = S.tanks[i], T = TANKS[t.type], inp = inputs[i], foe = S.tanks[1 - i];
+        const t = S.tanks[i], T = t.b || TANKS[t.type], inp = inputs[i], foe = S.tanks[1 - i];
         if (t.hitT > 0) t.hitT--;
         if (t.hp <= 0) { t.vx = t.vy = 0; return; }
         const battle = S.ph === 'battle';
@@ -772,7 +985,7 @@ document.addEventListener('DOMContentLoaded', () => {
             t.x += vx; t.y += vy;
             pushOut(t, T.r, S.mp, S.cr);
             // tank vs tank: just push apart (no ramming damage)
-            const fr = TANKS[foe.type].r;
+            const fr = (foe.b || TANKS[foe.type]).r;
             if (foe.hp > 0) {
                 const dx = t.x - foe.x, dy = t.y - foe.y, d = Math.hypot(dx, dy) || 1, min = T.r + fr;
                 if (d < min) { t.x += dx / d * (min - d); t.y += dy / d * (min - d); pushOut(t, T.r, S.mp, S.cr); }
@@ -784,6 +997,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const ta = inp.ax !== null && inp.ax !== undefined ? Math.atan2(inp.ay, inp.ax) : Math.atan2(foe.y - t.y, foe.x - t.x);
         t.ta += clamp(angDiff(t.ta, ta), -T.turn, T.turn);
         if (battle && inp.f && t.cd <= 0) fire(i);
+    }
+
+    function hostLoopStep() {
+        if (!S) return;
+        const mul = S.ph === 'battle' && S.opt ? (SPEED_MUL[S.opt.spd] || 1) : 1;
+        simAcc += mul;
+        while (simAcc >= 1) {
+            simAcc -= 1;
+            hostTick();
+            if (!S || S.ph === 'gameover') return;
+        }
     }
 
     function hostTick() {
@@ -837,7 +1061,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function broadcast() {
         if (!S) return;
         session.send({
-            type: 'state', ph: S.ph, pt: S.pt, rd: S.rd, sc: S.sc, tp: S.tp, mp: S.mp, cr: S.cr.map(Math.round), zr: Math.round(S.zr), fin: S.fin,
+            type: 'state', ph: S.ph, pt: S.pt, rd: S.rd, sc: S.sc, tp: S.tp, cf: S.cf, opt: S.opt, mp: S.mp, cr: S.cr.map(Math.round), zr: Math.round(S.zr), fin: S.fin,
             tk: S.tanks.map((t) => [r1(t.x), r1(t.y), r2(t.ba), r2(t.ta), Math.ceil(t.hp), Math.floor(t.sp), t.dash, t.dcd, t.cd, t.fx, t.arm, t.hitT, r2(t.vx), r2(t.vy), t.boost, t.w, t.ammo, t.shT, t.sh, t.ip, t.ap, t.pw]),
             it: S.it.map((q) => [Math.round(q.x), Math.round(q.y), ITEM_KEYS.indexOf(q.k), q.life]),
             dr: S.dr.map((d) => [r1(d.x), r1(d.y), d.o, d.hp, r2(d.a)]),
@@ -850,26 +1074,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // Bot (?bot=easy|normal|hard) — plays the client side (index 1)
     // ==========================================================
     const BOT = {
-        react: GameBot.pick({ easy: 16, normal: 9, hard: 4 }),
-        dodge: GameBot.pick({ easy: 0.2, normal: 0.6, hard: 0.95 }),
-        fireGap: GameBot.pick({ easy: 0.5, normal: 0.2, hard: 0 }),
-        lead: GameBot.pick({ easy: 0, normal: 0.35, hard: 0.75 }),
-        dashP: GameBot.pick({ easy: 0.05, normal: 0.35, hard: 0.7 }),
-        specDelay: GameBot.pick({ easy: 150, normal: 60, hard: 10 }),
-        counter: GameBot.pick({ easy: 0, normal: 0.3, hard: 0.6 }),
-        loot: GameBot.pick({ easy: 110, normal: 220, hard: 330 })
+        react: GameBot.pick({ easy: 20, normal: 12, hard: 8 }),
+        dodge: GameBot.pick({ easy: 0.15, normal: 0.45, hard: 0.72 }),
+        fireGap: GameBot.pick({ easy: 0.55, normal: 0.30, hard: 0.15 }),
+        lead: GameBot.pick({ easy: 0, normal: 0.25, hard: 0.52 }),
+        dashP: GameBot.pick({ easy: 0.04, normal: 0.22, hard: 0.45 }),
+        specDelay: GameBot.pick({ easy: 160, normal: 75, hard: 30 }),
+        counter: GameBot.pick({ easy: 0, normal: 0.2, hard: 0.4 }),
+        loot: GameBot.pick({ easy: 110, normal: 200, hard: 280 })
     };
     const WANT = { rapid: 160, heavy: 150, sniper: 330, balance: 220 };
     const bot = {
         t: 0, dir: { x: 0, y: 0 }, fire: false, aim: null, d: 0, s: 0, strafe: 1, strafeT: 0, stuck: 0, unstick: 0, ux: 0, uy: 0, specWait: 0, frozen: false,
         reset() { this.t = 0; this.dir = { x: 0, y: 0 }; this.fire = false; this.aim = null; this.stuck = 0; this.unstick = 0; this.specWait = 0; }
     };
-    function botPickType() {
+    function botPickCfg() {
+        const p0 = picks[0] && picks[0].core ? picks[0].core : picks[0];
+        let core = TYPES[Math.floor(Math.random() * TYPES.length)];
         if (Math.random() < BOT.counter) {
-            const c = TYPES.find((k) => ADV[k] === picks[0]);
-            if (c) return c;
+            const c = TYPES.find((k) => ADV[k] === p0);
+            if (c) core = c;
         }
-        return TYPES[Math.floor(Math.random() * TYPES.length)];
+        const cfg = AP.defaultCfg(core);
+        if (GameBot.level === 'hard') {
+            const all = AP.allCfgs(core).filter((c) => AP.cost(c) >= 2 && AP.cost(c) <= 4);
+            if (all.length) return all[Math.floor(Math.random() * all.length)];
+        }
+        return cfg;
     }
     /** Frames-ahead danger of standing at (x, y) moving (vx, vy): min distance to an enemy shell. */
     function danger(me, r, vx, vy) {
@@ -927,7 +1158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
     function botDecide() {
-        const me = S.tanks[1], foe = S.tanks[0], T = TANKS[me.type];
+        const me = S.tanks[1], foe = S.tanks[0], T = me.b || TANKS[me.type];
         const dx = foe.x - me.x, dy = foe.y - me.y, dist = Math.hypot(dx, dy);
         const losSteel = !blocked(me.x, me.y, foe.x, foe.y, S.mp, S.cr, false);
         const los = losSteel && !blocked(me.x, me.y, foe.x, foe.y, S.mp, S.cr, true);
@@ -1028,6 +1259,7 @@ document.addEventListener('DOMContentLoaded', () => {
             p1Label.textContent = L(role === 'host' ? 'p1_you' : 'p1_host');
             p2Label.textContent = L(role === 'host' ? 'p2_opp' : 'p2_you');
             roleText.innerHTML = L(role === 'host' ? 'role_host' : 'role_client');
+            refreshOptsUi();
         },
         onChannelOpen() {
             channelOpen = true;
@@ -1051,7 +1283,13 @@ document.addEventListener('DOMContentLoaded', () => {
         onMessage: handleMessage
     });
 
-    function syncPick() { if (myRole === 'host') picks[0] = myPick; session.send({ type: 'pick', t: myPick }); }
+    function syncPick() {
+        const cfg = myCfg();
+        if (myRole === 'host') picks[0] = cfg;
+        const msg = { type: 'pick', t: myPick, cfg };
+        if (myRole === 'host') msg.opt = { items: optItems, spd: optSpeed };
+        session.send(msg);
+    }
     let awaitingRestart = false;
     setInterval(() => {
         if (!channelOpen) return;
@@ -1071,9 +1309,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleMessage(msg) {
         if (!msg || typeof msg !== 'object') return;
         if (msg.type === 'pick') {
-            if (!TYPES.includes(msg.t)) return;
-            if (myRole === 'host') picks[1] = msg.t;
-            if (!GameBot.enabled && oppPick !== msg.t) { oppPick = msg.t; refreshPicker(); }
+            const c = AP.sanitize(msg.cfg || { core: msg.t }, msg.t).cfg;
+            if (!TYPES.includes(c.core)) return;
+            if (myRole === 'host') picks[1] = c;
+            if (myRole === 'client' && msg.opt && typeof msg.opt === 'object') {
+                optItems = !!msg.opt.items;
+                if (SPEED_KEYS.includes(msg.opt.spd)) optSpeed = msg.opt.spd;
+                refreshOptsUi();
+            }
+            if (!GameBot.enabled) {
+                oppPick = c.core;
+                oppCfg = c;
+                refreshPicker();
+            }
         } else if (msg.type === 'input') {
             if (myRole !== 'host') return;
             const inp = { x: 0, y: 0, f: !!msg.f, ax: null, ay: null };
@@ -1095,6 +1343,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!net || net.rd !== msg.rd) disp[0] = disp[1] = null;
             net = msg;
             netAt = performance.now();
+            if (msg.opt) {
+                optItems = !!msg.opt.items;
+                if (SPEED_KEYS.includes(msg.opt.spd)) optSpeed = msg.opt.spd;
+            }
             for (const ev of msg.ev || []) if (ev.id > lastEvId) { lastEvId = ev.id; fx(ev); }
             updateScoreDom(msg.sc);
             if (msg.ph === 'gameover') { if (!gameoverShown) showGameOver(msg.sc); }
@@ -1114,7 +1366,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================
     function showScreen(el) {
         overlay.classList.remove('hidden');
-        [lobbyScreen, readyScreen, gameoverScreen, disconnectScreen].forEach((s) => s.classList.toggle('hidden', s !== el));
+        [lobbyScreen, readyScreen, gameoverScreen, disconnectScreen, garageScreen].forEach((s) => { if (s) s.classList.toggle('hidden', s !== el); });
         if (el === readyScreen) readyScreen.insertBefore(pickerSlot, startBtn);
         if (el === gameoverScreen) pickerSlot2.appendChild(pickerSlot);
     }
@@ -1135,11 +1387,11 @@ document.addEventListener('DOMContentLoaded', () => {
     lobbyBtn.addEventListener('click', () => location.reload());
     startBtn.addEventListener('click', () => {
         Sfx.init();
-        if (myRole === 'host' && (!S || S.ph === 'gameover')) { picks[0] = myPick; startMatch(); }
+        if (myRole === 'host' && (!S || S.ph === 'gameover')) { picks[0] = myCfg(); startMatch(); }
     });
     restartBtn.addEventListener('click', () => {
         Sfx.init();
-        if (myRole === 'host') { picks[0] = myPick; startMatch(); }
+        if (myRole === 'host') { picks[0] = myCfg(); startMatch(); }
         else {
             syncPick();
             session.send({ type: 'restart-request' });
@@ -1167,7 +1419,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 p.x += (tx - p.x) * 0.45; p.y += (ty - p.y) * 0.45;
                 p.ba += angDiff(p.ba, a[2]) * 0.45; p.ta += angDiff(p.ta, a[3]) * 0.45;
             }
-            return { type: net.tp[i], x: p.x, y: p.y, ba: p.ba, ta: p.ta, hp: a[4], sp: a[5], dash: a[6], dcd: a[7], cd: a[8], fx: a[9], arm: a[10], hitT: a[11], vx: a[12], vy: a[13], boost: a[14], w: a[15], ammo: a[16], shT: a[17], sh: a[18], ip: a[19], ap: a[20], pw: a[21] };
+            const b = AP.build(net.cf && net.cf[i] ? net.cf[i] : { core: net.tp[i] });
+            return { type: net.tp[i], b, x: p.x, y: p.y, ba: p.ba, ta: p.ta, hp: a[4], sp: a[5], dash: a[6], dcd: a[7], cd: a[8], fx: a[9], arm: a[10], hitT: a[11], vx: a[12], vy: a[13], boost: a[14], w: a[15], ammo: a[16], shT: a[17], sh: a[18], ip: a[19], ap: a[20], pw: a[21] };
         });
     }
     function drawItems() {
@@ -1333,22 +1586,28 @@ document.addEventListener('DOMContentLoaded', () => {
         g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
     }
     /** Tank body + turret at the origin of g (already translated). */
-    function drawTank(g, type, owner, ba, ta, odo, o) {
-        const T = TANKS[type], r = T.r;
+    function drawTank(g, typeOrB, owner, ba, ta, odo, o) {
+        const T = typeof typeOrB === 'object' ? typeOrB : TANKS[typeOrB];
+        const type = T.type || typeOrB, r = T.r;
+        const cfg = T.cfg || {};
         g.save();
         g.rotate(ba);
         // treads
-        const tl = r * 2.1, tw = r * 0.55;
+        const tl = r * 2.1, tw = r * (cfg.track === 'omni' ? 0.65 : 0.55);
         for (const side of [-1, 1]) {
-            g.fillStyle = '#1b1d22';
+            g.fillStyle = cfg.track === 'omni' ? '#1f3642' : '#1b1d22';
             roundRect(g, -tl / 2, side * (r * 0.78) - tw / 2, tl, tw, 4); g.fill();
-            g.strokeStyle = '#4a4e57'; g.lineWidth = 1.5;
+            g.strokeStyle = cfg.track === 'omni' ? '#5ad7ff' : '#4a4e57'; g.lineWidth = 1.5;
             const ph = ((odo % 6) + 6) % 6;
             for (let x = -tl / 2 + ph; x < tl / 2; x += 6) { g.beginPath(); g.moveTo(x, side * r * 0.78 - tw / 2 + 1); g.lineTo(x, side * r * 0.78 + tw / 2 - 1); g.stroke(); }
         }
         // hull
         g.fillStyle = o.hit ? '#ffffff' : owner;
         roundRect(g, -r * 0.95, -r * 0.62, r * 1.9, r * 1.24, 6); g.fill();
+        if (cfg.hull === 'plate' || cfg.hull === 'fort') {
+            g.strokeStyle = 'rgba(255,255,255,0.4)'; g.lineWidth = 2;
+            roundRect(g, -r * 0.85, -r * 0.52, r * 1.7, r * 1.04, 4); g.stroke();
+        }
         g.fillStyle = 'rgba(0,0,0,0.25)';
         roundRect(g, -r * 0.95, r * 0.15, r * 1.9, r * 0.47, 5); g.fill();
         g.fillStyle = o.wreck ? '#2a2a2a' : T.col;
@@ -1357,10 +1616,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // turret
         g.save();
         g.rotate(ta);
-        const bw = type === 'heavy' ? 9 : type === 'rapid' ? 5 : 6;
+        const bw = (type === 'heavy' || cfg.gun === 'heavy') ? 9 : type === 'rapid' ? 5 : 6;
         g.fillStyle = '#2a2d35';
-        g.fillRect(0, -bw / 2, r + T.len, bw);
-        if (type === 'rapid') g.fillRect(0, -bw / 2 - 5, r + T.len - 3, 4);
+        if (cfg.gun === 'twin') {
+            g.fillRect(0, -bw - 1, r + T.len, bw - 1);
+            g.fillRect(0, 2, r + T.len, bw - 1);
+        } else {
+            g.fillRect(0, -bw / 2, r + T.len, bw);
+            if (type === 'rapid') g.fillRect(0, -bw / 2 - 5, r + T.len - 3, 4);
+        }
         g.fillStyle = T.col;
         g.fillRect(r + T.len - 4, -bw / 2 - 1, 5, bw + 2);
         g.beginPath(); g.arc(0, 0, r * 0.55, 0, Math.PI * 2);
@@ -1424,10 +1688,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // tanks
         tanks.forEach((t, i) => {
-            const T = TANKS[t.type];
+            const T = t.b || TANKS[t.type];
             if (t.hp <= 0) {        // wreck
                 ctx.save(); ctx.translate(t.x, t.y); ctx.globalAlpha = 0.7;
-                drawTank(ctx, t.type, '#3a3a3a', t.ba, t.ta, 0, { wreck: true });
+                drawTank(ctx, T, '#3a3a3a', t.ba, t.ta, 0, { wreck: true });
                 ctx.restore();
                 return;
             }
@@ -1439,7 +1703,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (t.dash > 0) { ctx.shadowColor = '#cfe8ff'; ctx.shadowBlur = 18; }
             if (t.type === 'rapid' && t.fx > 0) { ctx.shadowColor = '#ff8a1f'; ctx.shadowBlur = 16 + 6 * Math.sin(tGlobal / 3); }
             if (t.boost > 0) { ctx.shadowColor = '#9bffcf'; ctx.shadowBlur = 14; }
-            drawTank(ctx, t.type, OWNER[i], t.ba, t.ta, treadOdo[i], { hit: t.hitT > 6 });
+            drawTank(ctx, T, OWNER[i], t.ba, t.ta, treadOdo[i], { hit: t.hitT > 6 });
             ctx.shadowBlur = 0;
             if (t.ap > 0) {                       // armour plates: bolted skirt
                 ctx.save(); ctx.rotate(t.ba);
@@ -1547,19 +1811,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const drones = drawDrones();
         tanks.forEach((t, i) => {
             if (t.hp <= 0) return;
+            const T = t.b || TANKS[t.type];
             const icons = gearIcons(t, i, drones);
             if (!icons.length) return;
             const p = toView(t.x, t.y);
             ctx.font = '10px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif'; ctx.textAlign = 'center';
             ctx.fillStyle = '#fff';
-            ctx.fillText(icons.map((g) => g[0]).join(''), p.x, p.y - TANKS[t.type].r - 22);
+            ctx.fillText(icons.map((g) => g[0]).join(''), p.x, p.y - T.r - 22);
         });
         tanks.forEach((t, i) => {
             if (t.hp <= 0) return;
-            const T = TANKS[t.type], p = toView(t.x, t.y);
+            const T = t.b || TANKS[t.type], p = toView(t.x, t.y);
             const bw = 44, x = p.x - bw / 2, y = p.y - T.r - 18;
             ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x - 1, y - 1, bw + 2, 9);
-            const f = t.hp / T.hp;
+            const f = clamp(t.hp / T.hp, 0, 1);
             ctx.fillStyle = f > 0.5 ? '#5bff8f' : f > 0.25 ? '#ffd34d' : '#ff5b5b';
             ctx.fillRect(x, y, bw * f, 4);
             ctx.fillStyle = t.sp >= 100 ? (Math.floor(tGlobal / 8) % 2 ? '#fff' : T.col) : T.col;
@@ -1585,7 +1850,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (flash > 0.01) { ctx.fillStyle = `rgba(255,40,40,${flash})`; ctx.fillRect(0, 0, W, H); flash *= Math.pow(0.88, dtf); }
 
         if (d && tanks[myIdx]) {
-            const me = tanks[myIdx], T = TANKS[me.type];
+            const me = tanks[myIdx], T = me.b || TANKS[me.type];
             // bottom-left: my gauges
             const gear = gearIcons(me, myIdx, drones);
             ctx.fillStyle = 'rgba(8,10,16,0.7)'; roundRect(ctx, 24, H - (gear.length ? 78 : 58), 196, gear.length ? 56 : 36, 8); ctx.fill();
@@ -1594,7 +1859,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.fillText(gear.map((g) => g[0] + g[1]).join('  '), 32, H - 62);
             }
             ctx.font = '700 11px "Plus Jakarta Sans", sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#cfd3ff';
-            ctx.fillText(`${T.icon} ${T.name}  HP ${Math.ceil(me.hp)}`, 32, H - 44);
+            ctx.fillText(`${T.icon} ${T.nick || T.name}  HP ${Math.ceil(me.hp)}`, 32, H - 44);
             ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(32, H - 36, 130, 6);
             ctx.fillStyle = me.sp >= 100 ? '#fff' : T.col; ctx.fillRect(32, H - 36, 130 * me.sp / 100, 6);
             ctx.fillStyle = me.dcd > 0 ? 'rgba(255,255,255,0.3)' : '#cfe8ff';
@@ -1647,14 +1912,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const pickAng = {};
     function renderPicker(dtf) {
         if (overlay.classList.contains('hidden')) return;
-        for (const { cv, t } of pickCanvases) {
+        for (const { cv, t, B } of pickCanvases) {
             const g = cv.getContext('2d');
             g.setTransform(1, 0, 0, 1, 0, 0);
             g.clearRect(0, 0, cv.width, cv.height);
             const on = t === myPick;
             pickAng[t] = (pickAng[t] || -Math.PI / 2) + (on ? 0.03 : 0) * dtf;
             g.translate(56, 58); g.scale(1.55, 1.55);
-            drawTank(g, t, OWNER[myIdx], -Math.PI / 2, pickAng[t], on ? tGlobal : 0, {});
+            drawTank(g, B || t, OWNER[myIdx], -Math.PI / 2, pickAng[t], on ? tGlobal : 0, {});
         }
     }
 

@@ -562,3 +562,145 @@ html.gf-touch .touch-controls { display: flex; }
 .touch-controls.one-hand.left-hand .stick-zone { order: 1; }
 .touch-controls.one-hand.left-hand .touch-actions { order: 2; }
 .touch-controls.one-hand.left-hand .ctrl-mode-btn { left: auto; right: 8px; }
+
+/* ===== Match options (loot toggle, game speed) & Tank Garage ===== */
+.match-opts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 8px;
+}
+.opt-btn {
+    padding: 6px 11px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.22);
+    background: rgba(255,255,255,.06);
+    color: var(--text-primary);
+    font: 700 11px/1.2 var(--font-family);
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+.opt-btn:hover:not(:disabled) {
+    background: rgba(255,255,255,.12);
+    border-color: rgba(255,255,255,.4);
+}
+.opt-btn:disabled {
+    opacity: .65;
+    cursor: default;
+}
+.opt-btn.off {
+    opacity: .6;
+    border-style: dashed;
+}
+.garage-open-btn {
+    border-color: rgba(255, 211, 77, .45);
+    color: #ffe17d;
+}
+.pick .pk-mod {
+    position: absolute; top: 3px; left: 4px; font-size: 9px; line-height: 1;
+    padding: 2px 3px; border-radius: 6px; background: rgba(0,0,0,.55); letter-spacing: -1px;
+}
+.mu.mod { color: #ffd34d; letter-spacing: -1px; }
+
+/* Panel / Garage modal */
+.panel-screen {
+    max-width: 480px;
+    max-height: 92%;
+    background: rgba(14, 17, 26, .96);
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 16px;
+    padding: 14px 16px;
+    text-align: left;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255,255,255,.1);
+    padding-bottom: 8px;
+}
+.panel-head h2 { font-size: 16px; }
+.panel-close {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.06);
+    color: #fff; cursor: pointer; font-size: 13px;
+}
+.panel-body {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 4px;
+    font-size: 12px;
+}
+.panel-body h4 {
+    font: 800 12px/1.2 var(--font-family);
+    color: #ffd34d;
+    margin-top: 4px;
+}
+.panel-body h4 small {
+    font-weight: 400; font-size: 11px; color: var(--text-secondary); margin-left: 4px;
+}
+.g-note { font-size: 11px; color: var(--text-secondary); line-height: 1.45; }
+.gar-cores { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.gar-core {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px;
+    border-radius: 10px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05);
+    color: inherit; font-size: 18px; cursor: pointer;
+}
+.gar-core small { font: 900 9px/1 var(--font-mono); letter-spacing: .5px; opacity: .8; }
+.gar-core.on { border-color: #ff8a1f; box-shadow: 0 0 12px rgba(255,138,31,.45); background: rgba(255,138,31,.12); }
+.gar-head { display: flex; gap: 12px; align-items: center; }
+.gar-prev { width: 108px; height: 108px; flex: none; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.08), rgba(0,0,0,0) 70%); }
+.gar-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.gar-name { font: italic 900 15px/1.1 var(--font-mono); letter-spacing: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gar-type { font-size: 11px; opacity: .75; }
+.gar-energy { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+.gar-energy .pips { display: flex; gap: 3px; }
+.gar-energy .pips i { width: 12px; height: 12px; border-radius: 3px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,211,77,.4); display: inline-block; }
+.gar-energy .pips i.on { background: #ffd34d; box-shadow: 0 0 6px #ffd34d; }
+.gar-bars { display: flex; flex-direction: column; gap: 3px; }
+.gb { display: grid; grid-template-columns: 3.5em 1fr 1em; gap: 6px; align-items: center; font-size: 11px; }
+.gb-track { position: relative; height: 7px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; }
+.gb-track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+.gb-base { background: rgba(255,255,255,.22); }
+.gb-now { opacity: .9; }
+.gb em { font-style: normal; font-size: 10px; }
+.gb em.up { color: #9bffcf; }
+.gb em.down { color: #ffb0b0; }
+.gar-msg { min-height: 0; max-height: 0; overflow: hidden; transition: max-height .2s; font-weight: 700; text-align: center; }
+.gar-msg.show { max-height: 3em; padding: 4px; border-radius: 8px; background: rgba(255,255,255,.07); }
+.gar-msg.warn { color: #ffd34d; }
+.gar-msg.good { color: #9bffcf; }
+.gar-parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 6px; }
+.gp {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+    padding: 7px 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.04); color: inherit; font-size: 11px; line-height: 1.35; cursor: pointer;
+}
+.gp:hover { background: rgba(255,255,255,.09); }
+.gp-top { display: flex; align-items: center; gap: 5px; width: 100%; }
+.gp-top b { font-size: 12px; flex: 1; }
+.gp-ic { font-size: 15px; }
+.gp-cost { font-size: 9px; color: #ffd34d; white-space: nowrap; }
+.gp .pg { color: #9bffcf; }
+.gp .pb { color: #ffb0b0; }
+.gp.on { border-color: #ffd34d; background: rgba(255,211,77,.12); box-shadow: 0 0 10px rgba(255,211,77,.35); }
+.gp.heavy:not(.on) { opacity: .65; border-style: dashed; }
+.gar-cols { display: flex; flex-wrap: wrap; gap: 8px; }
+.gc {
+    width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(255,255,255,.2);
+    background: var(--a);
+}
+.gc.on { border-color: #fff; box-shadow: 0 0 10px rgba(255,255,255,.7); transform: scale(1.1); }
+.gar-nick { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.gar-nick input {
+    flex: 1; min-width: 0; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,.2);
+    background: rgba(0,0,0,.3); color: inherit; font: inherit;
+}
+.gar-actions { display: flex; gap: 8px; justify-content: center; padding-bottom: 4px; }

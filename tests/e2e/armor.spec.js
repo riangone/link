@@ -162,4 +162,46 @@ test.describe('Armor', () => {
             await ctx.close();
         }
     });
+
+    test('match options (loot toggle, game speed) and tank garage customization work', async ({ page }) => {
+        const errors = [];
+        page.on('pageerror', e => errors.push(String(e)));
+        await page.addInitScript(() => {
+            localStorage.removeItem('armor-items');
+            localStorage.removeItem('armor-speed');
+            localStorage.removeItem('armor-builds');
+        });
+        await page.goto(`${dev.url}/armor/?bot=easy#bot-armor-opts`);
+        await expect(page.locator('#ready-screen')).toBeVisible({ timeout: 5_000 });
+
+        // Toggle loot off and speed to slow
+        await page.locator('#opt-items-btn').click();
+        expect(await page.evaluate(() => localStorage.getItem('armor-items'))).toBe('0');
+        await page.locator('#opt-speed-btn').click(); // normal -> fast
+        await page.locator('#opt-speed-btn').click(); // fast -> slow
+        expect(await page.evaluate(() => localStorage.getItem('armor-speed'))).toBe('slow');
+
+        // Open garage and equip parts on heavy tank
+        await page.locator('.pick[data-type="heavy"]').click();
+        await page.locator('#garage-btn').click();
+        await expect(page.locator('#garage-screen')).toBeVisible();
+        await page.locator('.gp[data-slot="gun"][data-id="heavy"]').click();
+        await page.locator('.gp[data-slot="hull"][data-id="plate"]').click();
+        await page.locator('.gar-done').click();
+        await expect(page.locator('#ready-screen')).toBeVisible();
+        await expect(page.locator('.pick[data-type="heavy"] .pk-mod')).toContainText('💣🧱');
+
+        // Start match and verify custom stats + loot disabled + slow speed
+        await page.locator('#start-btn').click();
+        await page.evaluate(() => window.__bot.skipCountdown());
+        await expect.poll(() => page.evaluate(() => window.__bot.state().ph)).toBe('battle');
+        const st = await page.evaluate(() => {
+            const s = window.__bot.state();
+            return { opt: s.opt, hp: s.tanks[0].hp, baseHp: window.__bot.TANKS.heavy.hp, itT: s.itT };
+        });
+        expect(st.opt).toEqual({ items: false, spd: 'slow' });
+        expect(st.hp).toBeGreaterThan(st.baseHp);
+        expect(st.itT).toBeGreaterThan(1e6);
+        expect(errors).toEqual([]);
+    });
 });

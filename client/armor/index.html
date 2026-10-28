@@ -61,9 +61,22 @@
                             <p class="tagline" id="role-text"></p>
                             <div id="picker-slot">
                                 <div class="picker" id="picker"></div>
+                                <div class="match-opts" id="match-opts">
+                                    <button type="button" class="opt-btn" id="opt-items-btn"></button>
+                                    <button type="button" class="opt-btn" id="opt-speed-btn"></button>
+                                    <button type="button" class="opt-btn garage-open-btn" id="garage-btn"></button>
+                                </div>
                                 <p class="opp-pick" id="opp-pick" data-i18n="opp_choosing"></p>
                             </div>
                             <button id="start-btn" class="btn btn-primary">ROLL OUT!</button>
+                        </div>
+
+                        <div class="overlay-content hidden panel-screen" id="garage-screen">
+                            <div class="panel-head">
+                                <h2 class="panel-title" data-i18n="gar_title"></h2>
+                                <button type="button" class="panel-close" id="garage-close" aria-label="close">✕</button>
+                            </div>
+                            <div class="panel-body" id="garage-body"></div>
                         </div>
 
                         <div class="overlay-content hidden" id="gameover-screen">
@@ -133,6 +146,7 @@
     <script src="../scripts/game-bot.js" data-lobby="../play/"></script>
     <script src="../scripts/game-fit.js"></script>
     <script src="i18n.js"></script>
+    <script src="parts.js"></script>
     <script src="game.js"></script>
 </body>
 </html>
