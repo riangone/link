@@ -82,11 +82,11 @@ export class PostFX {
         const mk = (frag, uniforms) => new THREE.ShaderMaterial({
             vertexShader: VERT, fragmentShader: frag, uniforms, depthTest: false, depthWrite: false
         });
-        this.matBright = mk(BRIGHT, { tDiffuse: { value: null }, threshold: { value: 1.0 } });
+        this.matBright = mk(BRIGHT, { tDiffuse: { value: null }, threshold: { value: 1.18 } });
         this.matBlur = mk(BLUR, { tDiffuse: { value: null }, dir: { value: new THREE.Vector2() } });
         this.matComposite = mk(COMPOSITE, {
             tScene: { value: null }, tBloomA: { value: null }, tBloomB: { value: null },
-            strength: { value: 0.65 }, exposure: { value: 1.05 }, flash: { value: 0 }
+            strength: { value: 0.28 }, exposure: { value: 1.02 }, flash: { value: 0 }
         });
     }
 

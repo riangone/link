@@ -251,15 +251,17 @@ function init() {
     let myRole = 'host'; // 'host' or 'client'
     let session = null;
 
-    // Expose for E2E testing
+    // Expose for E2E testing & GameBot integration
     window.__oni = {
         sim,
         threeScene,
+        botBrain,
         startFight,
         getState: () => ({
             isPlaying,
-            p1: { hp: sim.f1.hp, state: sim.f1.state, x: sim.f1.x, combo: sim.f1.comboCount },
-            p2: { hp: sim.f2.hp, state: sim.f2.state, x: sim.f2.x, combo: sim.f2.comboCount },
+            isMultiplayer,
+            p1: { hp: sim.f1.hp, state: sim.f1.state, x: sim.f1.x, z: sim.f1.z, combo: sim.f1.comboCount },
+            p2: { hp: sim.f2.hp, state: sim.f2.state, x: sim.f2.x, z: sim.f2.z, combo: sim.f2.comboCount },
             roundTimer: sim.roundTimer,
             isMatchOver: sim.isMatchOver,
             winner: sim.winner
@@ -267,14 +269,23 @@ function init() {
     };
 
     // Optional WebRTC integration with Link platform
+    // CRITICAL: GameBot.session() returns a LocalSession when `?bot=easy|normal|hard` is in the URL,
+    // which immediately fires `onChannelOpen()`. We must only enable `isMultiplayer` when it is a
+    // real P2P human session (!GameBot.enabled), otherwise the local BotBrain gets bypassed!
     if (window.GameBot && typeof window.GameBot.session === 'function') {
+        const isBotUrlMode = !!window.GameBot.enabled;
         session = window.GameBot.session({
             gameFolder: 'oni',
             onRole: (role) => {
                 myRole = role;
             },
             onChannelOpen: () => {
-                isMultiplayer = true;
+                if (!isBotUrlMode) {
+                    isMultiplayer = true;
+                }
+            },
+            onPeerDisconnected: () => {
+                isMultiplayer = false;
             },
             onMessage: (msg) => {
                 if (msg.type === 'input' && myRole === 'host') {
@@ -292,6 +303,8 @@ function init() {
         startOverlay.classList.add('hidden');
         gameoverOverlay.classList.add('hidden');
         koBanner.style.display = 'none';
+        // Clicking "VS BOT" or "SURVIVAL WAVES" always activates local AI opponent
+        isMultiplayer = false;
         sim.survivalMode = !!survival;
         sim.reset();
         if (survival) {

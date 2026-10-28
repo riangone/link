@@ -17,19 +17,20 @@ import { CharacterModel, SIDE_L, SIDE_R } from './CharacterModel.js';
 const CAM_TURN = 0.38; // rad the stance opens toward the camera at turn = 1
 
 // [angular frequency rad/s, damping ratio] per semantic key at full speed (attack)
-const SPRING_DEFAULT = [46, 0.62];
+// High omega (85-105 rad/s) ensures fast 4-6 frame startup moves reach full extension + snappy overshoot
+const SPRING_DEFAULT = [88, 0.44];
 const SPRING = {
-    hipY: [40, 0.62], hipP: [42, 0.7], hipT: [40, 0.58], hipR: [36, 0.6], hipS: [30, 0.7], fwd: [38, 0.7],
-    spP: [44, 0.55], spY: [42, 0.5], spR: [38, 0.55],
-    hdP: [26, 0.5], hdY: [26, 0.5],
-    lSP: [38, 0.42], lSR: [36, 0.48], lSY: [36, 0.5], lEB: [44, 0.45], lWB: [30, 0.4],
-    rSP: [38, 0.42], rSR: [36, 0.48], rSY: [36, 0.5], rEB: [44, 0.45], rWB: [30, 0.4],
-    lHP: [48, 0.62], lHR: [46, 0.68], lKB: [54, 0.62],
-    rHP: [48, 0.58], rHR: [46, 0.65], rKB: [54, 0.6],
-    lift: [40, 0.75], spin: [42, 0.82], turn: [18, 0.9]
+    hipY: [82, 0.50], hipP: [86, 0.52], hipT: [92, 0.44], hipR: [80, 0.48], hipS: [76, 0.55], fwd: [88, 0.50],
+    spP: [92, 0.44], spY: [96, 0.40], spR: [86, 0.46],
+    hdP: [52, 0.48], hdY: [52, 0.48],
+    lSP: [98, 0.36], lSR: [92, 0.40], lSY: [92, 0.42], lEB: [106, 0.38], lWB: [72, 0.38],
+    rSP: [98, 0.36], rSR: [92, 0.40], rSY: [92, 0.42], rEB: [106, 0.38], rWB: [72, 0.38],
+    lHP: [102, 0.44], lHR: [98, 0.46], lKB: [110, 0.42],
+    rHP: [102, 0.42], rHR: [98, 0.45], rKB: [110, 0.42],
+    lift: [84, 0.58], spin: [94, 0.65], turn: [36, 0.78]
 };
 // feet/IK weights: fast and critically damped (no foot skating, no wobble); not slowed in idle
-const FOOT_SPRING = [64, 1.0];
+const FOOT_SPRING = [96, 0.92];
 const FOOT_KEYS = new Set(['lFx', 'lFy', 'lFz', 'lFY', 'lFP', 'rFx', 'rFy', 'rFz', 'rFY', 'rFP', 'lIK', 'rIK']);
 
 function wrapAngle(a) {
@@ -139,24 +140,105 @@ export class ProceduralFighterMesh {
 
     buildHeldWeaponMesh() {
         this.heldGunGroup = new THREE.Group();
-        this.heldGunMat = new THREE.MeshStandardMaterial({
-            color: 0x262c3e,
-            roughness: 0.35,
-            metalness: 0.75
-        });
-        this.heldGunGlowMat = new THREE.MeshBasicMaterial({
-            color: 0x00f0ff
-        });
+        this.weaponVariants = {};
+        this.weaponGlowMats = {};
 
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.08, 0.28), this.heldGunMat);
-        body.position.set(0, -0.04, 0.10);
-        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.11, 0.055), this.heldGunMat);
-        grip.position.set(0, -0.02, 0.0);
-        grip.rotation.x = 0.25;
-        const strip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.02, 0.22), this.heldGunGlowMat);
-        strip.position.set(0, -0.04, 0.12);
+        const darkMetal = new THREE.MeshToonMaterial({ color: 0x222634 });
+        const slateMetal = new THREE.MeshToonMaterial({ color: 0x3a4154 });
+        const silverChrome = new THREE.MeshToonMaterial({ color: 0x94a3b8 });
+        const gripMat = new THREE.MeshToonMaterial({ color: 0x14161f });
 
-        this.heldGunGroup.add(body, grip, strip);
+        // 1. TCTF_PISTOL (Campbell Equalizer Mk4 — Oni iconic heavy bullpup sidearm with underbarrel laser)
+        const pistol = new THREE.Group();
+        const pGlow = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+        this.weaponGlowMats.TCTF_PISTOL = pGlow;
+        const pGrip = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.11, 0.048), gripMat);
+        pGrip.position.set(0, -0.02, -0.01);
+        pGrip.rotation.x = 0.24;
+        const pSlide = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.052, 0.23), slateMetal);
+        pSlide.position.set(0, -0.055, 0.075);
+        const pFrame = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.032, 0.19), darkMetal);
+        pFrame.position.set(0, -0.032, 0.065);
+        const pBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.07, 10), silverChrome);
+        pBarrel.rotation.x = Math.PI / 2;
+        pBarrel.position.set(0, -0.058, 0.205);
+        const pLaser = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.02, 0.09), darkMetal);
+        pLaser.position.set(0, -0.022, 0.125);
+        const pLens = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.014, 0.14), pGlow);
+        pLens.position.set(0, -0.055, 0.09);
+        const pSight = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.014, 0.035), pGlow);
+        pSight.position.set(0, -0.084, 0.02);
+        pistol.add(pGrip, pSlide, pFrame, pBarrel, pLaser, pLens, pSight);
+        this.weaponVariants.TCTF_PISTOL = pistol;
+        this.heldGunGroup.add(pistol);
+
+        // 2. SCRAM_CANNON (SML3 Scram Cannon — Multi-barrel rotary micro-missile launcher pod)
+        const scram = new THREE.Group();
+        const sGlow = new THREE.MeshBasicMaterial({ color: 0xff9900 });
+        this.weaponGlowMats.SCRAM_CANNON = sGlow;
+        const sGrip = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.11, 0.052), gripMat);
+        sGrip.position.set(0, -0.02, -0.01);
+        sGrip.rotation.x = 0.2;
+        const sHousing = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.095, 0.28), darkMetal);
+        sHousing.position.set(0, -0.055, 0.11);
+        const sPod = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.26, 8), slateMetal);
+        sPod.rotation.x = Math.PI / 2;
+        sPod.position.set(0, -0.06, 0.14);
+        // 3 rotary missile tubes + glowing warhead tips
+        for (let k = 0; k < 3; k++) {
+            const ang = (k * Math.PI * 2) / 3 - Math.PI / 2;
+            const tx = Math.cos(ang) * 0.024;
+            const ty = -0.06 + Math.sin(ang) * 0.024;
+            const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.08, 8), silverChrome);
+            tube.rotation.x = Math.PI / 2;
+            tube.position.set(tx, ty, 0.275);
+            const tip = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.03, 8), sGlow);
+            tip.rotation.x = Math.PI / 2;
+            tip.position.set(tx, ty, 0.32);
+            scram.add(tube, tip);
+        }
+        const sVent = new THREE.Mesh(new THREE.BoxGeometry(0.102, 0.024, 0.18), sGlow);
+        sVent.position.set(0, -0.055, 0.12);
+        scram.add(sGrip, sHousing, sPod, sVent);
+        scram.visible = false;
+        this.weaponVariants.SCRAM_CANNON = scram;
+        this.heldGunGroup.add(scram);
+
+        // 3. MERCURY_BOW (Oni Syndicate Mercury Bow — Long sleek rail-sniper with twin curved bow limbs & mercury flask)
+        const bow = new THREE.Group();
+        const bGlow = new THREE.MeshBasicMaterial({ color: 0x00ffaa });
+        this.weaponGlowMats.MERCURY_BOW = bGlow;
+        const bGrip = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.11, 0.048), gripMat);
+        bGrip.position.set(0, -0.02, -0.01);
+        bGrip.rotation.x = 0.22;
+        const bStock = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.068, 0.18), darkMetal);
+        bStock.position.set(0, -0.045, -0.09);
+        const bReceiver = new THREE.Mesh(new THREE.BoxGeometry(0.046, 0.065, 0.34), slateMetal);
+        bReceiver.position.set(0, -0.055, 0.14);
+        const bRail = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.015, 0.56, 10), silverChrome);
+        bRail.rotation.x = Math.PI / 2;
+        bRail.position.set(0, -0.062, 0.34);
+        const bCore = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.44, 8), bGlow);
+        bCore.rotation.x = Math.PI / 2;
+        bCore.position.set(0, -0.042, 0.26);
+        const bScope = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.15, 10), darkMetal);
+        bScope.rotation.x = Math.PI / 2;
+        bScope.position.set(0, -0.098, 0.10);
+        // Twin horizontal/angled crossbow energy limbs at the front receiver
+        for (const s of [-1, 1]) {
+            const limb = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.014, 0.032), silverChrome);
+            limb.position.set(s * 0.095, -0.055, 0.28);
+            limb.rotation.y = -s * 0.38;
+            const arcGlow = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.008, 0.012), bGlow);
+            arcGlow.position.set(s * 0.095, -0.055, 0.26);
+            arcGlow.rotation.y = -s * 0.38;
+            bow.add(limb, arcGlow);
+        }
+        bow.add(bGrip, bStock, bReceiver, bRail, bCore, bScope);
+        bow.visible = false;
+        this.weaponVariants.MERCURY_BOW = bow;
+        this.heldGunGroup.add(bow);
+
         this.heldGunGroup.visible = false;
         this.arms.r.fist.add(this.heldGunGroup);
     }
@@ -167,12 +249,16 @@ export class ProceduralFighterMesh {
             : (this.lastTime === null ? 1 / 60 : Math.min(0.1, Math.max(0, timeSeconds - this.lastTime)));
         this.lastTime = timeSeconds;
 
-        // gait phase advances with distance travelled -> planted feet do not slide
-        const moved = Math.hypot(fighter.x - this.lastX, fighter.z - this.lastZ);
+        // gait phase advances with full 3D distance travelled (forward, back, or lateral strafe) -> planted feet never slide
+        const dx = fighter.x - this.lastX, dz = fighter.z - this.lastZ;
+        const moved = Math.hypot(dx, dz);
         this.lastX = fighter.x; this.lastZ = fighter.z;
-        if (fighter.state === FIGHTER_STATE.RUN) this.loco.phase += moved * GAIT.RUN.perMeter;
-        else if (fighter.state === FIGHTER_STATE.WALK) {
-            const dir = Math.sign(fighter.vx * fighter.facing) || 1;
+        if (fighter.state === FIGHTER_STATE.RUN) {
+            this.loco.phase += moved * GAIT.RUN.perMeter;
+        } else if (fighter.state === FIGHTER_STATE.WALK) {
+            const yaw = typeof fighter.facingAngle === 'number' ? fighter.facingAngle : (fighter.facing === -1 ? Math.PI : 0);
+            const fwdDot = dx * Math.cos(yaw) + dz * Math.sin(yaw);
+            const dir = fwdDot < -0.0005 ? -1 : 1;
             this.loco.phase += dir * moved * GAIT.WALK.perMeter;
         }
 
@@ -194,10 +280,15 @@ export class ProceduralFighterMesh {
         const hasGun = !!(fighter.weapon && fighter.hp > 0);
         this.heldGunGroup.visible = hasGun;
         if (hasGun) {
-            const col = fighter.weapon.color || 0x00f0ff;
-            this.heldGunGlowMat.color.setHex(fighter.weapon.ammo > 0 ? col : 0x555566);
-            const scaleZ = fighter.weapon.type === 'MERCURY_BOW' ? 1.55 : (fighter.weapon.type === 'SCRAM_CANNON' ? 1.25 : 1.0);
-            this.heldGunGroup.scale.set(1, 1, scaleZ);
+            const wType = fighter.weapon.type || 'TCTF_PISTOL';
+            for (const [k, grp] of Object.entries(this.weaponVariants)) {
+                grp.visible = (k === wType);
+            }
+            const glowMat = this.weaponGlowMats[wType] || this.weaponGlowMats.TCTF_PISTOL;
+            if (glowMat) {
+                const col = fighter.weapon.color || 0x00f0ff;
+                glowMat.color.setHex(fighter.weapon.ammo > 0 ? col : 0x475569);
+            }
         }
     }
 
@@ -217,10 +308,10 @@ export class ProceduralFighterMesh {
      * the torso leads and head/arms trail it (overlapping action), feet are critically damped.
      */
     integrateSprings(state, dt) {
-        const attack = state === FIGHTER_STATE.ATTACK;
-        const hurt = state === FIGHTER_STATE.HIT_STUN;
-        const speed = attack ? 1.0 : (hurt ? 0.9 : 0.6);
-        const steps = Math.max(1, Math.ceil(dt / (1 / 240)));
+        const attack = state === FIGHTER_STATE.ATTACK || state === FIGHTER_STATE.THROW || state === FIGHTER_STATE.EVADE;
+        const hurt = state === FIGHTER_STATE.HIT_STUN || state === FIGHTER_STATE.BEING_THROWN;
+        const speed = attack ? 1.15 : (hurt ? 1.0 : 0.72);
+        const steps = Math.max(1, Math.ceil(dt / (1 / 300)));
         const h = dt / steps;
         const P = this.pose, V = this.vel, T = this.target;
         for (const k of POSE_KEYS) {
@@ -263,12 +354,12 @@ export class ProceduralFighterMesh {
         const d = this.dims;
         this.pelvis.position.set(p.hipS, d.pelvisY + p.hipY, p.fwd);
         this.pelvis.rotation.set(p.hipP, p.hipT, p.hipR);
-        this.spine.rotation.set(p.spP * 0.45, p.spY * 0.45, p.spR * 0.5);
-        this.chest.rotation.set(p.spP * 0.4, p.spY * 0.45, p.spR * 0.5);
+        this.spine.rotation.set(p.spP * 0.55, p.spY * 0.55, p.spR * 0.58);
+        this.chest.rotation.set(p.spP * 0.55, p.spY * 0.58, p.spR * 0.58);
         // neck + head: keep the eyes on the opponent (gaze stabilisation) and add the authored offset
-        const torsoP = p.hipP + p.spP * 0.85, torsoY = p.hipT + p.spY * 0.9;
-        this.neck.rotation.set(-torsoP * 0.3 + p.hdP * 0.3, -torsoY * 0.35 + p.hdY * 0.4, -p.spR * 0.3);
-        this.head.rotation.set(-torsoP * 0.35 + p.hdP * 0.7, -torsoY * 0.4 + p.hdY * 0.6, -p.spR * 0.3 - p.hipR * 0.5);
+        const torsoP = p.hipP + p.spP * 0.95, torsoY = p.hipT + p.spY * 0.95;
+        this.neck.rotation.set(-torsoP * 0.3 + p.hdP * 0.35, -torsoY * 0.35 + p.hdY * 0.45, -p.spR * 0.35);
+        this.head.rotation.set(-torsoP * 0.35 + p.hdP * 0.75, -torsoY * 0.4 + p.hdY * 0.65, -p.spR * 0.35 - p.hipR * 0.5);
 
         this.applyArm(this.arms.l, SIDE_L, p.lSP, p.lSR, p.lSY, p.lEB, p.lWB);
         this.applyArm(this.arms.r, SIDE_R, p.rSP, p.rSR, p.rSY, p.rEB, p.rWB);

@@ -152,6 +152,109 @@ export class VFXSystem {
     }
 
     /**
+     * Build authentic Oni (2001) 3D weapon model for arena drops / flying disarmed weapons
+     */
+    buildArenaWeaponModel(w) {
+        const group = new THREE.Group();
+        const darkMetal = new THREE.MeshToonMaterial({ color: 0x222634 });
+        const slateMetal = new THREE.MeshToonMaterial({ color: 0x3b4358 });
+        const silverChrome = new THREE.MeshToonMaterial({ color: 0x94a3b8 });
+        const glowMat = new THREE.MeshBasicMaterial({ color: w.color || 0x00f0ff });
+
+        const wType = w.type || 'TCTF_PISTOL';
+        const gunRoot = new THREE.Group();
+
+        if (wType === 'SCRAM_CANNON') {
+            // SML3 Scram Cannon — Multi-barrel rotary micro-missile launcher pod
+            const housing = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.44), darkMetal);
+            const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.40, 8), slateMetal);
+            pod.rotation.x = Math.PI / 2;
+            pod.position.set(0, 0.02, 0.05);
+            const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.14, 0.07), darkMetal);
+            grip.position.set(0, -0.09, -0.08);
+            grip.rotation.x = -0.25;
+            const vent = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.035, 0.28), glowMat);
+            vent.position.set(0, 0.02, 0.02);
+            gunRoot.add(housing, pod, grip, vent);
+            for (let k = 0; k < 3; k++) {
+                const ang = (k * Math.PI * 2) / 3 + Math.PI / 6;
+                const tx = Math.cos(ang) * 0.036;
+                const ty = 0.02 + Math.sin(ang) * 0.036;
+                const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12, 8), silverChrome);
+                tube.rotation.x = Math.PI / 2;
+                tube.position.set(tx, ty, 0.26);
+                const warhead = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.045, 8), glowMat);
+                warhead.rotation.x = Math.PI / 2;
+                warhead.position.set(tx, ty, 0.33);
+                gunRoot.add(tube, warhead);
+            }
+        } else if (wType === 'MERCURY_BOW') {
+            // Syndicate Mercury Bow — Long rail-sniper with twin curved crossbow limbs & glowing mercury core
+            const stock = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.10, 0.28), darkMetal);
+            stock.position.set(0, -0.01, -0.22);
+            const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.095, 0.46), slateMetal);
+            receiver.position.set(0, 0.01, 0.06);
+            const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.78, 10), silverChrome);
+            rail.rotation.x = Math.PI / 2;
+            rail.position.set(0, 0.02, 0.24);
+            const core = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.56, 8), glowMat);
+            core.rotation.x = Math.PI / 2;
+            core.position.set(0, -0.01, 0.16);
+            const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.22, 10), darkMetal);
+            scope.rotation.x = Math.PI / 2;
+            scope.position.set(0, 0.075, 0.02);
+            const grip = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.13, 0.065), darkMetal);
+            grip.position.set(0, -0.08, -0.06);
+            grip.rotation.x = -0.25;
+            for (const s of [-1, 1]) {
+                const limb = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.02, 0.045), silverChrome);
+                limb.position.set(s * 0.14, 0.015, 0.22);
+                limb.rotation.y = -s * 0.38;
+                const arc = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.012, 0.018), glowMat);
+                arc.position.set(s * 0.14, 0.015, 0.19);
+                arc.rotation.y = -s * 0.38;
+                gunRoot.add(limb, arc);
+            }
+            gunRoot.add(stock, receiver, rail, core, scope, grip);
+        } else {
+            // Campbell Equalizer Mk4 (TCTF Pistol) — Heavy tactical bullpup pistol with underbarrel laser
+            const slide = new THREE.Mesh(new THREE.BoxGeometry(0.058, 0.078, 0.34), slateMetal);
+            slide.position.set(0, 0.03, 0.02);
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.048, 0.28), darkMetal);
+            frame.position.set(0, -0.01, 0.01);
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.10, 10), silverChrome);
+            barrel.rotation.x = Math.PI / 2;
+            barrel.position.set(0, 0.035, 0.21);
+            const grip = new THREE.Mesh(new THREE.BoxGeometry(0.048, 0.14, 0.068), darkMetal);
+            grip.position.set(0, -0.08, -0.08);
+            grip.rotation.x = -0.24;
+            const laser = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.032, 0.14), darkMetal);
+            laser.position.set(0, -0.025, 0.09);
+            const strip = new THREE.Mesh(new THREE.BoxGeometry(0.064, 0.022, 0.22), glowMat);
+            strip.position.set(0, 0.03, 0.04);
+            gunRoot.add(slide, frame, barrel, grip, laser, strip);
+        }
+
+        const haloRing = new THREE.Mesh(
+            new THREE.RingGeometry(0.30, 0.36, 28),
+            new THREE.MeshBasicMaterial({
+                color: w.color || 0x00f0ff,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.72,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            })
+        );
+        haloRing.rotation.x = -Math.PI / 2;
+        haloRing.position.y = -0.11;
+
+        group.add(gunRoot, haloRing);
+        group.userData = { gunRoot, glowMat, haloRing };
+        return group;
+    }
+
+    /**
      * Synchronize 3D meshes for dropped/flying weapons and active homing projectiles in Simulation
      */
     syncEntities(sim) {
@@ -165,35 +268,14 @@ export class VFXSystem {
             activeWpnIds.add(w.id);
             let group = this.weaponMeshes.get(w.id);
             if (!group) {
-                group = new THREE.Group();
-                const gunBody = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.08, 0.14, 0.42),
-                    new THREE.MeshStandardMaterial({ color: 0x2a3146, roughness: 0.3, metalness: 0.8 })
-                );
-                const glowStrip = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.09, 0.04, 0.34),
-                    new THREE.MeshBasicMaterial({ color: w.color || 0x00f0ff })
-                );
-                const haloRing = new THREE.Mesh(
-                    new THREE.RingGeometry(0.28, 0.34, 24),
-                    new THREE.MeshBasicMaterial({
-                        color: w.color || 0x00f0ff,
-                        side: THREE.DoubleSide,
-                        transparent: true,
-                        opacity: 0.7,
-                        blending: THREE.AdditiveBlending,
-                        depthWrite: false
-                    })
-                );
-                haloRing.rotation.x = -Math.PI / 2;
-                haloRing.position.y = -0.1;
-                group.add(gunBody, glowStrip, haloRing);
-                group.userData = { glowStrip, haloRing };
+                group = this.buildArenaWeaponModel(w);
                 this.scene.add(group);
                 this.weaponMeshes.set(w.id, group);
             }
-            group.position.set(w.x, w.y + (w.isGrounded ? 0.08 : 0), w.z);
-            group.rotation.set(w.spinPitch || 0, w.spinYaw || 0, w.isGrounded ? 0.35 : 0.8);
+            group.position.set(w.x, w.y + (w.isGrounded ? 0.09 : 0), w.z);
+            if (group.userData.gunRoot) {
+                group.userData.gunRoot.rotation.set(w.spinPitch || 0, w.spinYaw || 0, w.isGrounded ? 0.28 : 0.85);
+            }
             if (group.userData.haloRing) {
                 group.userData.haloRing.visible = w.isGrounded && w.ammo > 0;
             }
@@ -205,7 +287,7 @@ export class VFXSystem {
             }
         }
 
-        // 2. Active Projectiles (Scram Cannon Homing Missiles)
+        // 2. Active Projectiles (Scram Cannon Homing Micro-Missiles with fins & thruster core)
         const projectiles = sim.getProjectiles ? sim.getProjectiles() : [];
         const activeProjIds = new Set();
         for (let i = 0; i < projectiles.length; i++) {
@@ -213,23 +295,38 @@ export class VFXSystem {
             activeProjIds.add(p.id);
             let mesh = this.projectileMeshes.get(p.id);
             if (!mesh) {
-                mesh = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.11, 10, 10),
+                mesh = new THREE.Group();
+                const rocketBody = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.032, 0.042, 0.22, 8),
+                    new THREE.MeshToonMaterial({ color: 0x334155 })
+                );
+                rocketBody.rotation.x = Math.PI / 2;
+                const warhead = new THREE.Mesh(
+                    new THREE.ConeGeometry(0.035, 0.09, 8),
+                    new THREE.MeshBasicMaterial({ color: p.color || 0xff9900 })
+                );
+                warhead.rotation.x = Math.PI / 2;
+                warhead.position.z = 0.15;
+                const thruster = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.065, 8, 8),
                     new THREE.MeshBasicMaterial({
-                        color: p.color || 0xff9900,
+                        color: 0xffcc33,
                         blending: THREE.AdditiveBlending
                     })
                 );
+                thruster.position.z = -0.12;
+                mesh.add(rocketBody, warhead, thruster);
                 this.scene.add(mesh);
                 this.projectileMeshes.set(p.id, mesh);
             }
             mesh.position.set(p.x, p.y, p.z);
+            if (Math.hypot(p.vx, p.vy, p.vz) > 0.1) {
+                mesh.lookAt(p.x + p.vx, p.y + p.vy, p.z + p.vz);
+            }
         }
         for (const [id, mesh] of this.projectileMeshes.entries()) {
             if (!activeProjIds.has(id)) {
                 this.scene.remove(mesh);
-                mesh.geometry.dispose();
-                mesh.material.dispose();
                 this.projectileMeshes.delete(id);
             }
         }

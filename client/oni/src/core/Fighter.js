@@ -724,7 +724,9 @@ export class Fighter {
 
     handleWalk(input, opponent, simEvents) {
         const { fx, fz } = this.getForwardVector();
+        const rx = -fz, rz = fx;
         const fwdDot = input.dirX * fx + input.dirZ * fz;
+        const sideDot = input.dirX * rx + input.dirZ * rz;
 
         // Oni-style auto-guard while walking backward or holding block
         this.isBlocking = input.block || fwdDot < -0.25;
@@ -757,19 +759,33 @@ export class Fighter {
             return;
         }
 
-        if (Math.abs(input.dirX) < 0.1 && Math.abs(input.dirZ) < 0.1) {
-            this.vx = 0;
-            this.vz = 0;
+        const dirMag = Math.hypot(input.dirX, input.dirZ);
+        if (dirMag < 0.1) {
+            this.vx *= 0.55;
+            this.vz *= 0.55;
             this.transitionTo(FIGHTER_STATE.IDLE);
             return;
         }
 
-        const isMovingForward = fwdDot >= 0;
+        const nx = input.dirX / Math.max(1.0, dirMag);
+        const nz = input.dirZ / Math.max(1.0, dirMag);
         const speedMult = this.daodanOverdrive ? 1.18 : 1.0;
-        const speed = (isMovingForward ? MOVE_SPEED.WALK_FORWARD : MOVE_SPEED.WALK_BACK) * speedMult;
 
-        this.vx = input.dirX * speed;
-        this.vz = input.dirZ * speed * 0.78;
+        // Oni 2001 directional speed profile: fast forward advance, guarded back-step, agile lateral strafe
+        let baseSpeed;
+        if (Math.abs(sideDot) > Math.abs(fwdDot) * 1.15) {
+            baseSpeed = (MOVE_SPEED.WALK_FORWARD * 0.88);
+        } else if (fwdDot >= 0) {
+            baseSpeed = MOVE_SPEED.WALK_FORWARD;
+        } else {
+            baseSpeed = MOVE_SPEED.WALK_BACK;
+        }
+        const targetVx = nx * baseSpeed * speedMult;
+        const targetVz = nz * baseSpeed * speedMult * 0.86;
+
+        // Smooth athletic acceleration (eliminates robotic instant velocity snapping)
+        this.vx += (targetVx - this.vx) * 0.42;
+        this.vz += (targetVz - this.vz) * 0.42;
     }
 
     handleRun(input, opponent, simEvents) {

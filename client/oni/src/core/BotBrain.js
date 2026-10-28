@@ -31,6 +31,7 @@ export class BotBrain {
         this.setLevel(level);
         this.actionTimer = 0;
         this.lastBranch = 'IDLE';
+        this.strafePhase = 0;
         this.evadeTapQueue = []; // multi-frame input queue for deterministic double-tap evade / dash
         this.rng = createDeterministicRNG(seed);
         this.tree = this.buildBehaviorTree();
@@ -327,15 +328,15 @@ export class BotBrain {
         }
 
         // 8b. If bot holds a weapon at mid/long range
-        if (dist >= 1.55 && bot.weapon) {
+        if (dist >= 1.55 && bot.weapon && this.actionTimer % 12 === 0) {
             if (bot.weapon.ammo > 0 && dist < 9.5) {
-                const fireChance = this.profile.level === 'hard' ? 0.16 : (this.profile.level === 'normal' ? 0.08 : 0.03);
+                const fireChance = this.profile.level === 'hard' ? 0.32 : (this.profile.level === 'normal' ? 0.18 : 0.08);
                 if (this.rand(sim) < fireChance) {
                     input.fire = true;
                     return BT_STATUS.SUCCESS;
                 }
             } else if (bot.weapon.ammo <= 0 && dist < 5.5) {
-                if (this.rand(sim) < 0.28) {
+                if (this.rand(sim) < 0.35) {
                     input.fire = true; // Throw empty weapon at opponent
                     return BT_STATUS.SUCCESS;
                 }
@@ -371,50 +372,68 @@ export class BotBrain {
         const { bot, dist, nx, nz, input, sim } = bb;
         if (dist >= 1.48) return BT_STATUS.FAILURE;
 
-        const r = this.rand(sim);
-        if (this.profile.level === 'hard') {
-            if (r < 0.38) {
-                input.punch = true;
-            } else if (r < 0.66) {
-                input.kick = true;
-            } else if (r < 0.78 && (bot.daodanStage >= 3 || bot.daodanOverdrive)) {
-                // Awakened Stage 3 Devil Spin Kick (Down + Forward + Kick)
-                input.down = true;
-                input.dirX = nx;
-                input.dirZ = nz;
-                input.kick = true;
-            } else if (r < 0.86) {
-                // Uppercut (Down + Forward + Punch)
-                input.down = true;
-                input.dirX = nx;
-                input.dirZ = nz;
-                input.punch = true;
-            } else if (r < 0.94) {
-                input.throwBtn = true;
+        if (this.actionTimer % 8 === 0) {
+            const r = this.rand(sim);
+            if (this.profile.level === 'hard') {
+                if (r < 0.36) {
+                    input.punch = true;
+                } else if (r < 0.62) {
+                    input.kick = true;
+                } else if (r < 0.74 && (bot.daodanStage >= 3 || bot.daodanOverdrive)) {
+                    // Awakened Stage 3 Devil Spin Kick (Down + Forward + Kick)
+                    input.down = true;
+                    input.dirX = nx;
+                    input.dirZ = nz;
+                    input.kick = true;
+                } else if (r < 0.82) {
+                    // Uppercut (Down + Forward + Punch)
+                    input.down = true;
+                    input.dirX = nx;
+                    input.dirZ = nz;
+                    input.punch = true;
+                } else if (r < 0.90) {
+                    input.throwBtn = true;
+                } else {
+                    input.block = true;
+                }
+            } else if (this.profile.level === 'normal') {
+                if (r < 0.30) input.punch = true;
+                else if (r < 0.54) input.kick = true;
+                else if (r < 0.78) input.block = true;
             } else {
-                input.block = true;
+                if (r < 0.16) input.punch = true;
+                else if (r < 0.28) input.kick = true;
             }
-        } else if (this.profile.level === 'normal') {
-            if (r < 0.35) input.punch = true;
-            else if (r < 0.62) input.kick = true;
-            else if (r < 0.80) input.block = true;
-        } else {
-            if (r < 0.15) input.punch = true;
-            else if (r < 0.28) input.kick = true;
         }
         return BT_STATUS.SUCCESS;
     }
 
     /**
-     * Branch 10: Approach & Mid-Range Gap Closing
+     * Branch 10: Approach & Mid-Range Gap Closing (with Oni-style 3D lateral strafing & dash-ins)
      */
     branchApproachPressure(bb) {
-        const { dist, dz, nx, nz, input, sim } = bb;
+        const { bot, dist, dz, nx, nz, input, sim } = bb;
         input.dirX = nx;
-        input.dirZ = Math.abs(dz) > 0.25 ? nz : 0;
 
-        if (this.profile.level === 'hard' && dist > 2.2 && dist < 3.8 && this.rand(sim) < 0.08) {
-            input.slide = true;
+        // Lateral Z-axis tactical strafing when approaching at mid-range (1.5m .. 4.0m)
+        if (Math.abs(dz) > 0.28) {
+            input.dirZ = nz;
+        } else if (dist > 1.5 && dist < 3.8 && this.profile.level !== 'easy') {
+            const strafeWave = Math.sin(this.actionTimer * 0.055 + (bot.id === 'p2' ? 1.2 : 0));
+            input.dirZ = Math.abs(strafeWave) > 0.45 ? Math.sign(strafeWave) * 0.75 : 0;
+        } else {
+            input.dirZ = 0;
+        }
+
+        if (this.profile.level !== 'easy' && dist > 2.1 && dist < 3.9) {
+            const r = this.rand(sim);
+            if (r < (this.profile.level === 'hard' ? 0.08 : 0.035)) {
+                input.slide = true;
+            } else if (r < 0.14 && bot.state !== FIGHTER_STATE.RUN && this.evadeTapQueue.length === 0) {
+                // Double-tap forward to sprint/dash into range like Oni's Strikers
+                this.queueDoubleTap(nx, 0);
+                return this.consumeTapQueue(bb);
+            }
         }
         return BT_STATUS.SUCCESS;
     }

@@ -47,8 +47,8 @@ export class ThreeScene {
         this._perf = { last: 0, frames: 0, sum: 0, n: 0 };
 
         this.scene = new THREE.Scene();
-        this.fogColor = new THREE.Color(0x0b0a1c);
-        this.scene.fog = new THREE.FogExp2(this.fogColor, 0.03);
+        this.fogColor = new THREE.Color(0x0b0f18);
+        this.scene.fog = new THREE.FogExp2(this.fogColor, 0.024);
 
         this.camera = new THREE.PerspectiveCamera(36, w / h, 0.1, 200);
         this.camera.position.set(0, 1.8, 7);
@@ -82,14 +82,18 @@ export class ThreeScene {
         const geo = new THREE.SphereGeometry(90, 32, 16);
         const mat = new THREE.ShaderMaterial({
             side: THREE.BackSide, depthWrite: false, fog: false,
-            uniforms: { top: { value: new THREE.Color(0x05040d) }, mid: { value: new THREE.Color(0x1b0f3a) }, glow: { value: new THREE.Color(0xff2f8a) } },
+            uniforms: {
+                top: { value: new THREE.Color(0x070a10) },
+                mid: { value: new THREE.Color(0x131b28) },
+                glow: { value: new THREE.Color(0x2a5678) }
+            },
             vertexShader: `varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
             fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 glow; varying vec3 vP;
               void main(){
                 float h = vP.y;
-                vec3 c = mix(mid, top, smoothstep(0.0, 0.45, h));
-                c += glow * 0.55 * exp(-abs(h - 0.02) * 18.0);
-                c += vec3(0.1,0.5,1.0) * 0.12 * exp(-abs(h - 0.12) * 6.0);
+                vec3 c = mix(mid, top, smoothstep(0.0, 0.48, h));
+                c += glow * 0.35 * exp(-abs(h - 0.02) * 14.0);
+                c += vec3(0.42, 0.32, 0.18) * 0.14 * exp(-abs(h - 0.06) * 10.0);
                 gl_FragColor = vec4(c, 1.0);
               }`
         });
@@ -98,9 +102,9 @@ export class ThreeScene {
     }
 
     setupLights() {
-        this.scene.add(new THREE.HemisphereLight(0x6a78c8, 0x140a20, 1.1));
+        this.scene.add(new THREE.HemisphereLight(0x889ab5, 0x1a1e26, 1.25));
 
-        const key = new THREE.DirectionalLight(0xfff1e6, 2.6);
+        const key = new THREE.DirectionalLight(0xf6ede0, 2.1);
         key.position.set(3, 9, 6);
         key.castShadow = true;
         key.shadow.mapSize.setScalar(this.lowPower ? 1024 : 2048);
@@ -117,13 +121,13 @@ export class ThreeScene {
         this.scene.add(key);
         this.scene.add(key.target);
 
-        const rimC = new THREE.DirectionalLight(0x22e6ff, 3.2);
+        const rimC = new THREE.DirectionalLight(0x5890b8, 1.35);
         rimC.position.set(-8, 4, -6);
         this.scene.add(rimC);
-        const rimM = new THREE.DirectionalLight(0xff2a8a, 3.0);
+        const rimM = new THREE.DirectionalLight(0xc88a55, 1.15);
         rimM.position.set(8, 4, -6);
         this.scene.add(rimM);
-        const fill = new THREE.DirectionalLight(0x8899ff, 0.6);
+        const fill = new THREE.DirectionalLight(0x7c8ea6, 0.55);
         fill.position.set(0, 2, 10);
         this.scene.add(fill);
     }
@@ -133,15 +137,19 @@ export class ThreeScene {
         const c = document.createElement('canvas');
         c.width = c.height = S;
         const g = c.getContext('2d');
-        g.fillStyle = '#16182a';
+        // Oni 2001 architectural brutalist concrete & matte tactical steel deck
+        g.fillStyle = '#252932';
         g.fillRect(0, 0, S, S);
-        // panel noise
         for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
-            const v = 20 + Math.floor(this.rand() * 10);
-            g.fillStyle = `rgb(${v},${v + 2},${v + 16})`;
-            g.fillRect(i * 128 + 3, j * 128 + 3, 122, 122);
+            const v = 38 + Math.floor(this.rand() * 12);
+            g.fillStyle = `rgb(${v},${v + 3},${v + 8})`;
+            g.fillRect(i * 128 + 4, j * 128 + 4, 120, 120);
+            // Concrete weathering & industrial stencil marks
+            g.fillStyle = `rgba(18,20,26,0.35)`;
+            g.fillRect(i * 128 + 10, j * 128 + 10, 108, 4);
         }
-        g.strokeStyle = 'rgba(10,10,18,1)';
+        // Dark expansion joints (matte asphalt/rubber seams, no mirror glare)
+        g.strokeStyle = 'rgba(14,16,20,1)';
         g.lineWidth = 6;
         for (let i = 0; i <= 4; i++) {
             g.beginPath(); g.moveTo(i * 128, 0); g.lineTo(i * 128, S); g.stroke();
@@ -150,20 +158,20 @@ export class ThreeScene {
         const map = new THREE.CanvasTexture(c);
         map.colorSpace = THREE.SRGBColorSpace;
 
-        // emissive seams
+        // Subtle recessed floor marker lights (subdued industrial amber/cyan)
         const e = document.createElement('canvas');
         e.width = e.height = S;
         const ge = e.getContext('2d');
         ge.fillStyle = '#000';
         ge.fillRect(0, 0, S, S);
-        ge.strokeStyle = '#1aa8d8';
-        ge.lineWidth = 2;
+        ge.strokeStyle = '#1e3f52';
+        ge.lineWidth = 1.5;
         for (let i = 0; i <= 4; i++) {
             ge.beginPath(); ge.moveTo(i * 128, 0); ge.lineTo(i * 128, S); ge.stroke();
-            ge.beginPath(); ge.moveTo(0, i * 128); ge.lineTo(S, i * 128); ge.stroke();
+            ge.beginPath(); ge.moveTo(0, i * 128); ge.lineTo(S, i * 128); g.stroke();
         }
-        ge.fillStyle = '#ff2f8a';
-        for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) ge.fillRect(i * 128 - 4, j * 128 - 4, 8, 8);
+        ge.fillStyle = '#b87328';
+        for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) ge.fillRect(i * 128 - 3, j * 128 - 3, 6, 6);
         const emissive = new THREE.CanvasTexture(e);
         emissive.colorSpace = THREE.SRGBColorSpace;
 
@@ -178,14 +186,14 @@ export class ThreeScene {
     setupStage() {
         const { map, emissive } = this.makeFloorTextures();
 
-        // P5 Tier 1: Elevated Upper Rooftop Deck (|x| <= 6.4, |z| <= 4.6, y = 0.0)
+        // P5 Tier 1: Elevated Upper Rooftop Deck — Oni brutalist matte concrete (roughness 0.88, metalness 0.08)
         const upperDeckMat = new THREE.MeshStandardMaterial({
             map,
             emissiveMap: emissive,
             emissive: 0xffffff,
-            emissiveIntensity: 0.35,
-            roughness: 0.32,
-            metalness: 0.55
+            emissiveIntensity: 0.16,
+            roughness: 0.88,
+            metalness: 0.08
         });
         const upperDeck = new THREE.Mesh(new THREE.BoxGeometry(12.8, 1.8, 9.2), upperDeckMat);
         upperDeck.position.set(0, -0.9, 0);
@@ -193,9 +201,9 @@ export class ThreeScene {
         upperDeck.castShadow = true;
         this.scene.add(upperDeck);
 
-        // Glowing cyan/amber hazard trim along the upper deck edge (|x| = 6.4, |z| = 4.6)
-        const edgeGlowC = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x22e6ff).multiplyScalar(1.5) });
-        const edgeGlowWarn = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff9900).multiplyScalar(1.6) });
+        // Tactical industrial hazard trim along the upper deck edge (|x| = 6.4, |z| = 4.6)
+        const edgeGlowC = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x3a88a8) });
+        const edgeGlowWarn = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xd88418) });
         const upperRimX1 = new THREE.Mesh(new THREE.BoxGeometry(12.88, 0.06, 0.08), edgeGlowC);
         upperRimX1.position.set(0, 0.01, 4.6);
         this.scene.add(upperRimX1);
@@ -210,13 +218,13 @@ export class ThreeScene {
         upperRimZ2.position.set(6.4, 0.01, 0);
         this.scene.add(upperRimZ2);
 
-        // P5 Tier 2: Lower Perimeter Catwalk (|x| <= 9.8, |z| <= 5.8, top surface at y = -1.8)
+        // P5 Tier 2: Lower Perimeter Catwalk (matte industrial concrete & dark grating)
         const catwalkMat = new THREE.MeshStandardMaterial({
-            color: 0x121526,
-            roughness: 0.45,
-            metalness: 0.72,
-            emissive: 0x0b162c,
-            emissiveIntensity: 0.4
+            color: 0x1c212b,
+            roughness: 0.85,
+            metalness: 0.14,
+            emissive: 0x080d14,
+            emissiveIntensity: 0.2
         });
         const lowerCatwalk = new THREE.Mesh(new THREE.BoxGeometry(19.6, 2.2, 11.6), catwalkMat);
         lowerCatwalk.position.set(0, -2.9, 0);
@@ -224,7 +232,7 @@ export class ThreeScene {
         this.scene.add(lowerCatwalk);
 
         // Fatal Abyss Danger Trim around outer catwalk edge (|x| = 9.8, |z| = 5.8, y = -1.8)
-        const dangerMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff0055).multiplyScalar(1.8) });
+        const dangerMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xc83232) });
         const lowerRimX1 = new THREE.Mesh(new THREE.BoxGeometry(19.68, 0.07, 0.09), dangerMat);
         lowerRimX1.position.set(0, -1.79, 5.8);
         this.scene.add(lowerRimX1);
@@ -238,18 +246,17 @@ export class ThreeScene {
         lowerRimZ2.position.set(9.8, -1.79, 0);
         this.scene.add(lowerRimZ2);
 
-        // Glowing arena ring in the center of the upper deck
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0x22e6ff });
-        ringMat.color.multiplyScalar(1.4);
+        // Painted TCTF tactical combat ring on the upper concrete deck
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x3b7898, transparent: true, opacity: 0.65 });
         const ring = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.035, 8, 96), ringMat);
         ring.rotation.x = -Math.PI / 2;
-        ring.position.y = 0.03;
+        ring.position.y = 0.025;
         this.scene.add(ring);
 
-        // Perimeter barrier posts + light bars along the back of the lower catwalk
-        const postMat = new THREE.MeshStandardMaterial({ color: 0x1a1c2c, roughness: 0.4, metalness: 0.8 });
-        const barC = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x22e6ff).multiplyScalar(1.6) });
-        const barM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff2f8a).multiplyScalar(1.6) });
+        // Perimeter concrete/steel barrier posts + subdued warning bars along the back of the lower catwalk
+        const postMat = new THREE.MeshStandardMaterial({ color: 0x222630, roughness: 0.82, metalness: 0.18 });
+        const barC = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x3a88a8) });
+        const barM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xd88418) });
         for (let i = -4; i <= 4; i++) {
             const x = i * 2.3;
             const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.3, 0.18), postMat);
@@ -307,23 +314,23 @@ export class ThreeScene {
                 tex.repeat.set(Math.max(1, Math.round(w / 2.5)), Math.max(1, Math.round(h / 6)));
                 tex.needsUpdate = true;
                 const mat = new THREE.MeshStandardMaterial({
-                    color: 0x0c0d18, roughness: 0.8, metalness: 0.3,
-                    emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.7
+                    color: 0x141922, roughness: 0.92, metalness: 0.06,
+                    emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.45
                 });
                 const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
                 b.position.set(x, h / 2 - 3, z0 - r() * zJitter);
                 this.scene.add(b);
 
-                if (r() > 0.45) { // vertical neon sign
+                if (r() > 0.55) { // vertical industrial sign
                     const c = neonCols[Math.floor(r() * neonCols.length)];
                     const sign = new THREE.Mesh(new THREE.BoxGeometry(0.35, 2 + r() * 3, 0.1),
-                        new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(1.5) }));
+                        new THREE.MeshBasicMaterial({ color: new THREE.Color(c) }));
                     sign.position.set(x + w / 2 + 0.25, 1.5 + r() * (h * 0.5), b.position.z + d / 2);
                     this.scene.add(sign);
                 }
-                if (r() > 0.6) { // rooftop beacon
+                if (r() > 0.6) { // rooftop aircraft warning beacon
                     const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6),
-                        new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff3355).multiplyScalar(3) }));
+                        new THREE.MeshBasicMaterial({ color: new THREE.Color(0xd93838) }));
                     beacon.position.set(x, h - 3 + 0.2, b.position.z);
                     this.scene.add(beacon);
                 }

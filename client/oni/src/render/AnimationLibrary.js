@@ -38,17 +38,17 @@ export function makePose(over = {}) {
 }
 
 // ---------------------------------------------------------------- base stances
-// bladed orthodox stance: lead foot forward and slightly in, rear foot turned out
+// Wide, athletic Oni martial-arts stance: deep knee bend, open foot spacing, dynamic guard
 const STANCE_FEET = {
-    lFx: 0.1, lFz: 0.21, lFY: 0.2, rFx: 0.13, rFz: -0.23, rFY: 0.85, lIK: 1, rIK: 1
+    lFx: 0.14, lFz: 0.28, lFY: 0.22, rFx: 0.17, rFz: -0.30, rFY: 0.88, lIK: 1, rIK: 1
 };
 
 export const GUARD = makePose({
     ...STANCE_FEET,
-    hipY: -0.085, hipT: 0.18, hipS: 0.0, fwd: -0.01, spP: 0.12, spY: -0.12, spR: 0.03, hdP: 0.1, hdY: 0.05,
-    lSP: 0.95, lSR: 0.24, lSY: 0.12, lEB: 1.95, lWB: 0.15,
-    rSP: 0.6, rSR: 0.3, rSY: 0.25, rEB: 2.3, rWB: 0.2,
-    lHP: 0.38, lHR: 0.1, lKB: 0.4, rHP: -0.32, rHR: 0.1, rKB: 0.45,
+    hipY: -0.115, hipT: 0.28, hipS: 0.0, fwd: 0.02, spP: 0.18, spY: -0.22, spR: 0.05, hdP: 0.12, hdY: 0.08,
+    lSP: 1.12, lSR: 0.38, lSY: 0.05, lEB: 1.55, lWB: 0.12,
+    rSP: 0.72, rSR: 0.45, rSY: 0.18, rEB: 1.95, rWB: 0.18,
+    lHP: 0.48, lHR: 0.16, lKB: 0.52, rHP: -0.42, rHR: 0.16, rKB: 0.56,
     turn: 1
 });
 
@@ -127,249 +127,251 @@ const GRABBED_POSE = makePose({
 // 'act' = last active frame, 'rec:x' = x of the way through recovery. Frame 0 and the final
 // frame are always the guard. Keys inherit from the previous key, so only changes are listed.
 export const ATTACK_ANIMS = {
-    PUNCH_1: { // lead jab: small step-in, shoulder drives through, rear hand stays on the chin
+    PUNCH_1: { // lead jab: deep lunge step-in, full shoulder whip & rear arm counterbalance
         trail: 'lFist',
         keys: [
-            { at: 'wind', ease: 'out', pose: { hipY: -0.1, spY: -0.02, lSP: 0.85, lEB: 2.2, fwd: -0.03 } },
+            { at: 'wind', ease: 'out', pose: { hipY: -0.14, spY: 0.32, lSP: 0.55, lSR: 0.45, lEB: 2.35, fwd: -0.06 } },
             {
                 at: 'hit', ease: 'out', pose: {
-                    lSP: 1.55, lSR: -0.02, lSY: 0.22, lEB: 0.04, lWB: 0.0,
-                    spY: -0.6, spP: 0.22, spR: 0.06, hipT: -0.05, hdP: 0.14,
-                    rSP: 0.8, rSY: 0.4, rEB: 2.45,
-                    lFz: 0.33, rFz: -0.2, rFP: 0.25, hipY: -0.12, fwd: 0.12, hipS: 0.03, turn: 0.15
+                    lSP: 1.68, lSR: -0.08, lSY: -0.15, lEB: 0.0, lWB: -0.08,
+                    spY: -0.92, spP: 0.34, spR: 0.12, hipT: -0.35, hdP: 0.18,
+                    rSP: -0.25, rSR: 0.65, rSY: 0.15, rEB: 1.75,
+                    lFz: 0.44, rFz: -0.26, rFP: 0.45, hipY: -0.16, fwd: 0.28, hipS: 0.05, turn: 0.05
                 }
             },
-            { at: 'act', pose: { lSP: 1.6, spY: -0.66, fwd: 0.14 } },
-            { at: 'rec:0.45', ease: 'inout', pose: { lSP: 1.1, lEB: 1.4, spY: -0.25, fwd: 0.05, lFz: 0.27, rFz: -0.22, rFP: 0.05 } }
+            { at: 'act', pose: { lSP: 1.72, spY: -0.98, fwd: 0.32, lEB: 0.0 } },
+            { at: 'rec:0.5', ease: 'inout', pose: { lSP: 1.15, lEB: 1.25, spY: -0.28, fwd: 0.08, lFz: 0.32, rFz: -0.26, rFP: 0.1 } }
         ]
     },
-    PUNCH_2: { // rear cross: load the back leg, pivot the rear foot, hips then shoulders, lead hand back
+    PUNCH_2: { // rear cross: deep coil, full hip/shoulder torque, rear heel pivot, lead arm whipped back
         trail: 'rFist',
         keys: [
             {
                 at: 'wind', ease: 'out', pose: {
-                    hipT: -0.15, spY: -0.55, hipY: -0.12, fwd: -0.06, hipS: -0.02,
-                    rSP: 0.45, rSR: 0.35, rEB: 2.45, lSP: 1.15, lEB: 1.3, lSY: 0.3, hdY: 0.15
+                    hipT: -0.45, spY: -0.82, hipY: -0.16, fwd: -0.10, hipS: -0.04,
+                    rSP: 0.15, rSR: 0.55, rEB: 2.5, lSP: 1.35, lEB: 0.9, lSY: 0.1, hdY: 0.25
                 }
             },
             {
                 at: 'hit', ease: 'out', pose: {
-                    hipT: 0.6, spY: 1.0, spP: 0.3, spR: -0.1, hipY: -0.13, fwd: 0.2, hipS: 0.05,
-                    rSP: 1.55, rSR: -0.05, rSY: 0.4, rEB: 0.02, rWB: 0.0,
-                    lSP: 0.55, lSR: 0.5, lSY: 0.5, lEB: 2.5,
-                    lFz: 0.31, rFz: -0.2, rFY: 0.15, rFP: 0.55, hdY: -0.35, hdP: 0.12, turn: 0.05
+                    hipT: 0.85, spY: 1.28, spP: 0.42, spR: -0.18, hipY: -0.18, fwd: 0.36, hipS: 0.07,
+                    rSP: 1.68, rSR: -0.08, rSY: -0.18, rEB: 0.0, rWB: -0.05,
+                    lSP: -0.55, lSR: 0.85, lSY: -0.2, lEB: 1.35,
+                    lFz: 0.42, rFz: -0.24, rFY: 0.12, rFP: 0.78, hdY: -0.45, hdP: 0.16, turn: 0.0
                 }
             },
-            { at: 'act', pose: { spY: 1.12, rSP: 1.6, fwd: 0.23 } },
-            { at: 'rec:0.4', ease: 'inout', pose: { spY: 0.4, hipT: 0.35, rSP: 1.0, rEB: 1.4, fwd: 0.08, rFP: 0.25, rFY: 0.45 } }
+            { at: 'act', pose: { spY: 1.38, rSP: 1.74, fwd: 0.40, rEB: 0.0 } },
+            { at: 'rec:0.45', ease: 'inout', pose: { spY: 0.42, hipT: 0.38, rSP: 1.0, rEB: 1.25, fwd: 0.12, rFP: 0.25, rFY: 0.45 } }
         ]
     },
-    UPPERCUT: { // rising dragon: deep coil, explode upward with a knee drive, lead arm counter-swings
+    UPPERCUT: { // rising dragon: deep crouch coil -> explosive skyward uppercut with full body arch & knee drive
         trail: 'rFist',
         keys: [
             {
                 at: 'wind', ease: 'out', pose: {
-                    hipY: -0.3, spP: 0.6, spY: -0.55, hipT: -0.1, hdP: 0.25, fwd: 0.02,
-                    rSP: -0.45, rSR: 0.25, rEB: 1.4, lSP: 1.1, lEB: 2.2,
-                    lFz: 0.26, rFz: -0.3, rFx: 0.16
+                    hipY: -0.38, spP: 0.78, spY: -0.75, hipT: -0.35, hdP: 0.35, fwd: -0.04,
+                    rSP: -0.75, rSR: 0.45, rEB: 1.65, lSP: 1.25, lSR: 0.45, lEB: 1.9,
+                    lFz: 0.32, rFz: -0.34, rFx: 0.18
                 }
             },
             {
                 at: 'hit', ease: 'out', pose: {
-                    hipY: 0.1, spP: -0.42, spY: 0.75, spR: -0.15, hipT: 0.45, hdP: -0.55, fwd: 0.12,
-                    rSP: 2.85, rSR: 0.08, rSY: 0.3, rEB: 0.35, rWB: -0.2,
-                    lSP: -0.5, lSR: 0.55, lEB: 0.9,
-                    rIK: 0, rHP: 1.15, rKB: 1.7, rFP: 0.7, lFP: 0.9,
-                    lift: 0.32, turn: 0.4
+                    hipY: 0.16, spP: -0.58, spY: 0.98, spR: -0.24, hipT: 0.65, hdP: -0.68, fwd: 0.22,
+                    rSP: 3.05, rSR: 0.15, rSY: 0.1, rEB: 0.12, rWB: -0.25,
+                    lSP: -0.85, lSR: 0.95, lEB: 0.45,
+                    rIK: 0, lIK: 0, rHP: 1.48, rKB: 1.85, lHP: -0.35, lKB: 0.15, rFP: 0.85, lFP: 0.95,
+                    lift: 0.48, turn: 0.25
                 }
             },
-            { at: 'act', pose: { lift: 0.45, rSP: 3.0, spP: -0.5 } },
-            { at: 'rec:0.45', ease: 'in', pose: { lift: 0.0, hipY: -0.2, spP: 0.25, rSP: 1.2, rEB: 1.6, rIK: 1, lFP: 0, rFP: 0, rHP: 0.2, rKB: 0.6 } }
+            { at: 'act', pose: { lift: 0.62, rSP: 3.12, rEB: 0.05, spP: -0.65 } },
+            { at: 'rec:0.5', ease: 'in', pose: { lift: 0.0, hipY: -0.22, spP: 0.28, rSP: 1.2, rEB: 1.4, lIK: 1, rIK: 1, lFP: 0, rFP: 0, rHP: 0.2, rKB: 0.6 } }
         ]
     },
-    KICK_LOW: { // rear-leg snap kick: knee chamber, weight over the lead foot, arms counterbalance
+    KICK_LOW: { // wide snapping roundhouse kick: high knee chamber, full hip turnover, wide counter-swing arms
         trail: 'rFoot',
         keys: [
             {
                 at: 'wind', ease: 'out', pose: {
-                    rIK: 0, rHP: 1.35, rHR: 0.05, rKB: 2.2, rFP: 0.6,
-                    hipS: 0.07, hipT: 0.3, hipY: -0.06, fwd: 0.06, spP: -0.08,
-                    lSP: 0.95, lSR: 0.35, rSP: 0.4, rSR: 0.45, rEB: 1.9
+                    rIK: 0, rHP: 1.55, rHR: 0.55, rKB: 2.35, rFP: 0.7,
+                    hipS: 0.09, hipT: 0.42, hipY: -0.08, fwd: 0.08, spP: -0.15,
+                    lSP: 1.15, lSR: 0.65, rSP: -0.35, rSR: 0.85, rEB: 1.4
                 }
             },
             {
                 at: 'hit', ease: 'out', pose: {
-                    rHP: 1.2, rKB: 0.04, rFP: 0.95, hipT: 0.5, hipP: -0.12, spP: -0.42, spY: 0.3, hdP: 0.3,
-                    lSP: 0.75, lSR: 0.85, lEB: 1.3, rSP: -0.25, rSR: 0.95, rEB: 0.9,
-                    fwd: 0.1, lFY: 0.5, turn: 0.25
+                    rHP: 1.48, rHR: 0.72, rKB: 0.0, rFP: 1.05,
+                    hipT: 0.78, hipP: -0.28, spP: -0.58, spY: 0.55, spR: -0.38, hdP: 0.35,
+                    lSP: 0.95, lSR: 1.35, lEB: 0.45, rSP: -0.65, rSR: 1.35, rEB: 0.35,
+                    fwd: 0.22, lFY: 0.68, lFP: 0.35, turn: 0.15
                 }
             },
-            { at: 'act', pose: { rHP: 1.28 } },
-            { at: 'rec:0.4', ease: 'inout', pose: { rHP: 1.15, rKB: 1.9, spP: -0.1, hipT: 0.3, lSR: 0.4, rSR: 0.4, rSP: 0.4, rEB: 1.9 } },
-            { at: 'rec:0.75', ease: 'in', pose: { rIK: 1, rFP: 0, hipS: 0.02, fwd: 0.02, lFY: 0.2 } }
+            { at: 'act', pose: { rHP: 1.56, rHR: 0.82, fwd: 0.26 } },
+            { at: 'rec:0.45', ease: 'inout', pose: { rHP: 1.15, rHR: 0.25, rKB: 1.85, spP: -0.12, hipT: 0.3, lSR: 0.45, rSR: 0.45, rSP: 0.4, rEB: 1.7 } },
+            { at: 'rec:0.8', ease: 'in', pose: { rIK: 1, rFP: 0, lFP: 0, hipS: 0.02, fwd: 0.02, lFY: 0.22 } }
         ]
     },
-    KICK_HEAVY: { // 360 spinning roundhouse: spot over the shoulder, pivot on the ball of the lead foot
+    KICK_HEAVY: { // 360 spinning high hook/roundhouse: deep torso tilt, wide eagle-wing arms, high head-level leg extension
         trail: 'rFoot',
         keepSpin: true,
         keys: [
             {
                 at: 'wind', ease: 'inout', pose: {
-                    spin: Math.PI * 0.95, hipY: -0.12, spP: 0.15, spY: -0.25, hdY: 0.9, hdP: 0.1,
-                    lFx: 0.03, lFz: 0.02, lFP: 0.4, rFx: 0.14, rFz: -0.25, rFP: 0.5, hipS: 0.06,
-                    lSP: 0.45, lSR: 1.0, lEB: 1.0, rSP: 0.4, rSR: 1.0, rEB: 1.0
+                    spin: Math.PI * 0.95, hipY: -0.16, spP: 0.25, spY: -0.45, hdY: 1.05, hdP: 0.15,
+                    lFx: 0.04, lFz: 0.04, lFP: 0.55, rFx: 0.16, rFz: -0.28, rFP: 0.6, hipS: 0.08,
+                    lSP: 0.55, lSR: 1.25, lEB: 0.75, rSP: 0.5, rSR: 1.25, rEB: 0.75
                 }
             },
             {
                 at: 'hit', ease: 'out', pose: {
-                    spin: Math.PI * 2, rIK: 0, rHP: 1.65, rHR: 1.0, rKB: 0.05, rFP: 0.85,
-                    spR: -0.75, spP: -0.4, hipR: -0.2, hdY: 0.2, hdP: 0.2,
-                    lSP: 0.15, lSR: 1.55, lEB: 0.25, rSP: 0.1, rSR: 1.45, rEB: 0.25,
-                    fwd: 0.12, turn: 0.2
+                    spin: Math.PI * 2, rIK: 0, rHP: 1.98, rHR: 1.28, rKB: 0.0, rFP: 1.0,
+                    spR: -0.95, spP: -0.58, hipR: -0.35, hipP: -0.25, hdY: 0.25, hdP: 0.25,
+                    lSP: 0.1, lSR: 1.75, lEB: 0.1, rSP: -0.2, rSR: 1.65, rEB: 0.1,
+                    fwd: 0.26, lift: 0.14, lFP: 0.55, turn: 0.15
                 }
             },
-            { at: 'act', pose: { spin: Math.PI * 2 + 0.3, rHR: 1.1 } },
-            { at: 'rec:0.5', ease: 'inout', pose: { spin: Math.PI * 2, rHP: 0.6, rHR: 0.3, rKB: 1.4, spR: -0.2, spP: 0.0, lSR: 0.6, rSR: 0.6, lEB: 1.5, rEB: 1.5, lFP: 0.1 } },
-            { at: 'rec:0.8', ease: 'in', pose: { rIK: 1, rFP: 0 } }
+            { at: 'act', pose: { spin: Math.PI * 2 + 0.38, rHP: 2.05, rHR: 1.35, fwd: 0.30 } },
+            { at: 'rec:0.55', ease: 'inout', pose: { spin: Math.PI * 2, lift: 0, rHP: 0.7, rHR: 0.3, rKB: 1.4, spR: -0.2, spP: 0.0, lSR: 0.6, rSR: 0.6, lEB: 1.4, rEB: 1.4, lFP: 0.1 } },
+            { at: 'rec:0.85', ease: 'in', pose: { rIK: 1, rFP: 0, lFP: 0 } }
         ]
     },
-    SLIDE_KICK: { // Oni signature slide sweep: drop, lean back, lead with the near leg
+    SLIDE_KICK: { // Oni signature baseball slide sweep: full ground drop, body stretched horizontal, kicking leg fully locked out
         trail: 'rFoot',
         keys: [
             {
                 at: 'wind', ease: 'in', pose: {
-                    hipY: -0.32, spP: 0.5, fwd: 0.1, lSP: -0.3, rSP: 1.0, rEB: 1.8,
-                    rFz: -0.1, rFP: 0.6
+                    hipY: -0.38, spP: 0.62, fwd: 0.16, lSP: -0.55, rSP: 1.25, rEB: 1.5,
+                    rFz: -0.12, rFP: 0.75
                 }
             },
             {
                 at: 'hit', ease: 'out', pose: {
-                    lIK: 0, rIK: 0, hipY: -0.66, hipP: -0.85, spP: -0.25, hdP: 0.5, fwd: 0,
-                    rHP: 0.85, rKB: 0.0, rFP: 0.9, lHP: 0.3, lKB: 1.85, lFP: 0.3,
-                    lSP: -1.1, lSR: 0.45, lEB: 0.15, rSP: 1.1, rSR: 0.3, rEB: 1.7, turn: 0.6
+                    lIK: 0, rIK: 0, hipY: -0.74, hipP: -1.08, spP: -0.38, hdP: 0.68, fwd: 0.34,
+                    rHP: 1.18, rHR: 0.22, rKB: 0.0, rFP: 1.05, lHP: 0.45, lHR: 0.45, lKB: 2.15, lFP: 0.4,
+                    lSP: -1.35, lSR: 0.75, lEB: 0.05, rSP: 1.35, rSR: 0.55, rEB: 1.25, turn: 0.5
                 }
             },
-            { at: 'act', pose: { hipY: -0.68, spP: -0.3 } },
-            { at: 'rec:0.5', ease: 'inout', pose: { hipY: -0.45, hipP: -0.3, spP: 0.45, rHP: 0.9, rKB: 1.3, lHP: 1.3, lKB: 2.0, lSP: 0.2, lEB: 1.0 } },
-            { at: 'rec:0.8', ease: 'out', pose: { lIK: 1, rIK: 1, hipY: -0.2, hipP: 0, spP: 0.25, rFP: 0, lFP: 0 } }
+            { at: 'act', pose: { hipY: -0.76, spP: -0.44, fwd: 0.40, rHP: 1.24 } },
+            { at: 'rec:0.5', ease: 'inout', pose: { hipY: -0.48, hipP: -0.32, spP: 0.52, rHP: 0.95, rKB: 1.35, lHP: 1.35, lKB: 2.0, lSP: 0.3, lEB: 1.0, fwd: 0.12 } },
+            { at: 'rec:0.85', ease: 'out', pose: { lIK: 1, rIK: 1, hipY: -0.18, hipP: 0, spP: 0.22, rFP: 0, lFP: 0, fwd: 0.02 } }
         ]
     },
-    COMBO_PUNCH_KICK: { // P-P-K finisher: high crescent kick with torso lean back
+    COMBO_PUNCH_KICK: { // P-P-K finisher: explosive high axe/crescent kick with dramatic torso lean-back
         trail: 'rFoot',
         keys: [
-            { at: 'wind', ease: 'out', pose: { rIK: 0, rHP: 1.45, rHR: 0.35, rKB: 2.1, hipT: 0.25, spP: -0.1, lSP: 1.0, rSP: 0.5 } },
+            { at: 'wind', ease: 'out', pose: { rIK: 0, rHP: 1.65, rHR: 0.55, rKB: 2.2, hipT: 0.38, spP: -0.22, lSP: 1.25, rSP: -0.35 } },
             {
                 at: 'hit', ease: 'out', pose: {
-                    rHP: 1.72, rHR: 0.75, rKB: 0.04, rFP: 0.85,
-                    hipT: 0.65, spP: -0.45, spR: -0.5, hdP: 0.25,
-                    lSP: 0.3, lSR: 1.35, lEB: 0.4, rSP: 0.2, rSR: 1.25, rEB: 0.4,
-                    fwd: 0.14, turn: 0.2
+                    rHP: 2.05, rHR: 0.95, rKB: 0.0, rFP: 1.0,
+                    hipT: 0.85, hipP: -0.32, spP: -0.64, spR: -0.68, hdP: 0.38,
+                    lSP: 0.25, lSR: 1.65, lEB: 0.15, rSP: -0.35, rSR: 1.55, rEB: 0.15,
+                    fwd: 0.28, lift: 0.12, lFP: 0.45, turn: 0.15
                 }
             },
-            { at: 'act', pose: { rHP: 1.8, rHR: 0.9 } },
-            { at: 'rec:0.5', ease: 'inout', pose: { rHP: 0.85, rHR: 0.2, rKB: 1.6, spP: -0.05, spR: -0.1, lSR: 0.4, rSR: 0.4 } },
-            { at: 'rec:0.8', ease: 'in', pose: { rIK: 1, rFP: 0, fwd: 0.02 } }
+            { at: 'act', pose: { rHP: 2.14, rHR: 1.08, fwd: 0.32 } },
+            { at: 'rec:0.5', ease: 'inout', pose: { lift: 0, rHP: 0.85, rHR: 0.2, rKB: 1.6, spP: -0.05, spR: -0.1, lSR: 0.45, rSR: 0.45 } },
+            { at: 'rec:0.85', ease: 'in', pose: { rIK: 1, rFP: 0, lFP: 0, fwd: 0.02 } }
         ]
     },
-    KICK_MID: { // K-K middle hit: chambered side thrust kick
+    KICK_MID: { // K-K middle hit: deep chambered Bruce Lee style side thrust kick
         trail: 'lFoot',
         keys: [
-            { at: 'wind', ease: 'out', pose: { lIK: 0, lHP: 1.4, lHR: 0.45, lKB: 2.15, hipT: -0.25, hipS: -0.05, spR: 0.25 } },
+            { at: 'wind', ease: 'out', pose: { lIK: 0, lHP: 1.62, lHR: 0.65, lKB: 2.3, hipT: -0.42, hipS: -0.08, spR: 0.38 } },
             {
                 at: 'hit', ease: 'out', pose: {
-                    lHP: 1.55, lHR: 0.85, lKB: 0.03, lFP: 0.75,
-                    hipT: -0.55, spP: -0.28, spR: 0.55, hdP: 0.15,
-                    lSP: 0.85, lSR: 0.9, lEB: 1.1, rSP: 0.7, rSR: 0.8, rEB: 1.6,
-                    fwd: 0.12, turn: 0.25
+                    lHP: 1.82, lHR: 1.12, lKB: 0.0, lFP: 0.9,
+                    hipT: -0.78, hipP: -0.25, spP: -0.45, spR: 0.78, hdP: 0.25,
+                    lSP: 1.05, lSR: 1.35, lEB: 0.35, rSP: -0.35, rSR: 1.25, rEB: 0.85,
+                    fwd: 0.26, rFP: 0.35, turn: 0.15
                 }
             },
-            { at: 'act', pose: { lHP: 1.6 } },
+            { at: 'act', pose: { lHP: 1.88, lHR: 1.18, fwd: 0.30 } },
             { at: 'rec:0.5', ease: 'inout', pose: { lHP: 0.95, lHR: 0.2, lKB: 1.7, spR: 0.1, hipT: 0 } },
-            { at: 'rec:0.8', ease: 'in', pose: { lIK: 1, lFP: 0 } }
+            { at: 'rec:0.85', ease: 'in', pose: { lIK: 1, lFP: 0, rFP: 0 } }
         ]
     },
-    RISING_FURY: { // Crouch+Jump+Kick: airborne 540 hurricane rising kick
+    RISING_FURY: { // Crouch+Jump+Kick: airborne 540 hurricane rising split kick
         trail: 'rFoot',
         keepSpin: true,
         keys: [
-            { at: 'wind', ease: 'in', pose: { hipY: -0.35, spP: 0.45, spin: Math.PI * 0.5, lSP: 0.5, rSP: 0.5 } },
+            { at: 'wind', ease: 'in', pose: { hipY: -0.42, spP: 0.62, spin: Math.PI * 0.5, lSP: 0.3, rSP: 0.3, lSR: 0.9, rSR: 0.9 } },
             {
                 at: 'hit', ease: 'out', pose: {
-                    lIK: 0, rIK: 0, lift: 0.35, spin: Math.PI * 1.65,
-                    rHP: 1.75, rHR: 0.95, rKB: 0.05, lHP: 0.85, lKB: 1.85,
-                    spP: -0.35, spR: -0.55, lSP: 0.3, lSR: 1.45, lEB: 0.35, rSP: 0.3, rSR: 1.45, rEB: 0.35
+                    lIK: 0, rIK: 0, lift: 0.52, spin: Math.PI * 1.65,
+                    rHP: 2.02, rHR: 1.22, rKB: 0.0, lHP: 1.05, lHR: 0.55, lKB: 2.05,
+                    spP: -0.55, spR: -0.78, lSP: 0.15, lSR: 1.72, lEB: 0.1, rSP: 0.15, rSR: 1.72, rEB: 0.1,
+                    fwd: 0.22
                 }
             },
-            { at: 'act', pose: { lift: 0.52, spin: Math.PI * 2.1, rHP: 1.85 } },
-            { at: 'rec:0.55', ease: 'inout', pose: { lift: 0.1, spin: Math.PI * 2, rHP: 0.7, rKB: 1.4, lSR: 0.5, rSR: 0.5 } },
+            { at: 'act', pose: { lift: 0.68, spin: Math.PI * 2.15, rHP: 2.12 } },
+            { at: 'rec:0.55', ease: 'inout', pose: { lift: 0.12, spin: Math.PI * 2, rHP: 0.7, rKB: 1.4, lSR: 0.5, rSR: 0.5 } },
             { at: 'rec:0.85', ease: 'in', pose: { lIK: 1, rIK: 1, lift: 0 } }
         ]
     },
-    DASH_PUNCH: { // Running lunging haymaker
+    DASH_PUNCH: { // Running lunging full-body haymaker
         trail: 'rFist',
         keys: [
-            { at: 'wind', ease: 'out', pose: { hipY: -0.16, spY: -0.75, spP: 0.25, rSP: -0.25, rSR: 0.65, rEB: 1.6, lSP: 1.3, fwd: -0.05 } },
+            { at: 'wind', ease: 'out', pose: { hipY: -0.20, spY: -0.95, spP: 0.35, rSP: -0.55, rSR: 0.85, rEB: 1.4, lSP: 1.45, lEB: 0.5, fwd: -0.08 } },
             {
                 at: 'hit', ease: 'out', pose: {
-                    hipT: 0.7, spY: 1.15, spP: 0.38, hipY: -0.15, fwd: 0.28,
-                    rSP: 1.62, rSR: -0.05, rSY: 0.45, rEB: 0.02,
-                    lSP: 0.3, lSR: 0.65, lEB: 2.3,
-                    lFz: 0.36, rFz: -0.24, rFP: 0.65, turn: 0.05
+                    hipT: 0.92, spY: 1.42, spP: 0.52, spR: -0.22, hipY: -0.18, fwd: 0.44,
+                    rSP: 1.75, rSR: -0.08, rSY: -0.15, rEB: 0.0,
+                    lSP: -0.65, lSR: 0.95, lEB: 1.1,
+                    lFz: 0.48, rFz: -0.30, rFP: 0.85, turn: 0.0
                 }
             },
-            { at: 'act', pose: { fwd: 0.32, rSP: 1.68 } },
-            { at: 'rec:0.45', ease: 'inout', pose: { fwd: 0.08, spY: 0.35, rSP: 0.95, rEB: 1.5, rFP: 0.2 } }
+            { at: 'act', pose: { fwd: 0.48, rSP: 1.82, spY: 1.48 } },
+            { at: 'rec:0.5', ease: 'inout', pose: { fwd: 0.10, spY: 0.35, rSP: 0.95, rEB: 1.4, rFP: 0.2 } }
         ]
     },
-    FLYING_KICK: { // Running airborne dropkick / flying side kick
+    FLYING_KICK: { // Running airborne dropkick / flying side kick — full horizontal airborne layout
         trail: 'rFoot',
         keys: [
-            { at: 'wind', ease: 'out', pose: { lIK: 0, rIK: 0, lift: 0.18, rHP: 1.35, rKB: 1.9, lHP: 0.9, lKB: 1.7, spP: 0.2 } },
+            { at: 'wind', ease: 'out', pose: { lIK: 0, rIK: 0, lift: 0.26, rHP: 1.55, rKB: 2.0, lHP: 1.1, lKB: 1.85, spP: 0.3 } },
             {
                 at: 'hit', ease: 'out', pose: {
-                    lIK: 0, rIK: 0, lift: 0.38, hipP: -0.55, spP: -0.35, spR: -0.45,
-                    rHP: 1.65, rHR: 0.55, rKB: 0.02, rFP: 0.85,
-                    lHP: 0.95, lKB: 2.1,
-                    lSP: 0.4, lSR: 1.25, lEB: 0.5, rSP: 0.2, rSR: 1.25, rEB: 0.5,
-                    fwd: 0.22, turn: 0.3
+                    lIK: 0, rIK: 0, lift: 0.54, hipP: -0.78, spP: -0.52, spR: -0.65,
+                    rHP: 1.88, rHR: 0.78, rKB: 0.0, rFP: 1.0,
+                    lHP: 1.15, lHR: 0.45, lKB: 2.25,
+                    lSP: 0.35, lSR: 1.55, lEB: 0.2, rSP: -0.35, rSR: 1.55, rEB: 0.2,
+                    fwd: 0.38, turn: 0.2
                 }
             },
-            { at: 'act', pose: { lift: 0.42, rHP: 1.72, fwd: 0.26 } },
-            { at: 'rec:0.5', ease: 'inout', pose: { lift: 0.08, hipP: -0.1, spP: 0.2, rHP: 0.8, rKB: 1.5, fwd: 0.05 } },
+            { at: 'act', pose: { lift: 0.58, rHP: 1.96, fwd: 0.44 } },
+            { at: 'rec:0.5', ease: 'inout', pose: { lift: 0.1, hipP: -0.1, spP: 0.2, rHP: 0.8, rKB: 1.5, fwd: 0.08 } },
             { at: 'rec:0.85', ease: 'in', pose: { lIK: 1, rIK: 1, lift: 0, rFP: 0 } }
         ]
     },
-    BACK_SPIN_FIST: { // Back + Punch: spinning backfist
+    BACK_SPIN_FIST: { // Back + Punch: wide spinning backfist whip
         trail: 'lFist',
         keepSpin: true,
         keys: [
-            { at: 'wind', ease: 'in', pose: { spin: -Math.PI * 0.85, hipY: -0.12, spY: 0.45, lSP: 0.7, lSR: 0.3, lEB: 1.9 } },
+            { at: 'wind', ease: 'in', pose: { spin: -Math.PI * 0.9, hipY: -0.16, spY: 0.65, lSP: 0.6, lSR: 0.5, lEB: 2.1 } },
             {
                 at: 'hit', ease: 'out', pose: {
-                    spin: -Math.PI * 2, hipY: -0.1, spY: -0.85, spP: 0.18, fwd: 0.16,
-                    lSP: 1.55, lSR: 0.95, lSY: -0.3, lEB: 0.08,
-                    rSP: 0.7, rEB: 2.2, turn: 0.2
+                    spin: -Math.PI * 2, hipY: -0.12, spY: -1.15, spP: 0.28, fwd: 0.28,
+                    lSP: 1.65, lSR: 1.35, lSY: -0.45, lEB: 0.0,
+                    rSP: -0.45, rSR: 0.85, rEB: 1.6, turn: 0.15
                 }
             },
-            { at: 'act', pose: { lSR: 1.1, fwd: 0.18 } },
+            { at: 'act', pose: { lSR: 1.48, fwd: 0.32 } },
             { at: 'rec:0.5', ease: 'inout', pose: { spin: -Math.PI * 2, spY: -0.25, lSP: 1.0, lSR: 0.35, lEB: 1.5, fwd: 0.04 } }
         ]
     },
-    WILLOW_KICK: { // Back + Kick: overhead backward arc kick (倒挂金钩)
+    WILLOW_KICK: { // Back + Kick: overhead backward scorpion/arc kick (倒挂金钩)
         trail: 'rFoot',
         keys: [
-            { at: 'wind', ease: 'out', pose: { hipY: -0.24, spP: 0.55, hdP: 0.35, lSP: 0.2, rSP: 0.2 } },
+            { at: 'wind', ease: 'out', pose: { hipY: -0.32, spP: 0.75, hdP: 0.45, lSP: -0.2, rSP: -0.2 } },
             {
                 at: 'hit', ease: 'out', pose: {
-                    rIK: 0, hipY: -0.15, hipP: 0.65, spP: 0.85, hdP: 0.45,
-                    rHP: 2.15, rHR: 0.25, rKB: 0.05, rFP: 0.9,
-                    lSP: -0.6, lSR: 0.85, lEB: 0.3, rSP: -0.6, rSR: 0.85, rEB: 0.3,
-                    fwd: 0.08, turn: 0.3
+                    rIK: 0, hipY: -0.18, hipP: 0.92, spP: 1.05, hdP: 0.55,
+                    rHP: 2.42, rHR: 0.35, rKB: 0.0, rFP: 1.05,
+                    lSP: -0.95, lSR: 1.15, lEB: 0.1, rSP: -0.95, rSR: 1.15, rEB: 0.1,
+                    fwd: 0.18, lFP: 0.45, turn: 0.25
                 }
             },
-            { at: 'act', pose: { rHP: 2.25, hipP: 0.75 } },
+            { at: 'act', pose: { rHP: 2.52, hipP: 0.98 } },
             { at: 'rec:0.5', ease: 'inout', pose: { hipP: 0.2, spP: 0.3, rHP: 0.9, rKB: 1.5, lSP: 0.6, rSP: 0.6 } },
-            { at: 'rec:0.85', ease: 'in', pose: { rIK: 1, rFP: 0 } }
+            { at: 'rec:0.85', ease: 'in', pose: { rIK: 1, rFP: 0, lFP: 0 } }
         ]
     },
     GROUND_STOMP: { // Downed opponent stomp: high knee raise -> heavy heel slam
@@ -417,17 +419,17 @@ export const ATTACK_ANIMS = {
     DISARM_KICK: { // Run + Jump + Punch: acrobatic vaulting disarm kick + mid-air weapon snatch
         trail: 'rFoot',
         keys: [
-            { at: 'wind', ease: 'out', pose: { lIK: 0, rIK: 0, lift: 0.28, hipP: -0.35, rHP: 1.45, rKB: 1.8, lHP: 0.9, lKB: 1.6, rSP: 1.3, lSP: 0.8 } },
+            { at: 'wind', ease: 'out', pose: { lIK: 0, rIK: 0, lift: 0.32, hipP: -0.45, rHP: 1.65, rKB: 1.9, lHP: 1.05, lKB: 1.75, rSP: 1.45, lSP: 0.9 } },
             {
                 at: 'hit', ease: 'out', pose: {
-                    lIK: 0, rIK: 0, lift: 0.48, hipP: -0.65, spP: -0.25,
-                    rHP: 1.8, rHR: 0.45, rKB: 0.04, rFP: 0.85,
-                    lHP: 1.05, lKB: 2.0,
-                    rSP: 1.75, rEB: 0.2, lSP: -0.4, lSR: 0.95, lEB: 0.5,
-                    fwd: 0.24, turn: 0.25
+                    lIK: 0, rIK: 0, lift: 0.58, hipP: -0.82, spP: -0.42,
+                    rHP: 2.02, rHR: 0.65, rKB: 0.0, rFP: 1.0,
+                    lHP: 1.15, lKB: 2.15,
+                    rSP: 1.85, rEB: 0.05, lSP: -0.65, lSR: 1.35, lEB: 0.25,
+                    fwd: 0.36, turn: 0.2
                 }
             },
-            { at: 'act', pose: { lift: 0.45, rHP: 1.85, rSP: 1.8 } },
+            { at: 'act', pose: { lift: 0.55, rHP: 2.08, rSP: 1.9 } },
             { at: 'rec:0.55', ease: 'inout', pose: { lift: 0.1, hipP: -0.1, spP: 0.15, rHP: 0.8, rKB: 1.4, rSP: 1.0, rEB: 1.4 } },
             { at: 'rec:0.85', ease: 'in', pose: { lIK: 1, rIK: 1, lift: 0, rFP: 0 } }
         ]
@@ -606,8 +608,8 @@ function gaitFoot(phase, stride, stanceFrac, liftH) {
 }
 
 export const GAIT = {
-    WALK: { perMeter: 9.5, stance: 0.6 },
-    RUN: { perMeter: 4.2, stance: 0.36 }
+    WALK: { perMeter: 7.2, stance: 0.54 },
+    RUN: { perMeter: 3.1, stance: 0.30 }
 };
 
 /**
@@ -692,7 +694,7 @@ export function resolvePose(out, f, loco, t) {
         return out;
     }
 
-    if (st === FIGHTER_STATE.BLOCK || f.isBlocking) {
+    if (st === FIGHTER_STATE.BLOCK || (f.isBlocking && st !== FIGHTER_STATE.WALK)) {
         Object.assign(out, BLOCK);
         if (st === FIGHTER_STATE.BLOCK && timer < 5) { out.fwd = -0.1; out.spP = 0.12; out.rFP = 0.2; } // blockstun shove
         return out;
@@ -708,63 +710,94 @@ export function resolvePose(out, f, loco, t) {
         const s = Math.sin(ph), c = Math.cos(ph);
         const g = GAIT.RUN;
         const stride = (Math.PI * 2 / g.perMeter) * g.stance;
-        const L = gaitFoot(ph, stride, g.stance, 0.16);
-        const R = gaitFoot(ph + Math.PI, stride, g.stance, 0.16);
+        const L = gaitFoot(ph, stride, g.stance, 0.26);
+        const R = gaitFoot(ph + Math.PI, stride, g.stance, 0.26);
         Object.assign(out, GUARD, {
-            lFx: 0.07, rFx: 0.07, lFY: 0.05, rFY: 0.05,
-            lFz: 0.05 + L.z - L.swing * 0.12, lFy: L.y, lFP: L.swing * 0.7,
-            rFz: 0.05 + R.z - R.swing * 0.12, rFy: R.y, rFP: R.swing * 0.7,
-            hipY: -0.06 - Math.abs(c) * 0.035, fwd: 0.06,
-            hipT: -s * 0.18, hipR: s * 0.05, hipS: 0, spP: 0.48, spY: s * 0.32, spR: 0, hdP: -0.3, hdY: 0,
-            lSP: s * 1.2 + 0.3, lSR: 0.15, lSY: 0.1, lEB: 1.55 + Math.max(0, s) * 0.4,
-            rSP: -s * 1.2 + 0.3, rSR: 0.15, rSY: 0.1, rEB: 1.55 + Math.max(0, -s) * 0.4,
-            turn: 0.15
+            lFx: 0.08, rFx: 0.08, lFY: 0.05, rFY: 0.05,
+            lFz: 0.08 + L.z - L.swing * 0.14, lFy: L.y, lFP: L.swing * 0.88,
+            rFz: 0.08 + R.z - R.swing * 0.14, rFy: R.y, rFP: R.swing * 0.88,
+            hipY: -0.09 - Math.abs(c) * 0.06, fwd: 0.12,
+            hipT: -s * 0.32, hipR: s * 0.08, hipS: 0, spP: 0.62, spY: s * 0.48, spR: 0, hdP: -0.38, hdY: 0,
+            lSP: s * 1.55 + 0.35, lSR: 0.24, lSY: 0.05, lEB: 1.35 + Math.max(0, s) * 0.55,
+            rSP: -s * 1.55 + 0.35, rSR: 0.24, rSY: 0.05, rEB: 1.35 + Math.max(0, -s) * 0.55,
+            turn: 0.1
         });
         out.gait = true;
         return out;
     }
 
     if (st === FIGHTER_STATE.WALK) {
-        // fighting-stance shuffle: feet keep their bladed spacing and never cross
+        // Oni 2001 4-Directional Combat Footwork:
+        // Decompose velocity into character-local forward (fwdFrac) and lateral strafe (sideFrac)
         const ph = loco.phase;
-        const s = Math.sin(ph);
+        const s = Math.sin(ph), c = Math.cos(ph);
         const g = GAIT.WALK;
         const stride = (Math.PI * 2 / g.perMeter) * g.stance;
-        const L = gaitFoot(ph, stride, g.stance, 0.07);
-        const R = gaitFoot(ph + Math.PI, stride, g.stance, 0.07);
+        const L = gaitFoot(ph, stride, g.stance, 0.15);
+        const R = gaitFoot(ph + Math.PI, stride, g.stance, 0.15);
+
+        const yaw = typeof f.facingAngle === 'number' ? f.facingAngle : (f.facing === -1 ? Math.PI : 0);
+        const fx = Math.cos(yaw), fz = Math.sin(yaw);
+        const rx = -fz, rz = fx;
+        const spd = Math.hypot(f.vx || 0, f.vz || 0);
+        const fwdFrac = spd > 0.05 ? ((f.vx * fx + f.vz * fz) / spd) : 1;
+        const sideFrac = spd > 0.05 ? ((f.vx * rx + f.vz * rz) / spd) : 0;
+        const absFwd = Math.abs(fwdFrac), absSide = Math.abs(sideFrac);
+
         Object.assign(out, GUARD);
-        out.lFz += L.z; out.lFy = L.y; out.lFP = L.swing * 0.25;
-        out.rFz += R.z; out.rFy = R.y; out.rFP = R.swing * 0.25;
-        out.hipY = GUARD.hipY - 0.015 - Math.abs(Math.cos(ph)) * 0.02;
-        out.hipS = (L.swing - R.swing) * -0.02;
-        out.hipR = (L.swing - R.swing) * 0.04;
-        out.hipT = GUARD.hipT + s * 0.06;
-        out.spY = GUARD.spY - s * 0.1;
-        out.spP = GUARD.spP + 0.04;
-        out.lSP = GUARD.lSP - s * 0.1;
-        out.rSP = GUARD.rSP + s * 0.1;
+        // Forward/back foot stride + lateral sidestep foot spacing transfer
+        out.lFz += L.z * 1.38 * (0.35 + 0.65 * absFwd);
+        out.rFz += R.z * 1.38 * (0.35 + 0.65 * absFwd);
+        out.lFx = Math.max(0.06, GUARD.lFx + L.z * 0.55 * sideFrac + Math.max(0, -sideFrac) * L.swing * 0.11);
+        out.rFx = Math.max(0.06, GUARD.rFx - R.z * 0.55 * sideFrac + Math.max(0, sideFrac) * R.swing * 0.11);
+        out.lFy = L.y * (0.85 + 0.25 * absSide);
+        out.rFy = R.y * (0.85 + 0.25 * absSide);
+        out.lFP = L.swing * 0.46 + (fwdFrac < -0.25 ? 0.18 : 0);
+        out.rFP = R.swing * 0.46 + (fwdFrac < -0.25 ? 0.22 : 0.12);
+
+        // Pelvis & torso directional banking (lean into forward advance, guarded coil on retreat, bank on lateral strafe)
+        out.hipY = GUARD.hipY - 0.03 - Math.abs(c) * 0.045;
+        out.fwd = GUARD.fwd + fwdFrac * 0.085;
+        out.hipS = (L.swing - R.swing) * -0.045 - sideFrac * 0.065;
+        out.hipR = (L.swing - R.swing) * 0.075 + sideFrac * 0.14;
+        out.hipT = GUARD.hipT + s * 0.22 * (0.4 + 0.6 * absFwd) - sideFrac * 0.18;
+        out.spP = GUARD.spP + fwdFrac * 0.14 + Math.abs(s) * 0.04;
+        out.spY = GUARD.spY - s * 0.32 * (0.45 + 0.55 * absFwd) + sideFrac * 0.16;
+        out.spR = GUARD.spR - sideFrac * 0.18 + (L.swing - R.swing) * 0.06;
+        out.hdP = GUARD.hdP - fwdFrac * 0.08;
+
+        // If retreating (auto-guarding while walking backward), raise high forearm guard while legs step back!
+        if (f.isBlocking || fwdFrac < -0.25) {
+            out.lSP = 1.24 - s * 0.16; out.lSR = 0.08; out.lSY = 0.28; out.lEB = 2.15;
+            out.rSP = 1.08 + s * 0.16; out.rSR = 0.12; out.rSY = 0.34; out.rEB = 2.25;
+        } else {
+            out.lSP = GUARD.lSP - s * 0.36;
+            out.rSP = GUARD.rSP + s * 0.36;
+            out.lEB = GUARD.lEB + s * 0.15;
+            out.rEB = GUARD.rEB - s * 0.15;
+        }
         out.gait = true;
         return out;
     }
 
-    // IDLE: bounce on the balls of the feet + weight shift + breathing (non-repeating mix)
+    // IDLE: rhythmic martial-arts footwork bounce + weight transfer + open guard breathing
     Object.assign(out, GUARD);
-    const b = Math.sin(t * 5.2);
-    const w = Math.sin(t * 1.3 + (f.id === 'p2' ? 1.7 : 0));
-    const br = Math.sin(t * 2.1);
-    out.hipY = GUARD.hipY + b * 0.022 - 0.01;
-    out.hipS = w * 0.025;
-    out.hipR = w * 0.04;
-    out.hipT = GUARD.hipT + w * 0.05;
-    out.spP = GUARD.spP + b * 0.03 + br * 0.025;
-    out.spR = GUARD.spR - w * 0.05;
-    out.spY = GUARD.spY + Math.sin(t * 0.9) * 0.07;
-    out.hdY = GUARD.hdY - w * 0.05;
-    out.lFP = Math.max(0, b) * 0.12;
-    out.rFP = 0.15 + Math.max(0, b) * 0.15;
-    out.lSP = GUARD.lSP + br * 0.06;
-    out.rSP = GUARD.rSP - br * 0.05;
-    out.lEB = GUARD.lEB + b * 0.07;
-    out.rEB = GUARD.rEB - b * 0.06;
+    const b = Math.sin(t * 5.6);
+    const w = Math.sin(t * 1.6 + (f.id === 'p2' ? 1.7 : 0));
+    const br = Math.sin(t * 2.4);
+    out.hipY = GUARD.hipY + b * 0.036 - 0.012;
+    out.hipS = w * 0.045;
+    out.hipR = w * 0.06;
+    out.hipT = GUARD.hipT + w * 0.09;
+    out.spP = GUARD.spP + b * 0.045 + br * 0.035;
+    out.spR = GUARD.spR - w * 0.07;
+    out.spY = GUARD.spY + Math.sin(t * 1.1) * 0.11;
+    out.hdY = GUARD.hdY - w * 0.07;
+    out.lFP = Math.max(0, b) * 0.20;
+    out.rFP = 0.22 + Math.max(0, b) * 0.22;
+    out.lSP = GUARD.lSP + br * 0.10;
+    out.rSP = GUARD.rSP - br * 0.09;
+    out.lEB = GUARD.lEB + b * 0.11;
+    out.rEB = GUARD.rEB - b * 0.10;
     return out;
 }

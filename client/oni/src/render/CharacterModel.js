@@ -162,17 +162,36 @@ function faceTexture(p) {
 
 // ------------------------------------------------------------------ model
 
+/**
+ * Stylized 3-tone anime/retro cel-shading ramp for Oni (2001) aesthetic.
+ * Eliminates glossy plastic/mirror specular highlights and produces crisp anime shading planes.
+ */
+function makeCelGradientMap() {
+    const data = new Uint8Array([
+        95, 95, 95, 255,
+        175, 175, 175, 255,
+        255, 255, 255, 255
+    ]);
+    const tex = new THREE.DataTexture(data, 3, 1, THREE.RGBAFormat);
+    tex.minFilter = THREE.NearestFilter;
+    tex.magFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    return tex;
+}
+
 const PALETTES = {
     konoko: {
-        suit: 0x1a1f33, suit2: 0x262d4a, armor: 0xf0f3fa, trim: 0x39405e, accent: 0x22e8ff,
-        skin: 0xf6d2bb, skinCss: '#f6d2bb', hair: 0x8a3cff, hairEmissive: 0x2a0a5c,
-        glove: 0x20253a, sole: 0x14161f, outline: 0x0a0814,
-        irisTop: '#4b1d8f', irisBot: '#c06bff', browCss: '#5a2aa8'
+        // Oni 2001 Konoko TCTF Assault Suit: deep indigo-violet bodysuit + matte purple-slate tactical vest
+        suit: 0x262344, suit2: 0x1b1932, armor: 0x4b437a, trim: 0x2d3142, accent: 0x38bdf8,
+        skin: 0xf4cfb8, skinCss: '#f4cfb8', hair: 0x7c3aed, hairEmissive: 0x190833,
+        glove: 0x1e1d30, sole: 0x14151c, outline: 0x090812,
+        irisTop: '#4b1d8f', irisBot: '#a855f7', browCss: '#4c1d95'
     },
     trooper: {
-        suit: 0x1d1c24, suit2: 0x2c2b36, armor: 0x7a8296, trim: 0x353744, accent: 0xff2a5c,
+        // Oni 2001 Syndicate Striker: matte charcoal polymer armor + crimson tactical visor
+        suit: 0x1e2028, suit2: 0x2a2d38, armor: 0x4a5060, trim: 0x2d303b, accent: 0xef4444,
         skin: 0x2e2a36, skinCss: '#2e2a36', hair: 0x15151b, hairEmissive: 0x000000,
-        glove: 0x1b1a20, sole: 0x0d0d11, outline: 0x050408,
+        glove: 0x181920, sole: 0x0e0f14, outline: 0x06060a,
         irisTop: '#000', irisBot: '#000', browCss: '#000'
     }
 };
@@ -208,24 +227,20 @@ export class CharacterModel {
 
     makeMaterials() {
         const p = this.p;
+        const grad = makeCelGradientMap();
         this.mat = {
-            suit: new THREE.MeshStandardMaterial({ color: p.suit, roughness: 0.55, metalness: 0.2 }),
-            suit2: new THREE.MeshStandardMaterial({ color: p.suit2, roughness: 0.45, metalness: 0.35 }),
-            armor: new THREE.MeshPhysicalMaterial({
-                color: p.armor, roughness: 0.22, metalness: this.isP1 ? 0.1 : 0.45,
-                clearcoat: 1, clearcoatRoughness: 0.12
-            }),
-            trim: new THREE.MeshStandardMaterial({ color: p.trim, roughness: 0.35, metalness: 0.7 }),
-            accent: new THREE.MeshStandardMaterial({ color: p.accent, emissive: p.accent, emissiveIntensity: 2.4, roughness: 0.3 }),
-            skin: new THREE.MeshStandardMaterial({ color: p.skin, roughness: 0.6 }),
-            face: new THREE.MeshStandardMaterial({ map: this.isP1 ? faceTexture(p) : null, color: this.isP1 ? 0xffffff : p.skin, roughness: 0.6 }),
-            hair: new THREE.MeshStandardMaterial({
-                color: p.hair, roughness: 0.32, metalness: 0.15, emissive: p.hairEmissive, emissiveIntensity: 0.7
-            }),
-            glove: new THREE.MeshStandardMaterial({ color: p.glove, roughness: 0.45, metalness: 0.3 }),
-            sole: new THREE.MeshStandardMaterial({ color: p.sole, roughness: 0.8 })
+            suit: new THREE.MeshToonMaterial({ color: p.suit, gradientMap: grad }),
+            suit2: new THREE.MeshToonMaterial({ color: p.suit2, gradientMap: grad }),
+            armor: new THREE.MeshToonMaterial({ color: p.armor, gradientMap: grad }),
+            trim: new THREE.MeshToonMaterial({ color: p.trim, gradientMap: grad }),
+            accent: new THREE.MeshBasicMaterial({ color: p.accent }),
+            skin: new THREE.MeshToonMaterial({ color: p.skin, gradientMap: grad }),
+            face: new THREE.MeshToonMaterial({ map: this.isP1 ? faceTexture(p) : null, color: this.isP1 ? 0xffffff : p.skin, gradientMap: grad }),
+            hair: new THREE.MeshToonMaterial({ color: p.hair, gradientMap: grad }),
+            glove: new THREE.MeshToonMaterial({ color: p.glove, gradientMap: grad }),
+            sole: new THREE.MeshToonMaterial({ color: p.sole, gradientMap: grad })
         };
-        this.matOutline = outlineMaterial(p.outline, this.isP1 ? 0.0065 : 0.0075);
+        this.matOutline = outlineMaterial(p.outline, this.isP1 ? 0.0085 : 0.0095);
     }
 
     // queue a part on a joint; baked later (one mesh per joint+material)

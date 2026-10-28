@@ -41,8 +41,11 @@ test.describe('Oni Combat 3D Fighting Game', () => {
 
         const state = await page.evaluate(() => window.__oni.getState());
         expect(state.isPlaying).toBe(true);
+        expect(state.isMultiplayer).toBe(false);
         expect(state.p1.hp).toBeGreaterThan(0);
         expect(state.p2.hp).toBeGreaterThan(0);
+        // Verify Bot AI actively moved from its initial spawn (x = 2.6) or acted
+        expect(Math.abs(state.p2.x - 2.6)).toBeGreaterThan(0.05);
 
         // Verify no uncaught browser runtime errors occurred
         expect(errors).toEqual([]);
