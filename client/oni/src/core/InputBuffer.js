@@ -16,11 +16,12 @@ export class InputBuffer {
             jump: false,
             punchJustPressed: false,
             kickJustPressed: false,
+            slideJustPressed: false,
             frame: 0
         }));
         this.head = 0;
         this.currentFrame = 0;
-        this.prevRaw = { punch: false, kick: false, block: false, jump: false };
+        this.prevRaw = { punch: false, kick: false, block: false, jump: false, slide: false };
     }
 
     /**
@@ -33,16 +34,20 @@ export class InputBuffer {
 
         const punchJustPressed = !!raw.punch && !this.prevRaw.punch;
         const kickJustPressed = !!raw.kick && !this.prevRaw.kick;
+        const slideJustPressed = !!raw.slide && !this.prevRaw.slide;
 
         this.buffer[this.head] = {
             dirX: raw.dirX || 0,
             dirZ: raw.dirZ || 0,
+            // screen-space "down" for motion commands; falls back to world +Z (side view)
+            down: raw.down !== undefined ? !!raw.down : (raw.dirZ || 0) > 0.4,
             punch: !!raw.punch,
             kick: !!raw.kick,
             block: !!raw.block,
             jump: !!raw.jump,
             punchJustPressed,
             kickJustPressed,
+            slideJustPressed,
             frame: this.currentFrame
         };
 
@@ -50,7 +55,8 @@ export class InputBuffer {
             punch: !!raw.punch,
             kick: !!raw.kick,
             block: !!raw.block,
-            jump: !!raw.jump
+            jump: !!raw.jump,
+            slide: !!raw.slide
         };
     }
 
@@ -109,7 +115,7 @@ export class InputBuffer {
             const entry = this.get(i);
             if (!entry) break;
 
-            if (entry.dirZ > 0.4) sawDown = true;
+            if (entry.down) sawDown = true;
             if (Math.sign(entry.dirX) === facingSign) sawForward = true;
         }
 
@@ -130,9 +136,10 @@ export class InputBuffer {
                 jump: false,
                 punchJustPressed: false,
                 kickJustPressed: false,
+                slideJustPressed: false,
                 frame: 0
             };
         }
-        this.prevRaw = { punch: false, kick: false, block: false, jump: false };
+        this.prevRaw = { punch: false, kick: false, block: false, jump: false, slide: false };
     }
 }

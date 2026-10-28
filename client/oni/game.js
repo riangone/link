@@ -65,6 +65,9 @@ function init() {
     const keysDown = {};
     window.addEventListener('keydown', (e) => {
         keysDown[e.code] = true;
+        const camKeys = { Digit1: 'side', Digit2: 'diagonal', Digit3: 'shoulder', Digit4: 'top' };
+        if (camKeys[e.code]) setCam(threeScene.setCameraMode(camKeys[e.code]));
+        if (e.code === 'Digit0') threeScene.resetOrbit();
         if (!isPlaying && (e.code === 'Space' || e.code === 'Enter')) {
             startFight();
         }
@@ -72,6 +75,20 @@ function init() {
     window.addEventListener('keyup', (e) => {
         keysDown[e.code] = false;
     });
+
+    // Camera view switcher
+    const btnCam = document.getElementById('btn-camera');
+    const btnCamText = document.getElementById('btn-camera-text');
+    function setCam(mode) {
+        if (btnCamText) btnCamText.textContent = (locale.cam_modes && locale.cam_modes[mode]) || mode;
+    }
+    if (btnCam) {
+        btnCam.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setCam(threeScene.cycleCameraMode());
+        });
+    }
+    setCam(threeScene.camMode);
 
     // Touch Virtual Joystick & Buttons
     const touchState = { punch: false, kick: false, block: false, slide: false };
@@ -180,19 +197,24 @@ function init() {
         }
         dirX = Math.max(-1, Math.min(1, dirX));
         dirZ = Math.max(-1, Math.min(1, dirZ));
+        const down = dirZ > 0.4; // screen-space "down" for motion commands (uppercut)
+
+        // screen-relative stick -> world axes, following the current camera yaw
+        const yaw = threeScene.getInputYaw();
+        const c = Math.cos(yaw), sn = Math.sin(yaw);
+        const snap = v => (Math.abs(v) < 0.15 ? 0 : Math.max(-1, Math.min(1, v)));
+        const wx = snap(c * dirX + sn * dirZ);
+        const wz = snap(-sn * dirX + c * dirZ);
+        dirX = wx; dirZ = wz;
 
         const punch = !!(keysDown['KeyJ'] || keysDown['KeyZ'] || touchState.punch);
-        let kick = !!(keysDown['KeyK'] || keysDown['KeyX'] || touchState.kick);
+        const kick = !!(keysDown['KeyK'] || keysDown['KeyX'] || touchState.kick);
         const block = !!(keysDown['KeyL'] || keysDown['KeyC'] || touchState.block);
         const jump = !!keysDown['Space'];
 
-        // Quick slide-kick button trigger
-        if (touchState.slide) {
-            sim.f1.dashTimer = 25; // Trigger sprint state
-            kick = true;
-        }
+        const slide = !!(keysDown['KeyI'] || keysDown['KeyV'] || touchState.slide);
 
-        return { dirX, dirZ, punch, kick, block, jump };
+        return { dirX, dirZ, down, punch, kick, block, jump, slide };
     }
 
     // Match State
@@ -244,6 +266,7 @@ function init() {
         koBanner.style.display = 'none';
         sim.reset();
         isPlaying = true;
+        document.body.classList.add('in-fight');
     }
 
     btnStart.addEventListener('click', startFight);
@@ -257,6 +280,7 @@ function init() {
                 vfx.spawnHitSpark(ev.hitPoint.x, ev.hitPoint.y, ev.hitPoint.z, ev.blocked);
 
                 // Heavy impacts produce shockwaves & camera shake
+                if (!ev.blocked) threeScene.hitFlash(ev.knockdown ? 0.22 : 0.08);
                 if (ev.knockdown) {
                     threeScene.addTrauma(0.45);
                     vfx.spawnShockwave(ev.hitPoint.x, 0.05, ev.hitPoint.z, ev.attacker === 'p1' ? 0x00f0ff : 0xff0055);
@@ -331,6 +355,7 @@ function init() {
 
         // Visual Updates & Rendering
         const timeSec = currentTime / 1000;
+        meshP1.camYaw = meshP2.camYaw = threeScene.camYaw;
         meshP1.update(sim.f1, timeSec);
         meshP2.update(sim.f2, timeSec);
 

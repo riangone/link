@@ -72,6 +72,7 @@ export class Fighter {
         this.isGrounded = true;
         this.isBlocking = false;
         this.invincible = false;
+        this.dashTimer = 0;
         this.inputBuffer.clear();
     }
 
@@ -100,6 +101,7 @@ export class Fighter {
         const input = this.inputBuffer.get(0);
 
         this.stateTimer++;
+        if (this.dashTimer > 0) this.dashTimer--;
 
         // Combo reset decay
         if (this.comboResetTimer > 0) {
@@ -182,8 +184,15 @@ export class Fighter {
     handleIdle(input, opponent) {
         this.isBlocking = input.block;
 
-        // Check Dash
-        if (this.inputBuffer.checkDashForward(this.facing)) {
+        // Dedicated slide button (touch ⚡ / keyboard I)
+        if (input.slideJustPressed && this.isGrounded) {
+            this.transitionTo(FIGHTER_STATE.ATTACK, MOVES.SLIDE_KICK);
+            return;
+        }
+
+        // Check Dash (double-tap forward, or touch-joystick double-tap via dashTimer)
+        if (this.inputBuffer.checkDashForward(this.facing) || (this.dashTimer > 0 && Math.sign(input.dirX) === this.facing)) {
+            this.dashTimer = 0;
             this.transitionTo(FIGHTER_STATE.RUN);
             return;
         }
@@ -208,8 +217,15 @@ export class Fighter {
     handleWalk(input, opponent) {
         this.isBlocking = input.block;
 
-        // Check Dash
-        if (this.inputBuffer.checkDashForward(this.facing)) {
+        // Dedicated slide button (touch ⚡ / keyboard I)
+        if (input.slideJustPressed && this.isGrounded) {
+            this.transitionTo(FIGHTER_STATE.ATTACK, MOVES.SLIDE_KICK);
+            return;
+        }
+
+        // Check Dash (double-tap forward, or touch-joystick double-tap via dashTimer)
+        if (this.inputBuffer.checkDashForward(this.facing) || (this.dashTimer > 0 && Math.sign(input.dirX) === this.facing)) {
+            this.dashTimer = 0;
             this.transitionTo(FIGHTER_STATE.RUN);
             return;
         }
@@ -236,7 +252,7 @@ export class Fighter {
 
     handleRun(input, opponent) {
         // If pressing kick while running -> SLIDE KICK! (Signature Oni move)
-        if (input.kickJustPressed) {
+        if (input.kickJustPressed || input.slideJustPressed) {
             this.transitionTo(FIGHTER_STATE.ATTACK, MOVES.SLIDE_KICK);
             return;
         }

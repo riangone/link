@@ -561,6 +561,12 @@ body {
 
     .fighter-info {
         font-size: 11px;
+        white-space: nowrap;
+    }
+
+    /* the bar already shows HP; the numeric readout only crowds narrow screens */
+    #p1-hp-text, #p2-hp-text {
+        display: none;
     }
 
     .timer-box {
@@ -614,5 +620,16 @@ body {
 
     .controls-hud {
         display: contents; /* Keep HUD transparent to clicks */
+    }
+}
+
+/* During a fight, fade the desktop move list so it never hides the fighters' feet */
+@media (min-width: 769px) {
+    body.in-fight .controls-hud {
+        opacity: 0.38;
+        transition: opacity 0.3s ease;
+    }
+    body.in-fight .controls-hud:hover {
+        opacity: 1;
     }
 }

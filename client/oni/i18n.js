@@ -13,7 +13,7 @@ export const I18N = {
         ctrl_z_move: 'W / S (方向键 ↑ / ↓)：3D 轴向走位',
         ctrl_punch: 'J / Z 键：出拳 (轻刺拳 → 直拳 → 升龙)',
         ctrl_kick: 'K / X 键：踢腿 (低踢 → 回旋重踢)',
-        ctrl_slide: '前冲中按 K / X：疾风滑铲 (扫堂倒地)',
+        ctrl_slide: 'I / V 或前冲中按 K / X：疾风滑铲 (扫堂倒地)',
         ctrl_uppercut: 'S + D + J (↓ + → + 拳)：升龙破空拳 (击飞浮空)',
         ctrl_block: 'L / C 或 后退：能量格挡',
         vs_human: '👥 真人对战',
@@ -23,6 +23,7 @@ export const I18N = {
         back_to_lobby: '返回大厅',
         round_time: '时间',
         moves_btn: '招式表',
+        cam_modes: { side: '侧视', diagonal: '斜角', shoulder: '肩后', top: '俯视' },
         touch_tip: '🕹️ 摇杆移动/双击前冲 · P刺拳 · K踢腿 · ⚡滑铲 · B格挡',
         ko: 'K.O.',
         winner_p1: 'KONOKO 获胜！',
@@ -30,6 +31,7 @@ export const I18N = {
         draw: '平局！'
     },
     ja: {
+        cam_modes: { side: 'サイド', diagonal: '斜め', shoulder: '肩越し', top: '俯瞰' },
         title: 'オニ・コンバット · Oni Combat',
         tagline: '3Dサイバー近接格闘 · コマンド技、スライディング、ガード＆ヒットストップ',
         p1_name: 'コノコ (長谷川舞)',
@@ -39,7 +41,7 @@ export const I18N = {
         ctrl_z_move: 'W / S (↑ / ↓)：3D軸移動',
         ctrl_punch: 'J / Z キー：パンチ (ジャブ → ストレート → アッパー)',
         ctrl_kick: 'K / X キー：キック (ローキック → 回し蹴り)',
-        ctrl_slide: 'ダッシュ中に K / X：スライディング (足払い転倒)',
+        ctrl_slide: 'I / V またはダッシュ中に K / X：スライディング (足払い転倒)',
         ctrl_uppercut: 'S + D + J (↓ + → + P)：ライジング・アッパー (打ち上げ)',
         ctrl_block: 'L / C または 後退：ガード',
         vs_human: '👥 対人戦',
@@ -54,6 +56,7 @@ export const I18N = {
         draw: '引き分け！'
     },
     en: {
+        cam_modes: { side: 'Side', diagonal: '3/4', shoulder: 'Shoulder', top: 'Top' },
         title: 'Oni Combat - 3D Cyber Strike',
         tagline: '3D Cyberpunk Melee · Combos, Slide Sweeps, Blocking & Hitstop',
         p1_name: 'KONOKO (TCTF Agent)',
@@ -63,7 +66,7 @@ export const I18N = {
         ctrl_z_move: 'W / S (↑ / ↓): 3D Axis Stride',
         ctrl_punch: 'J / Z: Punch (Jab → Cross → Uppercut)',
         ctrl_kick: 'K / X: Kick (Low Kick → Spin Roundhouse)',
-        ctrl_slide: 'Dash + K / X: Slide Sweep (Knockdown)',
+        ctrl_slide: 'I / V or Dash + K / X: Slide Sweep (Knockdown)',
         ctrl_uppercut: 'S + D + J (↓ + → + P): Rising Uppercut (Launch)',
         ctrl_block: 'L / C or Walk Back: Energy Guard',
         vs_human: '👥 vs Human',
