@@ -34,6 +34,24 @@ function init() {
     const btnRematch = document.getElementById('btn-rematch');
     const winnerText = document.getElementById('winner-text');
     const fpsCounter = document.getElementById('fps-counter');
+    const btnToggleMoves = document.getElementById('btn-toggle-moves');
+    const movesPanel = document.getElementById('moves-panel');
+    const joystickZone = document.getElementById('joystick-zone');
+    const joystickBase = document.getElementById('joystick-base');
+    const joystickStick = document.getElementById('joystick-stick');
+
+    // Toggle Moves Panel on mobile / compact screens
+    if (btnToggleMoves && movesPanel) {
+        btnToggleMoves.addEventListener('click', (e) => {
+            e.stopPropagation();
+            movesPanel.classList.toggle('open');
+        });
+        document.addEventListener('click', (e) => {
+            if (!movesPanel.contains(e.target) && e.target !== btnToggleMoves) {
+                movesPanel.classList.remove('open');
+            }
+        });
+    }
 
     // Systems
     const threeScene = new ThreeScene(container);
@@ -47,23 +65,102 @@ function init() {
     const keysDown = {};
     window.addEventListener('keydown', (e) => {
         keysDown[e.code] = true;
+        if (!isPlaying && (e.code === 'Space' || e.code === 'Enter')) {
+            startFight();
+        }
     });
     window.addEventListener('keyup', (e) => {
         keysDown[e.code] = false;
     });
 
-    // Touch Virtual Buttons
-    const touchState = { punch: false, kick: false, block: false };
+    // Touch Virtual Joystick & Buttons
+    const touchState = { punch: false, kick: false, block: false, slide: false };
     const setupTouchBtn = (id, key) => {
         const el = document.getElementById(id);
         if (!el) return;
-        el.addEventListener('pointerdown', (e) => { e.preventDefault(); touchState[key] = true; });
-        el.addEventListener('pointerup', (e) => { e.preventDefault(); touchState[key] = false; });
-        el.addEventListener('pointercancel', (e) => { e.preventDefault(); touchState[key] = false; });
+        el.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            touchState[key] = true;
+            el.classList.add('active');
+        });
+        const release = (e) => {
+            touchState[key] = false;
+            el.classList.remove('active');
+        };
+        el.addEventListener('pointerup', release);
+        el.addEventListener('pointercancel', release);
     };
     setupTouchBtn('btn-punch', 'punch');
     setupTouchBtn('btn-kick', 'kick');
+    setupTouchBtn('btn-slide', 'slide');
     setupTouchBtn('btn-block', 'block');
+
+    // Virtual Joystick logic (supports touch & mouse drag)
+    let touchDirX = 0;
+    let touchDirZ = 0;
+    let isJoystickDragging = false;
+    let lastTapTime = 0;
+
+    if (joystickZone && joystickBase && joystickStick) {
+        const maxRadius = 36;
+        let baseRect = null;
+
+        const onJoyStart = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            isJoystickDragging = true;
+            baseRect = joystickBase.getBoundingClientRect();
+            onJoyMove(e);
+
+            // Double tap dash detection
+            const now = performance.now();
+            if (now - lastTapTime < 280) {
+                sim.f1.dashTimer = 25; // Dash impulse
+            }
+            lastTapTime = now;
+        };
+
+        const onJoyMove = (e) => {
+            if (!isJoystickDragging || !baseRect) return;
+            const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+            const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+            const centerX = baseRect.left + baseRect.width / 2;
+            const centerY = baseRect.top + baseRect.height / 2;
+
+            let dx = clientX - centerX;
+            let dy = clientY - centerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist > maxRadius) {
+                dx = (dx / dist) * maxRadius;
+                dy = (dy / dist) * maxRadius;
+            }
+
+            joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
+
+            // Deadzone of 6px
+            if (dist > 6) {
+                touchDirX = dx / maxRadius;
+                touchDirZ = dy / maxRadius;
+            } else {
+                touchDirX = 0;
+                touchDirZ = 0;
+            }
+        };
+
+        const onJoyEnd = () => {
+            isJoystickDragging = false;
+            touchDirX = 0;
+            touchDirZ = 0;
+            joystickStick.style.transform = 'translate(0px, 0px)';
+        };
+
+        joystickZone.addEventListener('pointerdown', onJoyStart);
+        window.addEventListener('pointermove', onJoyMove);
+        window.addEventListener('pointerup', onJoyEnd);
+        window.addEventListener('pointercancel', onJoyEnd);
+    }
 
     function samplePlayerInput() {
         let dirX = 0;
@@ -74,10 +171,26 @@ function init() {
         if (keysDown['KeyW'] || keysDown['ArrowUp']) dirZ -= 1;
         if (keysDown['KeyS'] || keysDown['ArrowDown']) dirZ += 1;
 
+        // Combine touch virtual joystick
+        if (Math.abs(touchDirX) > 0.2) {
+            dirX += touchDirX > 0 ? 1 : -1;
+        }
+        if (Math.abs(touchDirZ) > 0.2) {
+            dirZ += touchDirZ > 0 ? 1 : -1;
+        }
+        dirX = Math.max(-1, Math.min(1, dirX));
+        dirZ = Math.max(-1, Math.min(1, dirZ));
+
         const punch = !!(keysDown['KeyJ'] || keysDown['KeyZ'] || touchState.punch);
-        const kick = !!(keysDown['KeyK'] || keysDown['KeyX'] || touchState.kick);
+        let kick = !!(keysDown['KeyK'] || keysDown['KeyX'] || touchState.kick);
         const block = !!(keysDown['KeyL'] || keysDown['KeyC'] || touchState.block);
         const jump = !!keysDown['Space'];
+
+        // Quick slide-kick button trigger
+        if (touchState.slide) {
+            sim.f1.dashTimer = 25; // Trigger sprint state
+            kick = true;
+        }
 
         return { dirX, dirZ, punch, kick, block, jump };
     }
@@ -222,7 +335,7 @@ function init() {
         meshP2.update(sim.f2, timeSec);
 
         vfx.update(delta);
-        threeScene.updateCamera(sim.f1, sim.f2);
+        threeScene.updateCamera(sim.f1, sim.f2, !isPlaying, timeSec);
         threeScene.render();
 
         // Update HUD

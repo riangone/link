@@ -23,14 +23,15 @@ export class ThreeScene {
         this.scene.background = new THREE.Color(0x0a0c16);
         this.scene.fog = new THREE.FogExp2(0x0a0c16, 0.025);
 
-        // Camera (Tuned for Golden Ratio 3D Fighter Framing)
+        // Camera (Tuned with Adaptive Horizontal FOV for Mobile & Desktop)
         this.camera = new THREE.PerspectiveCamera(
             38,
-            this.container.clientWidth / this.container.clientHeight,
+            (this.container.clientWidth || window.innerWidth) / (this.container.clientHeight || window.innerHeight),
             0.1,
             100
         );
-        this.camera.position.set(0, 1.8, 6.5);
+        this.updateAdaptiveFOV();
+        this.camera.position.set(0, 1.6, 6.5);
 
         // Camera dynamics & shake
         this.cameraTarget = new THREE.Vector3(0, 1.05, 0);
@@ -153,6 +154,26 @@ export class ThreeScene {
         this.shakeIntensity = Math.min(0.8, this.shakeIntensity + intensity);
     }
 
+    updateAdaptiveFOV() {
+        if (!this.container) return;
+        const w = this.container.clientWidth || window.innerWidth;
+        const h = this.container.clientHeight || window.innerHeight;
+        if (w === 0 || h === 0) return;
+        const aspect = w / h;
+        this.camera.aspect = aspect;
+
+        // Maintain constant horizontal coverage so both fighters remain fully visible on any screen ratio
+        if (aspect < 1.0) {
+            // Target ~54 deg horizontal field on narrow portrait viewports
+            const targetHFov = 54 * (Math.PI / 180);
+            const vFovRad = 2 * Math.atan(Math.tan(targetHFov / 2) / aspect);
+            this.camera.fov = Math.min(74, Math.max(38, vFovRad * (180 / Math.PI)));
+        } else {
+            this.camera.fov = 38;
+        }
+        this.camera.updateProjectionMatrix();
+    }
+
     /**
      * Update camera position dynamically based on both fighters
      * Tight framing keeps both fighters large, focused, and centered.
@@ -163,28 +184,28 @@ export class ThreeScene {
         const midY = (f1.y + f2.y) * 0.5;
         const dist = Math.abs(f1.x - f2.x);
 
-        // Dynamic close framing (fighters occupy ~45% screen height)
-        const targetZ = Math.max(5.2, Math.min(9.2, 4.2 + dist * 0.48));
-        const targetX = midX * 0.85;
+        // Dynamic framing
+        const targetZ = Math.max(5.0, Math.min(10.5, 4.2 + dist * 0.5));
+        const targetX = midX;
         const targetY = 1.05 + midY * 0.35;
         const targetCamY = 1.55 + dist * 0.04;
 
         if (isPreview) {
             // Elegant subtle sway during idle/pre-fight screen
-            const swayX = Math.sin(timeSeconds * 0.5) * 0.6;
-            const swayY = Math.cos(timeSeconds * 0.3) * 0.15;
-            this.camera.position.x += ((targetX + swayX) - this.camera.position.x) * 0.05;
-            this.camera.position.z += ((targetZ + 0.5) - this.camera.position.z) * 0.05;
-            this.camera.position.y += ((targetCamY + swayY) - this.camera.position.y) * 0.05;
+            const swayX = Math.sin(timeSeconds * 0.5) * 0.45;
+            const swayY = Math.cos(timeSeconds * 0.3) * 0.12;
+            this.camera.position.x += ((targetX + swayX) - this.camera.position.x) * 0.08;
+            this.camera.position.z += ((targetZ + 0.3) - this.camera.position.z) * 0.08;
+            this.camera.position.y += ((targetCamY + swayY) - this.camera.position.y) * 0.08;
         } else {
             // Smooth dynamic follow during battle
-            this.camera.position.x += (targetX - this.camera.position.x) * 0.12;
-            this.camera.position.z += (targetZ - this.camera.position.z) * 0.12;
-            this.camera.position.y += (targetCamY - this.camera.position.y) * 0.12;
+            this.camera.position.x += (targetX - this.camera.position.x) * 0.14;
+            this.camera.position.z += (targetZ - this.camera.position.z) * 0.14;
+            this.camera.position.y += (targetCamY - this.camera.position.y) * 0.14;
         }
 
-        this.cameraTarget.x += (midX - this.cameraTarget.x) * 0.12;
-        this.cameraTarget.y += (targetY - this.cameraTarget.y) * 0.12;
+        this.cameraTarget.x += (midX - this.cameraTarget.x) * 0.14;
+        this.cameraTarget.y += (targetY - this.cameraTarget.y) * 0.14;
 
         // Apply shake
         if (this.shakeIntensity > 0.005) {
@@ -209,8 +230,7 @@ export class ThreeScene {
         const w = this.container.clientWidth;
         const h = this.container.clientHeight;
         if (w === 0 || h === 0) return;
-        this.camera.aspect = w / h;
-        this.camera.updateProjectionMatrix();
+        this.updateAdaptiveFOV();
         this.renderer.setSize(w, h);
     }
 }

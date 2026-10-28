@@ -22,6 +22,8 @@ export const I18N = {
         restart: '再来一局',
         back_to_lobby: '返回大厅',
         round_time: '时间',
+        moves_btn: '招式表',
+        touch_tip: '🕹️ 摇杆移动/双击前冲 · P刺拳 · K踢腿 · ⚡滑铲 · B格挡',
         ko: 'K.O.',
         winner_p1: 'KONOKO 获胜！',
         winner_p2: '对手获胜！',

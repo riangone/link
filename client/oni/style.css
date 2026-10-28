@@ -200,120 +200,260 @@ body {
     transform: scale(1.1);
 }
 
-/* Controls Guide & Move List */
+/* Top Bar Utility Buttons */
+.hud-pill-btn {
+    background: rgba(18, 22, 38, 0.85);
+    border: 1px solid var(--border-line);
+    border-radius: 20px;
+    color: var(--neon-cyan);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 14px;
+    cursor: pointer;
+    pointer-events: auto;
+    backdrop-filter: blur(8px);
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.hud-pill-btn:hover, .hud-pill-btn:active {
+    background: rgba(0, 240, 255, 0.2);
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+}
+
+/* Controls Guide & Move List (Bottom HUD) */
 .controls-hud {
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
+    gap: 12px;
+    width: 100%;
+    margin: 0 auto;
     font-size: 12px;
     color: var(--text-muted);
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
 }
 
 .command-box {
     background: var(--card-bg);
     border: 1px solid var(--border-line);
-    border-radius: 8px;
-    padding: 8px 14px;
-    line-height: 1.5;
+    border-radius: 10px;
+    padding: 10px 14px;
+    line-height: 1.45;
     pointer-events: auto;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.moves-panel {
+    max-width: 520px;
+    transition: transform 0.25s ease, opacity 0.25s ease;
 }
 
 .command-box strong {
     color: var(--neon-cyan);
     display: block;
-    margin-bottom: 3px;
+    margin-bottom: 5px;
+    font-size: 12px;
+    letter-spacing: 0.05em;
 }
 
-.command-box span {
+.cmd-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(200px, 1fr));
+    gap: 4px 14px;
+}
+
+.cmd-list span {
     display: block;
     font-family: monospace;
     font-size: 11px;
     color: #cbd5e1;
 }
 
-/* Touch On-Screen Controls (Shown on touch / mobile devices) */
+.cmd-list span strong {
+    display: inline;
+    color: #fff;
+    font-weight: 700;
+}
+
+.mobile-tip-bar {
+    display: none;
+    background: rgba(18, 22, 38, 0.85);
+    border: 1px solid var(--border-line);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #e2e8f0;
+    text-align: center;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.2);
+}
+
+.status-panel {
+    min-width: 120px;
+    text-align: right;
+}
+
+/* Touch On-Screen Controls (Universal Joystick & Action Pad) */
 .touch-controls {
     display: none;
     position: absolute;
     inset: 0;
     pointer-events: none;
-    z-index: 20;
+    z-index: 25;
 }
 
-@media (pointer: coarse) {
+@media (pointer: coarse), (max-width: 900px) {
     .touch-controls {
         display: block;
     }
 }
 
-.touch-dpad {
+/* Virtual Joystick Zone (Bottom Left) */
+.joystick-zone {
     position: absolute;
-    bottom: 24px;
-    left: 24px;
-    width: 140px;
-    height: 140px;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    left: 20px;
+    width: 130px;
+    height: 130px;
     pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
 }
 
+.joystick-base {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0, 240, 255, 0.12) 0%, rgba(18, 22, 38, 0.75) 80%);
+    border: 2px solid rgba(0, 240, 255, 0.5);
+    box-shadow: 0 0 16px rgba(0, 240, 255, 0.25), inset 0 0 12px rgba(0, 240, 255, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.joystick-stick {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #00f0ff, #0066cc);
+    box-shadow: 0 0 14px rgba(0, 240, 255, 0.8);
+    position: absolute;
+    transform: translate(0px, 0px);
+    pointer-events: none;
+    transition: transform 0.05s ease-out;
+}
+
+.joystick-label {
+    font-size: 10px;
+    color: var(--neon-cyan);
+    margin-top: 4px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+}
+
+/* Action Buttons (Bottom Right Arc Pad) */
 .touch-btn-pad {
     position: absolute;
-    bottom: 24px;
-    right: 24px;
-    display: flex;
-    gap: 12px;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    right: 20px;
+    width: 150px;
+    height: 150px;
     pointer-events: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 10px;
+    touch-action: none;
 }
 
 .t-btn {
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: rgba(18, 22, 38, 0.85);
+    background: rgba(18, 22, 38, 0.9);
     border: 2px solid var(--neon-cyan);
     color: #fff;
-    font-weight: 800;
+    font-weight: 900;
     font-size: 18px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.35);
+    cursor: pointer;
+    line-height: 1;
+    transition: transform 0.08s, background 0.08s;
 }
 
-.t-btn:active {
+.t-btn small {
+    font-size: 9px;
+    font-weight: 700;
+    opacity: 0.85;
+    margin-top: 1px;
+}
+
+.t-btn:active, .t-btn.active {
+    transform: scale(0.92);
     background: var(--neon-cyan);
     color: #000;
 }
 
 .t-btn.kick {
     border-color: var(--neon-magenta);
-    box-shadow: 0 0 10px rgba(255, 0, 119, 0.3);
+    box-shadow: 0 0 12px rgba(255, 0, 119, 0.35);
 }
 
-.t-btn.kick:active {
+.t-btn.kick:active, .t-btn.kick.active {
     background: var(--neon-magenta);
+    color: #fff;
+}
+
+.t-btn.slide {
+    border-color: #ffaa00;
+    box-shadow: 0 0 12px rgba(255, 170, 0, 0.35);
+    color: #ffdd44;
+}
+
+.t-btn.slide:active, .t-btn.slide.active {
+    background: #ffaa00;
+    color: #000;
 }
 
 .t-btn.block {
     border-color: var(--neon-yellow);
-    box-shadow: 0 0 10px rgba(255, 230, 0, 0.3);
+    box-shadow: 0 0 12px rgba(255, 230, 0, 0.35);
+    color: var(--neon-yellow);
 }
 
-.t-btn.block:active {
+.t-btn.block:active, .t-btn.block.active {
     background: var(--neon-yellow);
+    color: #000;
 }
 
-/* Modals & Overlays */
+/* Modals & Overlays (Translucent so 3D Subjects are Always Visible) */
 .overlay {
     position: absolute;
     inset: 0;
     z-index: 100;
-    background: rgba(8, 10, 22, 0.88);
-    backdrop-filter: blur(8px);
+    background: rgba(8, 10, 20, 0.35); /* Translucent so fighters are visible */
+    backdrop-filter: blur(3px);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 20px;
+    pointer-events: auto;
 }
 
 .overlay.hidden {
@@ -321,14 +461,34 @@ body {
 }
 
 .modal {
-    background: var(--card-bg);
+    background: rgba(18, 22, 38, 0.92);
     border: 1px solid var(--border-line);
     border-radius: 16px;
     padding: 28px 32px;
     text-align: center;
     max-width: 440px;
     width: 100%;
-    box-shadow: 0 0 30px rgba(0, 240, 255, 0.2);
+    box-shadow: 0 0 36px rgba(0, 240, 255, 0.25), 0 10px 40px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(12px);
+    animation: modalPop 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+@keyframes modalPop {
+    0% { transform: scale(0.92); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.modal-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: rgba(0, 240, 255, 0.15);
+    border: 1px solid var(--neon-cyan);
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: var(--neon-cyan);
+    margin-bottom: 12px;
 }
 
 .modal h1 {
@@ -336,37 +496,49 @@ body {
     font-weight: 900;
     color: var(--neon-cyan);
     letter-spacing: 0.05em;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    text-shadow: 0 0 16px rgba(0, 240, 255, 0.5);
 }
 
 .modal p {
-    font-size: 14px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #cbd5e1;
+    margin-bottom: 22px;
+}
+
+.modal-hint {
+    margin-top: 14px;
+    font-size: 11px;
     color: var(--text-muted);
-    margin-bottom: 20px;
 }
 
 .btn-group {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
 }
 
 .cyber-btn {
     background: linear-gradient(90deg, #00f0ff, #0088ff);
     color: #000;
-    font-weight: 800;
+    font-weight: 900;
     font-size: 15px;
     border: none;
-    border-radius: 8px;
-    padding: 12px 20px;
+    border-radius: 10px;
+    padding: 13px 22px;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    transition: transform 0.1s, box-shadow 0.2s;
+    transition: transform 0.15s, box-shadow 0.2s;
+}
+
+.cyber-btn.primary-glow {
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.45);
 }
 
 .cyber-btn:hover {
-    box-shadow: 0 0 18px rgba(0, 240, 255, 0.6);
+    box-shadow: 0 0 26px rgba(0, 240, 255, 0.75);
     transform: translateY(-2px);
 }
 
@@ -374,4 +546,73 @@ body {
     background: transparent;
     border: 1px solid var(--border-line);
     color: var(--text-main);
+}
+
+/* Responsive Overrides (Mobile / Compact Screens) */
+@media (max-width: 768px) {
+    .hud {
+        padding: 10px 14px;
+        pointer-events: none;
+    }
+
+    .top-bar {
+        gap: 8px;
+    }
+
+    .fighter-info {
+        font-size: 11px;
+    }
+
+    .timer-box {
+        min-width: 54px;
+        height: 48px;
+    }
+
+    .timer-num {
+        font-size: 24px;
+    }
+
+    /* Hide heavy desktop moves panel in main view on mobile, collapse to popup */
+    .moves-panel {
+        display: none;
+        position: fixed;
+        bottom: 180px;
+        left: 14px;
+        right: 14px;
+        max-width: none;
+        z-index: 50;
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 240, 255, 0.3);
+    }
+
+    .moves-panel.open {
+        display: block;
+        animation: modalPop 0.2s ease-out;
+    }
+
+    .cmd-list {
+        grid-template-columns: 1fr;
+        gap: 3px;
+    }
+
+    /* Floating tip badge right below top HP bar */
+    .mobile-tip-bar {
+        display: block;
+        position: fixed;
+        top: 76px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 10px;
+        padding: 3px 10px;
+        white-space: nowrap;
+        pointer-events: none;
+        z-index: 15;
+    }
+
+    .status-panel {
+        display: none; /* Keep bottom screen uncluttered for touch */
+    }
+
+    .controls-hud {
+        display: contents; /* Keep HUD transparent to clicks */
+    }
 }

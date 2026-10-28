@@ -46,6 +46,45 @@ test.describe('Oni Combat 3D Fighting Game', () => {
         expect(errors).toEqual([]);
     });
 
+    test('Mobile view renders virtual joystick, arcade buttons, and toggles move list', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto(`${dev.url}/oni/?bot=normal`);
+
+        // Check virtual joystick and arcade action buttons exist
+        await expect(page.locator('#joystick-zone')).toBeVisible();
+        await expect(page.locator('#btn-punch')).toBeVisible();
+        await expect(page.locator('#btn-kick')).toBeVisible();
+        await expect(page.locator('#btn-slide')).toBeVisible();
+        await expect(page.locator('#btn-block')).toBeVisible();
+
+        // Start fight
+        await page.click('#btn-start');
+        await expect(page.locator('#start-overlay')).toHaveClass(/hidden/);
+
+        // Toggle move list modal
+        const toggleBtn = page.locator('#btn-toggle-moves');
+        await expect(toggleBtn).toBeVisible();
+        await toggleBtn.click();
+        await expect(page.locator('#moves-panel')).toHaveClass(/open/);
+
+        // Close move list modal
+        await toggleBtn.click();
+        await expect(page.locator('#moves-panel')).not.toHaveClass(/open/);
+
+        // Test touch virtual punch button
+        await page.locator('#btn-punch').dispatchEvent('pointerdown');
+        await page.waitForTimeout(50);
+        await page.locator('#btn-punch').dispatchEvent('pointerup');
+
+        // Test touch slide button
+        await page.locator('#btn-slide').dispatchEvent('pointerdown');
+        await page.waitForTimeout(50);
+        await page.locator('#btn-slide').dispatchEvent('pointerup');
+
+        const state = await page.evaluate(() => window.__oni.getState());
+        expect(state.isPlaying).toBe(true);
+    });
+
     test('Lobby index includes oni game card', async ({ page }) => {
         await page.goto(`${dev.url}/play/`);
         const oniCard = page.locator('#g-oni');

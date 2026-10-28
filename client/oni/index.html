@@ -39,6 +39,11 @@
                         <div id="p2-hp-fill" class="hp-bar-fill" style="width: 100%;"></div>
                     </div>
                 </div>
+
+                <!-- Top Right Utility Actions -->
+                <button type="button" id="btn-toggle-moves" class="hud-pill-btn" title="查看出招表">
+                    📖 <span id="btn-moves-text">招式表</span>
+                </button>
             </div>
 
             <!-- Mid Screen Banners: K.O., Combos -->
@@ -48,39 +53,57 @@
             </div>
 
             <!-- Bottom Command HUD -->
-            <div class="controls-hud">
-                <div class="command-box">
+            <div class="controls-hud" id="controls-hud">
+                <div class="command-box moves-panel" id="moves-panel">
                     <strong id="hud-cmd-title">⚡ 战术指令 (出招表)</strong>
-                    <span>A/D 移动 (双击前冲) | W/S 3D走位</span>
-                    <span>J / Z: 刺拳(连按打出直拳)</span>
-                    <span>K / X: 踢腿 | 前冲中按K: 疾风滑铲</span>
-                    <span>S + D + J: 升龙破空拳 (击飞) | L / C: 格挡</span>
+                    <div class="cmd-list">
+                        <span><strong>A / D</strong> 左右移动 (双击快速前冲)</span>
+                        <span><strong>W / S</strong> 3D 轴向走位</span>
+                        <span><strong>J / Z</strong> 刺拳 (连按发动三连直拳)</span>
+                        <span><strong>K / X</strong> 踢腿 (前冲中按K: 疾风滑铲)</span>
+                        <span><strong>S + D + J</strong> 升龙破空拳 (下前拳·击飞)</span>
+                        <span><strong>L / C</strong> 格挡受击 (减免80%伤害)</span>
+                    </div>
                 </div>
-                <div class="command-box" style="text-align: right;">
+                <div class="mobile-tip-bar" id="mobile-tip-bar">
+                    🕹️ 摇杆移动/双击前冲 · P刺拳 · K踢腿 · ⚡滑铲 · B格挡
+                </div>
+                <div class="command-box status-panel">
                     <strong id="mode-status-text">🤖 人机战模式</strong>
                     <span id="fps-counter">60 FPS</span>
                 </div>
             </div>
         </div>
 
-        <!-- On-Screen Touch Controls (Active on Mobile/Touch) -->
-        <div class="touch-controls">
+        <!-- On-Screen Touch Controls (Active on Mobile/Touch Devices) -->
+        <div class="touch-controls" id="touch-controls">
+            <!-- Left Virtual Joystick for 3D Movement & Dash -->
+            <div class="joystick-zone" id="joystick-zone">
+                <div class="joystick-base" id="joystick-base">
+                    <div class="joystick-stick" id="joystick-stick"></div>
+                </div>
+            </div>
+
+            <!-- Right Action Buttons -->
             <div class="touch-btn-pad">
-                <button type="button" class="t-btn block" id="btn-block">B</button>
-                <button type="button" class="t-btn kick" id="btn-kick">K</button>
-                <button type="button" class="t-btn" id="btn-punch">P</button>
+                <button type="button" class="t-btn block" id="btn-block" aria-label="格挡">B<small>防</small></button>
+                <button type="button" class="t-btn slide" id="btn-slide" aria-label="滑铲">⚡<small>滑</small></button>
+                <button type="button" class="t-btn kick" id="btn-kick" aria-label="踢腿">K<small>腿</small></button>
+                <button type="button" class="t-btn punch" id="btn-punch" aria-label="刺拳">P<small>拳</small></button>
             </div>
         </div>
 
-        <!-- Start / Lobby Overlay -->
+        <!-- Start / Lobby Overlay (Translucent Cyber Floating Card) -->
         <div id="start-overlay" class="overlay">
-            <div class="modal">
-                <h1 id="modal-title">⚔️ 鬼神对决 (ONI COMBAT)</h1>
-                <p id="modal-desc">3D 纯前端赛博近空格斗 · 搓招缓冲、分层动作状态机、Hitbox判定与滑铲对战。</p>
+            <div class="modal start-modal">
+                <div class="modal-badge">3D CYBER BEAT 'EM UP</div>
+                <h1 id="modal-title">⚔️ 鬼神对决 · ONI</h1>
+                <p id="modal-desc">经典《Oni》纯前端 3D 动作对战 · 搓招缓冲、分层动作状态机、Hitbox 与疾风滑铲。</p>
                 <div class="btn-group">
-                    <button type="button" class="cyber-btn" id="btn-start">开始对决 (VS BOT)</button>
+                    <button type="button" class="cyber-btn primary-glow" id="btn-start">开始对决 (VS BOT)</button>
                     <a href="../play/" class="cyber-btn secondary" style="text-decoration: none; display: block;">返回对战大厅</a>
                 </div>
+                <div class="modal-hint">提示：按 空格键(Space) 或 点击按钮立即开战</div>
             </div>
         </div>
 

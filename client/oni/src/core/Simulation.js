@@ -9,8 +9,8 @@ import { FIGHTER_STATE } from './Constants.js';
 
 export class Simulation {
     constructor() {
-        this.f1 = new Fighter('p1', 'Konoko', -3.5, 1, false);
-        this.f2 = new Fighter('p2', 'Syndi-Bot', 3.5, -1, true);
+        this.f1 = new Fighter('p1', 'Konoko', -2.6, 1, false);
+        this.f2 = new Fighter('p2', 'Syndi-Bot', 2.6, -1, true);
 
         this.roundTimer = 99 * 60; // 99 seconds in frames
         this.currentFrame = 0;
@@ -23,8 +23,8 @@ export class Simulation {
     }
 
     reset() {
-        this.f1.reset(-3.5, 1);
-        this.f2.reset(3.5, -1);
+        this.f1.reset(-2.6, 1);
+        this.f2.reset(2.6, -1);
         this.roundTimer = 99 * 60;
         this.currentFrame = 0;
         this.hitstopFrames = 0;
