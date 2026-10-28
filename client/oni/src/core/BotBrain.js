@@ -372,37 +372,39 @@ export class BotBrain {
         const { bot, dist, nx, nz, input, sim } = bb;
         if (dist >= 1.48) return BT_STATUS.FAILURE;
 
-        if (this.actionTimer % 8 === 0) {
+        const interval = this.profile.attackInterval || 14;
+        if (this.actionTimer % interval === 0) {
             const r = this.rand(sim);
             if (this.profile.level === 'hard') {
-                if (r < 0.36) {
+                if (r < 0.34) {
                     input.punch = true;
-                } else if (r < 0.62) {
+                } else if (r < 0.58) {
                     input.kick = true;
-                } else if (r < 0.74 && (bot.daodanStage >= 3 || bot.daodanOverdrive)) {
+                } else if (r < 0.68 && (bot.daodanStage >= 3 || bot.daodanOverdrive)) {
                     // Awakened Stage 3 Devil Spin Kick (Down + Forward + Kick)
                     input.down = true;
                     input.dirX = nx;
                     input.dirZ = nz;
                     input.kick = true;
-                } else if (r < 0.82) {
+                } else if (r < 0.76) {
                     // Uppercut (Down + Forward + Punch)
                     input.down = true;
                     input.dirX = nx;
                     input.dirZ = nz;
                     input.punch = true;
-                } else if (r < 0.90) {
+                } else if (r < 0.84) {
                     input.throwBtn = true;
                 } else {
                     input.block = true;
                 }
             } else if (this.profile.level === 'normal') {
-                if (r < 0.30) input.punch = true;
-                else if (r < 0.54) input.kick = true;
-                else if (r < 0.78) input.block = true;
+                if (r < 0.28) input.punch = true;
+                else if (r < 0.48) input.kick = true;
+                else if (r < 0.64) input.block = true;
             } else {
-                if (r < 0.16) input.punch = true;
-                else if (r < 0.28) input.kick = true;
+                // Easy: slow telegraphing pokes, plenty of openings for player to counter
+                if (r < 0.18) input.punch = true;
+                else if (r < 0.30) input.kick = true;
             }
         }
         return BT_STATUS.SUCCESS;
@@ -413,6 +415,14 @@ export class BotBrain {
      */
     branchApproachPressure(bb) {
         const { bot, dist, dz, nx, nz, input, sim } = bb;
+
+        // Easy bot occasionally pauses at mid-range ( martial-arts sizing up ) so player isn't overwhelmed
+        if (this.profile.level === 'easy' && dist > 1.5 && dist < 2.8 && (this.actionTimer % 50) > 34) {
+            input.dirX = 0;
+            input.dirZ = 0;
+            return BT_STATUS.SUCCESS;
+        }
+
         input.dirX = nx;
 
         // Lateral Z-axis tactical strafing when approaching at mid-range (1.5m .. 4.0m)
@@ -425,11 +435,11 @@ export class BotBrain {
             input.dirZ = 0;
         }
 
-        if (this.profile.level !== 'easy' && dist > 2.1 && dist < 3.9) {
+        if (this.profile.level !== 'easy' && dist > 2.2 && dist < 3.9 && this.actionTimer % 12 === 0) {
             const r = this.rand(sim);
-            if (r < (this.profile.level === 'hard' ? 0.08 : 0.035)) {
+            if (r < (this.profile.level === 'hard' ? 0.14 : 0.06)) {
                 input.slide = true;
-            } else if (r < 0.14 && bot.state !== FIGHTER_STATE.RUN && this.evadeTapQueue.length === 0) {
+            } else if (r < (this.profile.level === 'hard' ? 0.28 : 0.14) && bot.state !== FIGHTER_STATE.RUN && this.evadeTapQueue.length === 0) {
                 // Double-tap forward to sprint/dash into range like Oni's Strikers
                 this.queueDoubleTap(nx, 0);
                 return this.consumeTapQueue(bb);
@@ -451,6 +461,9 @@ export class BotBrain {
      */
     think(botFighter, opponent, sim = null) {
         this.actionTimer++;
+        if (botFighter && this.profile && this.profile.speedScale) {
+            botFighter.speedScale = this.profile.speedScale;
+        }
         const input = this.createBlankInput();
 
         // Drain queued multi-frame double-tap inputs first

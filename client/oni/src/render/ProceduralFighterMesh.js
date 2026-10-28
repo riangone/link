@@ -310,7 +310,8 @@ export class ProceduralFighterMesh {
     integrateSprings(state, dt) {
         const attack = state === FIGHTER_STATE.ATTACK || state === FIGHTER_STATE.THROW || state === FIGHTER_STATE.EVADE;
         const hurt = state === FIGHTER_STATE.HIT_STUN || state === FIGHTER_STATE.BEING_THROWN;
-        const speed = attack ? 1.15 : (hurt ? 1.0 : 0.72);
+        const loco = state === FIGHTER_STATE.WALK || state === FIGHTER_STATE.RUN;
+        const speed = attack ? 1.15 : (hurt ? 1.0 : (loco ? 1.02 : 0.78));
         const steps = Math.max(1, Math.ceil(dt / (1 / 300)));
         const h = dt / steps;
         const P = this.pose, V = this.vel, T = this.target;

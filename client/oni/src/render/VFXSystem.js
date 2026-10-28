@@ -13,6 +13,7 @@ export class VFXSystem {
         this.beams = [];
         this.weaponMeshes = new Map();
         this.projectileMeshes = new Map();
+        this.interactableMeshes = new Map();
 
         // Audio Context (Synthesized sound effects)
         this.audioCtx = null;
@@ -328,6 +329,149 @@ export class VFXSystem {
             if (!activeProjIds.has(id)) {
                 this.scene.remove(mesh);
                 this.projectileMeshes.delete(id);
+            }
+        }
+    }
+
+    /**
+     * Build 3D stage interactables for RPG Story Campaign (Consoles, Medkit Crates, Weapon Crates, Shield Cells, Security Gate)
+     */
+    buildInteractableModel(item) {
+        const group = new THREE.Group();
+        const darkSteel = new THREE.MeshToonMaterial({ color: 0x242a38 });
+        const slateSteel = new THREE.MeshToonMaterial({ color: 0x3b4459 });
+
+        if (item.type === 'CONSOLE') {
+            // Oni Tactical Data Terminal Kiosk (slanted pedestal + glowing screen)
+            const pedestal = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.92, 0.34), darkSteel);
+            pedestal.position.y = 0.46;
+            const hood = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.34, 0.38), slateSteel);
+            hood.position.set(0, 1.0, 0);
+            hood.rotation.x = 0.35;
+            const screenMat = new THREE.MeshBasicMaterial({ color: item.hacked ? 0x00ff88 : 0x00f0ff });
+            const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.24), screenMat);
+            screen.position.set(0, 1.04, 0.195);
+            screen.rotation.x = -0.35;
+            const beacon = new THREE.Mesh(
+                new THREE.RingGeometry(0.38, 0.46, 24),
+                new THREE.MeshBasicMaterial({
+                    color: item.hacked ? 0x00ff88 : 0x00f0ff,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.75
+                })
+            );
+            beacon.rotation.x = -Math.PI / 2;
+            beacon.position.y = 0.02;
+            group.add(pedestal, hood, screen, beacon);
+            group.userData = { screenMat, beacon };
+        } else if (item.type === 'SECURITY_GATE') {
+            // Security Laser Barrier Pillars + Energy Bars
+            const postL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.7, 10), darkSteel);
+            postL.position.set(0, 0.85, -1.6);
+            const postR = postL.clone();
+            postR.position.set(0, 0.85, 1.6);
+            const laserGroup = new THREE.Group();
+            const laserMat = new THREE.MeshBasicMaterial({
+                color: 0xff2255,
+                transparent: true,
+                opacity: 0.85
+            });
+            for (let k = 0; k < 3; k++) {
+                const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 3.2, 8), laserMat);
+                bar.rotation.x = Math.PI / 2;
+                bar.position.set(0, 0.4 + k * 0.45, 0);
+                laserGroup.add(bar);
+            }
+            group.add(postL, postR, laserGroup);
+            group.userData = { laserGroup, laserMat };
+        } else if (item.type === 'MEDKIT_CRATE') {
+            // Hypo-Spray Medical Supply Crate (emerald cross glow)
+            const box = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.34, 0.36), slateSteel);
+            box.position.y = 0.19;
+            const crossMat = new THREE.MeshBasicMaterial({ color: 0x00ff88 });
+            const c1 = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.08), crossMat);
+            c1.position.set(0, 0.37, 0);
+            const c2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.22), crossMat);
+            c2.position.set(0, 0.37, 0);
+            const ring = new THREE.Mesh(
+                new THREE.RingGeometry(0.32, 0.38, 20),
+                new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.7 })
+            );
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.y = 0.02;
+            group.add(box, c1, c2, ring);
+            group.userData = { floatMesh: box };
+        } else if (item.type === 'SHIELD_CELL') {
+            // Daodan Resonance Crystal / Nano-Shield Cell
+            const crystalMat = new THREE.MeshBasicMaterial({ color: 0xd946ef });
+            const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), crystalMat);
+            crystal.position.y = 0.48;
+            const ring = new THREE.Mesh(
+                new THREE.RingGeometry(0.28, 0.35, 20),
+                new THREE.MeshBasicMaterial({ color: 0xd946ef, side: THREE.DoubleSide, transparent: true, opacity: 0.75 })
+            );
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.y = 0.02;
+            group.add(crystal, ring);
+            group.userData = { crystal };
+        } else {
+            // WEAPON_CRATE (amber ordnance locker)
+            const crate = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.34, 0.42), darkSteel);
+            crate.position.y = 0.18;
+            const trim = new THREE.Mesh(
+                new THREE.BoxGeometry(0.64, 0.05, 0.44),
+                new THREE.MeshBasicMaterial({ color: 0xffaa00 })
+            );
+            trim.position.y = 0.33;
+            const ring = new THREE.Mesh(
+                new THREE.RingGeometry(0.38, 0.44, 24),
+                new THREE.MeshBasicMaterial({ color: 0xffaa00, side: THREE.DoubleSide, transparent: true, opacity: 0.7 })
+            );
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.y = 0.02;
+            group.add(crate, trim, ring);
+        }
+
+        return group;
+    }
+
+    /**
+     * Synchronize 3D Campaign Interactables (Consoles, Crates, Security Gate)
+     */
+    syncInteractables(campaign, timeSec = 0) {
+        const list = (campaign && Array.isArray(campaign.interactables)) ? campaign.interactables : [];
+        const activeIds = new Set();
+
+        for (let i = 0; i < list.length; i++) {
+            const item = list[i];
+            if (!item.active) continue;
+            activeIds.add(item.id);
+
+            let mesh = this.interactableMeshes.get(item.id);
+            if (!mesh) {
+                mesh = this.buildInteractableModel(item);
+                this.scene.add(mesh);
+                this.interactableMeshes.set(item.id, mesh);
+            }
+            mesh.position.set(item.x, item.y || 0, item.z);
+
+            if (item.type === 'CONSOLE' && mesh.userData.screenMat) {
+                const col = item.hacked ? 0x00ff88 : 0x00f0ff;
+                mesh.userData.screenMat.color.setHex(col);
+                mesh.userData.beacon.material.color.setHex(col);
+            } else if (item.type === 'SECURITY_GATE' && mesh.userData.laserGroup) {
+                mesh.userData.laserGroup.visible = !item.unlocked;
+            } else if (item.type === 'SHIELD_CELL' && mesh.userData.crystal) {
+                mesh.userData.crystal.rotation.y = timeSec * 2.4;
+                mesh.userData.crystal.position.y = 0.48 + Math.sin(timeSec * 3.5) * 0.07;
+            }
+        }
+
+        for (const [id, mesh] of this.interactableMeshes.entries()) {
+            if (!activeIds.has(id)) {
+                this.scene.remove(mesh);
+                this.interactableMeshes.delete(id);
             }
         }
     }

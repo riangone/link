@@ -33,11 +33,11 @@ export const STAGE_CONFIG = {
 // Physics
 export const GRAVITY = -32;
 export const MOVE_SPEED = {
-    WALK_FORWARD: 6.0,
-    WALK_BACK: 4.2,
-    RUN: 11.0,
-    DASH: 14.0,
-    EVADE_IMPULSE: 10.5
+    WALK_FORWARD: 5.2,
+    WALK_BACK: 3.8,
+    RUN: 9.8,
+    DASH: 13.0,
+    EVADE_IMPULSE: 10.2
 };
 
 // Poise & Stun
@@ -73,11 +73,13 @@ export const AI_ARCHETYPES = {
         id: 'STRIKER_GRUNT',
         name: 'TCTF 新兵杂兵 (Striker Grunt)',
         level: 'easy',
-        reactionFrames: 18,
-        blockChance: 0.15,
+        speedScale: 0.66,
+        attackInterval: 26,
+        reactionFrames: 26,
+        blockChance: 0.08,
         techChance: 0.0,
         ukemiChance: 0.0,
-        evadeChance: 0.05,
+        evadeChance: 0.02,
         comboDepth: 1,
         hypoCount: 0,
         retreatHpRatio: 0.0
@@ -86,11 +88,13 @@ export const AI_ARCHETYPES = {
         id: 'COMBAT_ELITE',
         name: '黑曜石战术精锐 (Black Ops Elite)',
         level: 'normal',
-        reactionFrames: 10,
-        blockChance: 0.50,
-        techChance: 0.25,
-        ukemiChance: 0.35,
-        evadeChance: 0.45,
+        speedScale: 0.82,
+        attackInterval: 16,
+        reactionFrames: 14,
+        blockChance: 0.32,
+        techChance: 0.15,
+        ukemiChance: 0.25,
+        evadeChance: 0.22,
         comboDepth: 2,
         hypoCount: 1,
         retreatHpRatio: 0.28
@@ -99,11 +103,13 @@ export const AI_ARCHETYPES = {
         id: 'SYNDICATE_NINJA',
         name: '辛迪加暗影指挥官 (Syndicate Commander)',
         level: 'hard',
-        reactionFrames: 4,
-        blockChance: 0.82,
-        techChance: 0.58,
-        ukemiChance: 0.70,
-        evadeChance: 0.80,
+        speedScale: 0.96,
+        attackInterval: 9,
+        reactionFrames: 5,
+        blockChance: 0.72,
+        techChance: 0.50,
+        ukemiChance: 0.65,
+        evadeChance: 0.65,
         comboDepth: 3,
         hypoCount: 1,
         retreatHpRatio: 0.32
@@ -610,7 +616,7 @@ export const MOVE_TABLE = [
         condition: (f) => f.isGrounded && f.hypoCount > 0 && f.hp < f.maxHp
     },
 
-    // 1. Context-Sensitive Throws (Close range + Punch or Throw input)
+    // 1. Context-Sensitive Throws (Close range + Punch or Throw input, or holding forward + Punch like Oni 2001)
     {
         id: 'THROW_BACK',
         priority: 100,
@@ -625,7 +631,12 @@ export const MOVE_TABLE = [
         states: [FIGHTER_STATE.RUN],
         button: 'punchOrThrow',
         condition: (f, input, opp, ctx) =>
-            opp && ctx.dist <= THROW_RANGE + 0.25 && ctx.canBeThrown && (ctx.oppDizzy || input.throwJustPressed)
+            opp &&
+            ctx.dist <= THROW_RANGE + 0.25 &&
+            ctx.canBeThrown &&
+            !input.jump &&
+            f.isGrounded &&
+            (ctx.oppDizzy || input.throwJustPressed || (ctx.holdingForward && ctx.dist <= 1.25))
     },
     {
         id: 'THROW_FRONT',
@@ -633,20 +644,56 @@ export const MOVE_TABLE = [
         states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.CROUCH],
         button: 'punchOrThrow',
         condition: (f, input, opp, ctx) =>
-            opp && ctx.dist <= THROW_RANGE && ctx.canBeThrown && (ctx.oppDizzy || input.throwJustPressed)
+            opp &&
+            ctx.dist <= THROW_RANGE &&
+            ctx.canBeThrown &&
+            !input.jump &&
+            (ctx.oppDizzy || input.throwJustPressed || (ctx.holdingForward && ctx.dist <= 1.25))
+    },
+    // Dedicated Throw button triggers a lunge-in shoulder throw even from slightly wider close range (<= 1.65m)
+    {
+        id: 'THROW_FRONT',
+        priority: 93,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN, FIGHTER_STATE.CROUCH],
+        button: 'throw',
+        condition: (f, input, opp, ctx) =>
+            opp && ctx.dist <= THROW_RANGE + 0.35 && ctx.canBeThrown
     },
 
-    // 2. Ground Stomp (Opponent knocked down nearby + Kick)
+    // 1b. Dedicated One-Button Special Triggers (Direct arcade action buttons for Uppercut / Evade / Heavy Kick)
+    {
+        id: 'DEVIL_SPIN_KICK',
+        priority: 92,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN, FIGHTER_STATE.CROUCH],
+        button: 'special',
+        condition: (f) => f.daodanStage >= 3 || f.daodanOverdrive
+    },
+    {
+        id: 'UPPERCUT',
+        priority: 91,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN, FIGHTER_STATE.CROUCH],
+        button: 'special',
+        condition: () => true
+    },
+
+    // 2. Ground Stomp (Opponent knocked down nearby + Kick or Punch)
     {
         id: 'GROUND_STOMP',
         priority: 88,
         states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.CROUCH],
         button: 'kick',
         condition: (f, input, opp, ctx) =>
-            opp && opp.state === FIGHTER_STATE.KNOCKED_DOWN && opp.isGrounded && ctx.dist <= 1.65
+            opp && opp.state === FIGHTER_STATE.KNOCKED_DOWN && opp.isGrounded && ctx.dist <= 1.75
     },
 
-    // 3. Dedicated Slide Button or Run + Crouch/Slide/Kick
+    // 3. Context-Sensitive Tactical Dodge/Slide (Forward + Evade/Slide = Slide Kick; Dedicated Slide = Slide Kick)
+    {
+        id: 'SLIDE_KICK',
+        priority: 86,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN, FIGHTER_STATE.CROUCH],
+        button: 'evade',
+        condition: (f, input, opp, ctx) => f.isGrounded && ctx.holdingForward
+    },
     {
         id: 'SLIDE_KICK',
         priority: 85,
@@ -662,7 +709,7 @@ export const MOVE_TABLE = [
         condition: (f) => f.isGrounded
     },
 
-    // 4. Running Attacks (Run + Jump+Punch = Acrobatic Disarm, Kick = Flying Kick, Punch = Haymaker)
+    // 4. Running & Forward-Lunge Attacks (Run + Jump+Punch = Acrobatic Disarm, Kick or Forward+Kick at mid range = Flying Kick)
     {
         id: 'DISARM_KICK',
         priority: 83,
@@ -678,11 +725,33 @@ export const MOVE_TABLE = [
         condition: (f) => f.isGrounded
     },
     {
+        id: 'FLYING_KICK',
+        priority: 81.5,
+        states: [FIGHTER_STATE.WALK],
+        button: 'kick',
+        condition: (f, input, opp, ctx) => f.isGrounded && ctx.holdingForward && ctx.dist > 1.75 && ctx.dist <= 3.4
+    },
+    {
         id: 'DASH_PUNCH',
         priority: 80,
         states: [FIGHTER_STATE.RUN],
         button: 'punch',
         condition: (f) => f.isGrounded
+    },
+    // 4a. Airborne Jump Attacks (Jump + Kick = Flying Kick / Jump + Punch = Acrobatic Disarm Kick)
+    {
+        id: 'FLYING_KICK',
+        priority: 81,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK],
+        button: 'kick',
+        condition: (f) => !f.isGrounded
+    },
+    {
+        id: 'DISARM_KICK',
+        priority: 80,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK],
+        button: 'punch',
+        condition: (f) => !f.isGrounded
     },
 
     // 4b. Firearm Actions (Dedicated Fire button, or Punch at medium/long range when armed)

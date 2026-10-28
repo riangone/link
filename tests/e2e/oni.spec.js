@@ -16,17 +16,28 @@ test.describe('Oni Combat 3D Fighting Game', () => {
 
         await page.goto(`${dev.url}/oni/?bot=normal`);
 
-        // Check modal is visible
+        // Check modal is visible & difficulty selector works
         const startBtn = page.locator('#btn-start');
         await expect(startBtn).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#difficulty-selector')).toBeVisible();
+        await page.locator('.diff-btn[data-diff="easy"]').click();
 
         // Click start
         await startBtn.click();
         await expect(page.locator('#start-overlay')).toHaveClass(/hidden/);
 
-        // Verify canvas exists and is rendering
+        // Verify canvas, difficulty pill, and fullscreen pill exist
         const canvas = page.locator('#canvas-container canvas');
         await expect(canvas).toBeVisible();
+        await expect(page.locator('#btn-difficulty')).toBeVisible();
+        const fsBtn = page.locator('#btn-fullscreen');
+        await expect(fsBtn).toBeVisible();
+
+        // Test Fullscreen toggle button (activates native fullscreen or pseudo-fullscreen fallback in headless Chromium)
+        await fsBtn.click();
+        await expect(page.locator('#btn-fullscreen-text')).toHaveText('退出全屏');
+        await fsBtn.click();
+        await expect(page.locator('#btn-fullscreen-text')).toHaveText('全屏');
 
         // Check initial state
         await expect.poll(async () => {
@@ -52,19 +63,34 @@ test.describe('Oni Combat 3D Fighting Game', () => {
     });
 
     test('Mobile view renders virtual joystick, arcade buttons, and toggles move list', async ({ page }) => {
+        test.setTimeout(60000);
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto(`${dev.url}/oni/?bot=normal`);
 
-        // Check virtual joystick and arcade action buttons exist
+        // Check virtual joystick and expanded 9-button arcade action pad exist
         await expect(page.locator('#joystick-zone')).toBeVisible();
+        await expect(page.locator('#btn-jump')).toBeVisible();
+        await expect(page.locator('#btn-evade')).toBeVisible();
+        await expect(page.locator('#btn-special')).toBeVisible();
+        await expect(page.locator('#btn-throw')).toBeVisible();
+        await expect(page.locator('#btn-fire')).toBeVisible();
         await expect(page.locator('#btn-punch')).toBeVisible();
         await expect(page.locator('#btn-kick')).toBeVisible();
         await expect(page.locator('#btn-slide')).toBeVisible();
         await expect(page.locator('#btn-block')).toBeVisible();
 
-        // Start fight
-        await page.click('#btn-start');
+        // Start TCTF Training Dojo first, verify Shinatama comms banner & highlighted button, then switch to Campaign Ch.1
+        await page.click('#btn-start-tutorial');
         await expect(page.locator('#start-overlay')).toHaveClass(/hidden/);
+        await expect(page.locator('#comms-banner')).toBeVisible();
+        await expect(page.locator('#comms-title')).toContainText('第 1 课');
+
+        // Open mode menu and start Story Campaign Ch.1
+        await page.click('#btn-menu');
+        await expect(page.locator('#start-overlay')).not.toHaveClass(/hidden/);
+        await page.click('#btn-start-campaign');
+        await expect(page.locator('#start-overlay')).toHaveClass(/hidden/);
+        await expect(page.locator('#comms-title')).toContainText('CH.1');
 
         // Toggle move list modal
         const toggleBtn = page.locator('#btn-toggle-moves');
@@ -90,9 +116,17 @@ test.describe('Oni Combat 3D Fighting Game', () => {
         expect(state.isPlaying).toBe(true);
     });
 
-    test('Lobby index includes oni game card', async ({ page }) => {
-        await page.goto(`${dev.url}/play/`);
+    test('Lobby index includes oni game card and matchmaking accepts all 20 games', async ({ page }) => {
+        await page.goto(`${dev.url}/play/?lang=zh`);
         const oniCard = page.locator('#g-oni');
         await expect(oniCard).toBeVisible();
+
+        // Switch to PvP mode and verify clicking oni enters matchmaking waiting state (not bad-game error)
+        await page.locator('#mode button[data-m="pvp"]').click();
+        await oniCard.click();
+        await expect(page.locator('#ov.on')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#box .c')).toHaveText(/^\d{4}$/);
+        await page.locator('#cx').click();
+        await expect(page.locator('#ov.on')).not.toBeVisible();
     });
 });

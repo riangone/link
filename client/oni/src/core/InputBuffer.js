@@ -20,7 +20,9 @@ export class InputBuffer {
             throwBtn: false,
             fire: false,
             daodan: false,
-            heal: false
+            heal: false,
+            evade: false,
+            special: false
         };
     }
 
@@ -39,6 +41,8 @@ export class InputBuffer {
             fire: false,
             daodan: false,
             heal: false,
+            evade: false,
+            special: false,
             punchJustPressed: false,
             kickJustPressed: false,
             jumpJustPressed: false,
@@ -48,13 +52,16 @@ export class InputBuffer {
             fireJustPressed: false,
             daodanJustPressed: false,
             healJustPressed: false,
+            evadeJustPressed: false,
+            specialJustPressed: false,
+            consumedButtons: 0,
             frame: 0
         };
     }
 
     /**
      * Push raw input for the current fixed frame
-     * @param {Object} raw - { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn, fire, daodan, heal }
+     * @param {Object} raw - { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn, fire, daodan, heal, evade, special }
      */
     push(raw = {}) {
         this.currentFrame++;
@@ -69,6 +76,8 @@ export class InputBuffer {
         const fire = !!raw.fire;
         const daodan = !!raw.daodan;
         const heal = !!raw.heal;
+        const evade = !!raw.evade;
+        const special = !!raw.special;
         // Throw can be triggered by dedicated throwBtn OR simultaneous Punch + Kick
         const throwBtn = !!raw.throwBtn || (punch && kick);
 
@@ -80,6 +89,8 @@ export class InputBuffer {
         const fireJustPressed = fire && !this.prevRaw.fire;
         const daodanJustPressed = daodan && !this.prevRaw.daodan;
         const healJustPressed = heal && !this.prevRaw.heal;
+        const evadeJustPressed = evade && !this.prevRaw.evade;
+        const specialJustPressed = special && !this.prevRaw.special;
         const throwJustPressed = (!!raw.throwBtn && !this.prevRaw.throwBtn) ||
             (punch && kick && (!this.prevRaw.punch || !this.prevRaw.kick));
 
@@ -98,6 +109,8 @@ export class InputBuffer {
             fire,
             daodan,
             heal,
+            evade,
+            special,
             punchJustPressed,
             kickJustPressed,
             jumpJustPressed,
@@ -107,10 +120,72 @@ export class InputBuffer {
             fireJustPressed,
             daodanJustPressed,
             healJustPressed,
+            evadeJustPressed,
+            specialJustPressed,
+            consumedButtons: 0,
             frame: this.currentFrame
         };
 
-        this.prevRaw = { punch, kick, block, jump, crouch, slide, throwBtn, fire, daodan, heal };
+        this.prevRaw = { punch, kick, block, jump, crouch, slide, throwBtn, fire, daodan, heal, evade, special };
+    }
+
+    /**
+     * Button bitmask helper for 12-frame Pre-Buffer consumption
+     */
+    static getButtonBit(btnName) {
+        switch (btnName) {
+            case 'punch': return 1 << 0;
+            case 'kick': return 1 << 1;
+            case 'jump': return 1 << 2;
+            case 'crouch': return 1 << 3;
+            case 'slide': return 1 << 4;
+            case 'throw': return 1 << 5;
+            case 'fire': return 1 << 6;
+            case 'daodan': return 1 << 7;
+            case 'heal': return 1 << 8;
+            case 'evade': return 1 << 9;
+            case 'special': return 1 << 10;
+            default: return 0;
+        }
+    }
+
+    /**
+     * Check if `btnName` was pressed within the last `windowFrames` (default 10 frames = ~166ms)
+     * and has not yet been consumed by an action.
+     */
+    wasRecentlyPressed(btnName, windowFrames = 10) {
+        if (btnName === 'punchOrThrow') {
+            return this.wasRecentlyPressed('throw', windowFrames) || this.wasRecentlyPressed('punch', windowFrames);
+        }
+        const prop = `${btnName}JustPressed`;
+        const bit = InputBuffer.getButtonBit(btnName);
+        for (let i = 0; i < windowFrames; i++) {
+            const entry = this.get(i);
+            if (!entry) break;
+            if (entry[prop] && (entry.consumedButtons & bit) === 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Mark `btnName` as consumed across the recent buffer window so a single tap
+     * does not trigger a second unbuffered action immediately afterwards.
+     */
+    consumeBufferedButton(btnName, windowFrames = 12) {
+        if (btnName === 'punchOrThrow') {
+            this.consumeBufferedButton('throw', windowFrames);
+            this.consumeBufferedButton('punch', windowFrames);
+            return;
+        }
+        const bit = InputBuffer.getButtonBit(btnName);
+        if (!bit) return;
+        for (let i = 0; i < windowFrames; i++) {
+            const entry = this.get(i);
+            if (!entry) break;
+            entry.consumedButtons |= bit;
+        }
     }
 
     /**
@@ -287,7 +362,9 @@ export class InputBuffer {
             throwBtn: false,
             fire: false,
             daodan: false,
-            heal: false
+            heal: false,
+            evade: false,
+            special: false
         };
     }
 }

@@ -608,7 +608,7 @@ function gaitFoot(phase, stride, stanceFrac, liftH) {
 }
 
 export const GAIT = {
-    WALK: { perMeter: 7.2, stance: 0.54 },
+    WALK: { perMeter: 5.4, stance: 0.56 },
     RUN: { perMeter: 3.1, stance: 0.30 }
 };
 
@@ -728,13 +728,14 @@ export function resolvePose(out, f, loco, t) {
 
     if (st === FIGHTER_STATE.WALK) {
         // Oni 2001 4-Directional Combat Footwork:
-        // Decompose velocity into character-local forward (fwdFrac) and lateral strafe (sideFrac)
+        // Natural alternating step stride where feet pass through center with heel-to-toe roll,
+        // athletic hip weight transfer, and counter-rotating shoulders (no split-legged waddling).
         const ph = loco.phase;
         const s = Math.sin(ph), c = Math.cos(ph);
         const g = GAIT.WALK;
         const stride = (Math.PI * 2 / g.perMeter) * g.stance;
-        const L = gaitFoot(ph, stride, g.stance, 0.15);
-        const R = gaitFoot(ph + Math.PI, stride, g.stance, 0.15);
+        const L = gaitFoot(ph, stride, g.stance, 0.16);
+        const R = gaitFoot(ph + Math.PI, stride, g.stance, 0.16);
 
         const yaw = typeof f.facingAngle === 'number' ? f.facingAngle : (f.facing === -1 ? Math.PI : 0);
         const fx = Math.cos(yaw), fz = Math.sin(yaw);
@@ -745,36 +746,52 @@ export function resolvePose(out, f, loco, t) {
         const absFwd = Math.abs(fwdFrac), absSide = Math.abs(sideFrac);
 
         Object.assign(out, GUARD);
-        // Forward/back foot stride + lateral sidestep foot spacing transfer
-        out.lFz += L.z * 1.38 * (0.35 + 0.65 * absFwd);
-        out.rFz += R.z * 1.38 * (0.35 + 0.65 * absFwd);
-        out.lFx = Math.max(0.06, GUARD.lFx + L.z * 0.55 * sideFrac + Math.max(0, -sideFrac) * L.swing * 0.11);
-        out.rFx = Math.max(0.06, GUARD.rFx - R.z * 0.55 * sideFrac + Math.max(0, sideFrac) * R.swing * 0.11);
-        out.lFy = L.y * (0.85 + 0.25 * absSide);
-        out.rFy = R.y * (0.85 + 0.25 * absSide);
-        out.lFP = L.swing * 0.46 + (fwdFrac < -0.25 ? 0.18 : 0);
-        out.rFP = R.swing * 0.46 + (fwdFrac < -0.25 ? 0.22 : 0.12);
+        // When stepping forward/back, feet alternate cleanly around center (0.04m / -0.04m) instead of staying split
+        const baseLz = GUARD.lFz * (1 - 0.82 * absFwd) + 0.04 * absFwd;
+        const baseRz = GUARD.rFz * (1 - 0.82 * absFwd) - 0.04 * absFwd;
+        out.lFz = baseLz + L.z * (0.35 + 0.65 * absFwd);
+        out.rFz = baseRz + R.z * (0.35 + 0.65 * absFwd);
 
-        // Pelvis & torso directional banking (lean into forward advance, guarded coil on retreat, bank on lateral strafe)
-        out.hipY = GUARD.hipY - 0.03 - Math.abs(c) * 0.045;
-        out.fwd = GUARD.fwd + fwdFrac * 0.085;
-        out.hipS = (L.swing - R.swing) * -0.045 - sideFrac * 0.065;
-        out.hipR = (L.swing - R.swing) * 0.075 + sideFrac * 0.14;
-        out.hipT = GUARD.hipT + s * 0.22 * (0.4 + 0.6 * absFwd) - sideFrac * 0.18;
-        out.spP = GUARD.spP + fwdFrac * 0.14 + Math.abs(s) * 0.04;
-        out.spY = GUARD.spY - s * 0.32 * (0.45 + 0.55 * absFwd) + sideFrac * 0.16;
-        out.spR = GUARD.spR - sideFrac * 0.18 + (L.swing - R.swing) * 0.06;
+        // Narrow foot width slightly during forward stride for sleek athletic gait; widen on lateral sidestep
+        const baseLx = 0.105 * absFwd + GUARD.lFx * (1 - absFwd);
+        const baseRx = 0.115 * absFwd + GUARD.rFx * (1 - absFwd);
+        out.lFx = Math.max(0.06, baseLx + L.z * 0.48 * sideFrac + Math.max(0, -sideFrac) * L.swing * 0.10);
+        out.rFx = Math.max(0.06, baseRx - R.z * 0.48 * sideFrac + Math.max(0, sideFrac) * R.swing * 0.10);
+        out.lFY = 0.08 * absFwd + GUARD.lFY * (1 - absFwd);
+        out.rFY = 0.16 * absFwd + GUARD.rFY * (1 - absFwd);
+
+        out.lFy = L.y * (0.90 + 0.20 * absSide);
+        out.rFy = R.y * (0.90 + 0.20 * absSide);
+        // Heel-lift on trailing push-off foot + mid-swing ankle flexion
+        out.lFP = Math.max(0, -L.z * 1.15) + L.swing * 0.34 + (fwdFrac < -0.25 ? 0.16 : 0);
+        out.rFP = Math.max(0, -R.z * 1.15) + R.swing * 0.34 + (fwdFrac < -0.25 ? 0.20 : 0.06);
+
+        // Pelvis & torso: natural double-frequency vertical bob, counter-twist with legs, athletic forward lean
+        const bob = Math.sin(ph * 2 - 0.4);
+        out.hipY = -0.075 - 0.03 * (1 - absFwd) + bob * 0.028;
+        out.fwd = 0.03 + fwdFrac * 0.075;
+        out.hipS = -s * 0.038 * absFwd - sideFrac * 0.065;
+        out.hipR = s * 0.065 * absFwd + sideFrac * 0.13;
+        // Left leg forward (s < 0) -> pelvis twists right (+hipT) and chest counter-rotates left (-spY)
+        out.hipT = GUARD.hipT * (1 - 0.65 * absFwd) - s * 0.26 * (0.35 + 0.65 * absFwd) - sideFrac * 0.16;
+        out.spP = GUARD.spP + fwdFrac * 0.12 + bob * 0.025;
+        out.spY = GUARD.spY * (1 - 0.65 * absFwd) + s * 0.34 * (0.4 + 0.6 * absFwd) + sideFrac * 0.15;
+        out.spR = GUARD.spR * (1 - 0.5 * absFwd) - sideFrac * 0.16 - s * 0.05;
         out.hdP = GUARD.hdP - fwdFrac * 0.08;
+        out.turn = 0.32 * absFwd + 0.85 * (1 - absFwd);
 
         // If retreating (auto-guarding while walking backward), raise high forearm guard while legs step back!
         if (f.isBlocking || fwdFrac < -0.25) {
-            out.lSP = 1.24 - s * 0.16; out.lSR = 0.08; out.lSY = 0.28; out.lEB = 2.15;
-            out.rSP = 1.08 + s * 0.16; out.rSR = 0.12; out.rSY = 0.34; out.rEB = 2.25;
+            out.lSP = 1.24 + s * 0.16; out.lSR = 0.08; out.lSY = 0.28; out.lEB = 2.15;
+            out.rSP = 1.08 - s * 0.16; out.rSR = 0.12; out.rSY = 0.34; out.rEB = 2.25;
         } else {
-            out.lSP = GUARD.lSP - s * 0.36;
-            out.rSP = GUARD.rSP + s * 0.36;
-            out.lEB = GUARD.lEB + s * 0.15;
-            out.rEB = GUARD.rEB - s * 0.15;
+            // Natural counter-arm swing in combat ready posture (when left leg swings forward, right arm swings forward)
+            out.lSP = 0.88 + s * 0.42;
+            out.rSP = 0.68 - s * 0.42;
+            out.lSR = 0.28;
+            out.rSR = 0.32;
+            out.lEB = 1.48 - s * 0.16;
+            out.rEB = 1.72 + s * 0.16;
         }
         out.gait = true;
         return out;

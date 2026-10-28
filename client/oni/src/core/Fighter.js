@@ -90,6 +90,7 @@ export class Fighter {
         this.dashTimer = 0;
         this.ringOut = false;
         this.floorY = 0;
+        this.speedScale = 1.0;
 
         // Input
         this.inputBuffer = new InputBuffer();
@@ -339,14 +340,15 @@ export class Fighter {
             this.poise = Math.min(this.maxPoise, this.poise + POISE_CONFIG.REGEN_PER_TICK);
         }
 
-        // Auto-face opponent in neutral states (supports full 3D yaw tracking)
+        // Auto-face opponent in neutral states (Oni 2001 Soft Target Strafe: tight tracking in close/mid combat)
         if (
             this.state === FIGHTER_STATE.IDLE ||
             this.state === FIGHTER_STATE.WALK ||
             this.state === FIGHTER_STATE.CROUCH
         ) {
             if (opponent) {
-                this.faceTowards(opponent.x, opponent.z, 0.28);
+                const distToOpp = Math.hypot(opponent.x - this.x, opponent.z - this.z);
+                this.faceTowards(opponent.x, opponent.z, distToOpp < 5.2 ? 0.55 : 0.28);
             }
         }
 
@@ -566,22 +568,22 @@ export class Fighter {
             if (!this.unlockedMoves.has(entry.id)) continue;
             if (!entry.states.includes(this.state)) continue;
 
-            // Check button trigger
+            // Check button trigger (with 10-frame Pre-Buffer so taps right before recovery ends never drop)
             let triggered = false;
-            if (entry.button === 'punch') triggered = input.punchJustPressed;
-            else if (entry.button === 'kick') triggered = input.kickJustPressed;
-            else if (entry.button === 'slide') triggered = input.slideJustPressed;
-            else if (entry.button === 'fire') triggered = input.fireJustPressed;
-            else if (entry.button === 'daodan') triggered = input.daodanJustPressed;
-            else if (entry.button === 'heal') triggered = input.healJustPressed;
-            else if (entry.button === 'crouch') triggered = input.crouchJustPressed || input.down;
-            else if (entry.button === 'punchOrThrow') triggered = input.punchJustPressed || input.throwJustPressed;
+            if (entry.button === 'crouch') {
+                triggered = this.inputBuffer.wasRecentlyPressed('crouch', 10) || input.down;
+            } else {
+                triggered = this.inputBuffer.wasRecentlyPressed(entry.button, 10);
+            }
 
             if (!triggered) continue;
 
             if (entry.condition(this, input, opponent, ctx)) {
                 let move = MOVES[entry.id];
                 if (!move) continue;
+
+                // Consume the buffered button press so a single tap doesn't re-trigger after the move
+                this.inputBuffer.consumeBufferedButton(entry.button, 12);
 
                 // Adapt FIRE_WEAPON frame data to the equipped weapon's spec
                 if (move.id === 'FIRE_WEAPON' && this.weapon) {
@@ -601,11 +603,45 @@ export class Fighter {
                 } else {
                     if (opponent) this.faceTowards(opponent.x, opponent.z, Math.PI);
                     this.transitionTo(FIGHTER_STATE.ATTACK, move);
+                    this.applyMagneticCombatLunge(move, opponent, ctx);
                 }
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Oni / Sifu style Magnetic Combat Lunge & Soft Z-Axis Auto-Align:
+     * When launching a melee strike at mid-close range (0.95m .. 2.75m), smoothly
+     * step into range and align Z so strikes connect reliably instead of whiffing by inches.
+     */
+    applyMagneticCombatLunge(move, opponent, ctx) {
+        if (!move || !opponent || move.isFirearmMove || move.isWeaponThrow || move.isHealMove || move.isDaodanBurst) {
+            return;
+        }
+        const dx = opponent.x - this.x;
+        const dz = opponent.z - this.z;
+        const dist = ctx ? ctx.dist : Math.hypot(dx, dz);
+        if (dist < 0.05 || dist > 2.85) return;
+
+        const { fx, fz } = this.getForwardVector();
+        const idealDist = 0.92;
+        const gap = Math.max(0, dist - idealDist);
+
+        // Compute adaptive forward lunge impulse when outside point-blank range
+        if (gap > 0.08 && dist <= 2.75) {
+            const lungeBoost = Math.min(8.2, 2.6 + gap * 3.1);
+            if (Math.hypot(this.vx, this.vz) < lungeBoost) {
+                this.vx = fx * lungeBoost;
+                this.vz = fz * lungeBoost;
+            }
+        }
+
+        // Soft Z-axis lateral alignment so 3D depth misalignment doesn't cause frustrating whiffs
+        if (Math.abs(dz) > 0.06 && Math.abs(dz) < 1.35 && dist < 2.65) {
+            this.vz += Math.max(-3.6, Math.min(3.6, dz * 4.2));
+        }
     }
 
     /**
@@ -644,12 +680,21 @@ export class Fighter {
     }
 
     /**
-     * Check double-tap omnidirectional evasion (Backflip / Side Cartwheel)
+     * Check double-tap omnidirectional evasion (Backflip / Side Cartwheel) or dedicated Evade button
      */
     tryStartEvade(input, simEvents) {
         if (!this.isGrounded) return false;
         const { fx, fz } = this.getForwardVector();
-        const evadeDir = this.inputBuffer.checkDoubleTapEvade(fx, fz);
+        const fwdDot = input ? (input.dirX * fx + input.dirZ * fz) : 0;
+        let evadeDir = this.inputBuffer.checkDoubleTapEvade(fx, fz);
+        // When holding forward + pressing Evade button, defer to MOVE_TABLE so it executes Oni's SLIDE_KICK!
+        if (!evadeDir && input && fwdDot <= 0.35 && this.inputBuffer.wasRecentlyPressed('evade', 10)) {
+            this.inputBuffer.consumeBufferedButton('evade', 12);
+            const sideDot = -input.dirX * fz + input.dirZ * fx;
+            if (sideDot > 0.45) evadeDir = 'RIGHT';
+            else if (sideDot < -0.45) evadeDir = 'LEFT';
+            else evadeDir = 'BACK';
+        }
         if (!evadeDir) return false;
 
         this.evadeDir = evadeDir;
@@ -688,31 +733,37 @@ export class Fighter {
         // 1. Check Omnidirectional Evade (Backflip / Cartwheel)
         if (this.tryStartEvade(input, simEvents)) return;
 
-        // 2. Check Forward Dash (double-tap forward, or touch-joystick double-tap via dashTimer)
+        // 2. Check Declarative Move Table (Throws, Specials, Attacks)
+        if (this.tryStartMoveFromTable(input, opponent, simEvents)) {
+            return;
+        }
+
+        // 3. Check Crouch
+        if (input.crouch && this.isGrounded) {
+            this.transitionTo(FIGHTER_STATE.CROUCH);
+            return;
+        }
+
+        // 4. Check Jump (Apply horizontal momentum from directional input for dynamic forward/lateral jumps)
+        if ((input.jump || this.inputBuffer.wasRecentlyPressed('jump', 8)) && this.isGrounded) {
+            this.inputBuffer.consumeBufferedButton('jump', 10);
+            this.vy = 12.2;
+            this.isGrounded = false;
+            const speedMult = (this.daodanOverdrive ? 1.18 : 1.0) * (this.speedScale || 1.0);
+            if (Math.abs(input.dirX) > 0.1 || Math.abs(input.dirZ) > 0.1) {
+                this.vx = input.dirX * MOVE_SPEED.WALK_FORWARD * 1.12 * speedMult;
+                this.vz = input.dirZ * MOVE_SPEED.WALK_FORWARD * 0.95 * speedMult;
+            }
+            return;
+        }
+
+        // 5. Check Forward Dash (double-tap forward, or touch-joystick double-tap via dashTimer)
         if (
             this.inputBuffer.checkDashForward(fx, 18, fz) ||
             (this.dashTimer > 0 && fwdDot > 0.35)
         ) {
             this.dashTimer = 0;
             this.transitionTo(FIGHTER_STATE.RUN);
-            return;
-        }
-
-        // 3. Check Declarative Move Table (Throws, Specials, Attacks)
-        if (this.tryStartMoveFromTable(input, opponent, simEvents)) {
-            return;
-        }
-
-        // 4. Check Crouch
-        if (input.crouch && this.isGrounded) {
-            this.transitionTo(FIGHTER_STATE.CROUCH);
-            return;
-        }
-
-        // 5. Check Jump
-        if (input.jump && this.isGrounded) {
-            this.vy = 12.0;
-            this.isGrounded = false;
             return;
         }
 
@@ -733,15 +784,6 @@ export class Fighter {
 
         if (this.tryStartEvade(input, simEvents)) return;
 
-        if (
-            this.inputBuffer.checkDashForward(fx, 18, fz) ||
-            (this.dashTimer > 0 && fwdDot > 0.35)
-        ) {
-            this.dashTimer = 0;
-            this.transitionTo(FIGHTER_STATE.RUN);
-            return;
-        }
-
         if (this.tryStartMoveFromTable(input, opponent, simEvents)) {
             return;
         }
@@ -753,9 +795,22 @@ export class Fighter {
             return;
         }
 
-        if (input.jump && this.isGrounded) {
-            this.vy = 12.0;
+        if ((input.jump || this.inputBuffer.wasRecentlyPressed('jump', 8)) && this.isGrounded) {
+            this.inputBuffer.consumeBufferedButton('jump', 10);
+            this.vy = 12.2;
             this.isGrounded = false;
+            const speedMult = (this.daodanOverdrive ? 1.18 : 1.0) * (this.speedScale || 1.0);
+            this.vx = input.dirX * MOVE_SPEED.WALK_FORWARD * 1.15 * speedMult;
+            this.vz = input.dirZ * MOVE_SPEED.WALK_FORWARD * 0.95 * speedMult;
+            return;
+        }
+
+        if (
+            this.inputBuffer.checkDashForward(fx, 18, fz) ||
+            (this.dashTimer > 0 && fwdDot > 0.35)
+        ) {
+            this.dashTimer = 0;
+            this.transitionTo(FIGHTER_STATE.RUN);
             return;
         }
 
@@ -769,23 +824,44 @@ export class Fighter {
 
         const nx = input.dirX / Math.max(1.0, dirMag);
         const nz = input.dirZ / Math.max(1.0, dirMag);
-        const speedMult = this.daodanOverdrive ? 1.18 : 1.0;
+        const speedMult = (this.daodanOverdrive ? 1.18 : 1.0) * (this.speedScale || 1.0);
 
-        // Oni 2001 directional speed profile: fast forward advance, guarded back-step, agile lateral strafe
-        let baseSpeed;
-        if (Math.abs(sideDot) > Math.abs(fwdDot) * 1.15) {
-            baseSpeed = (MOVE_SPEED.WALK_FORWARD * 0.88);
-        } else if (fwdDot >= 0) {
-            baseSpeed = MOVE_SPEED.WALK_FORWARD;
+        // Oni 2001 Soft Target Strafe & directional speed profile:
+        // When in close/mid combat range (< 5.2m), decompose stick along the opponent's radial vector (tx, tz)
+        // and tangential orbit vector (-tz, tx) so pushing up/down smoothly circle-strafes around the opponent!
+        let targetVx;
+        let targetVz;
+        const distToOpp = opponent ? Math.hypot(opponent.x - this.x, opponent.z - this.z) : Infinity;
+
+        if (opponent && distToOpp > 0.15 && distToOpp < 5.2) {
+            const tx = (opponent.x - this.x) / distToOpp;
+            const tz = (opponent.z - this.z) / distToOpp;
+            const tanX = -tz;
+            const tanZ = tx;
+            const radialDot = nx * tx + nz * tz;
+            const tangentDot = nx * tanX + nz * tanZ;
+
+            const radialSpeed = radialDot >= 0 ? MOVE_SPEED.WALK_FORWARD : MOVE_SPEED.WALK_BACK;
+            const orbitSpeed = MOVE_SPEED.WALK_FORWARD * 0.9;
+
+            targetVx = (tx * radialDot * radialSpeed + tanX * tangentDot * orbitSpeed) * speedMult;
+            targetVz = (tz * radialDot * radialSpeed + tanZ * tangentDot * orbitSpeed) * speedMult * 0.92;
         } else {
-            baseSpeed = MOVE_SPEED.WALK_BACK;
+            let baseSpeed;
+            if (Math.abs(sideDot) > Math.abs(fwdDot) * 1.15) {
+                baseSpeed = MOVE_SPEED.WALK_FORWARD * 0.88;
+            } else if (fwdDot >= 0) {
+                baseSpeed = MOVE_SPEED.WALK_FORWARD;
+            } else {
+                baseSpeed = MOVE_SPEED.WALK_BACK;
+            }
+            targetVx = nx * baseSpeed * speedMult;
+            targetVz = nz * baseSpeed * speedMult * 0.86;
         }
-        const targetVx = nx * baseSpeed * speedMult;
-        const targetVz = nz * baseSpeed * speedMult * 0.86;
 
         // Smooth athletic acceleration (eliminates robotic instant velocity snapping)
-        this.vx += (targetVx - this.vx) * 0.42;
-        this.vz += (targetVz - this.vz) * 0.42;
+        this.vx += (targetVx - this.vx) * 0.44;
+        this.vz += (targetVz - this.vz) * 0.44;
     }
 
     handleRun(input, opponent, simEvents) {
@@ -795,14 +871,14 @@ export class Fighter {
         }
 
         if (input.jump && this.isGrounded) {
-            this.vy = 12.5;
+            this.vy = 12.6;
             this.isGrounded = false;
             return;
         }
 
         const { fx, fz } = this.getForwardVector();
         const fwdDot = input.dirX * fx + input.dirZ * fz;
-        const runSpd = MOVE_SPEED.RUN * (this.daodanOverdrive ? 1.18 : 1.0);
+        const runSpd = MOVE_SPEED.RUN * (this.daodanOverdrive ? 1.18 : 1.0) * (this.speedScale || 1.0);
 
         if (fwdDot > 0.2) {
             this.vx = fx * runSpd;
@@ -906,14 +982,54 @@ export class Fighter {
             }
         }
 
-        // 1. Animation Cancel into Evade during recovery window
-        if (this.stateTimer >= move.startup + move.active && this.tryStartEvade(input, simEvents)) {
-            return;
+        // 1. Animation Cancel during recovery window (Evade, Jump, Slide, Special, Throw, or Dash/Walk Cancel)
+        const activeEnd = move.startup + move.active;
+        if (this.stateTimer >= activeEnd) {
+            if (this.tryStartEvade(input, simEvents)) return;
+
+            // Allow Jump-Cancel during recovery for fluid aerial follow-ups
+            if ((input.jumpJustPressed || this.inputBuffer.wasRecentlyPressed('jump', 8)) && this.isGrounded) {
+                this.inputBuffer.consumeBufferedButton('jump', 10);
+                this.vy = 12.2;
+                this.isGrounded = false;
+                this.transitionTo(FIGHTER_STATE.IDLE);
+                return;
+            }
+
+            // Allow Slide / Special / Throw / Heal / Daodan cancel during recovery
+            if (
+                this.inputBuffer.wasRecentlyPressed('special', 8) ||
+                this.inputBuffer.wasRecentlyPressed('slide', 8) ||
+                this.inputBuffer.wasRecentlyPressed('throw', 8) ||
+                this.inputBuffer.wasRecentlyPressed('daodan', 8) ||
+                this.inputBuffer.wasRecentlyPressed('heal', 8)
+            ) {
+                const prevState = this.state;
+                this.state = FIGHTER_STATE.IDLE;
+                if (this.tryStartMoveFromTable(input, opponent, simEvents)) {
+                    return;
+                }
+                this.state = prevState;
+            }
+
+            // Early Walk/Block Cancel in the late recovery frames (last 35% of recovery) so movement never feels stuck in mud
+            const lateRecoveryStart = activeEnd + Math.max(2, Math.floor(move.recovery * 0.65));
+            if (this.stateTimer >= lateRecoveryStart && this.isGrounded) {
+                if (input.block) {
+                    this.transitionTo(FIGHTER_STATE.IDLE);
+                    this.isBlocking = true;
+                    return;
+                }
+                if (Math.hypot(input.dirX, input.dirZ) > 0.25) {
+                    this.transitionTo(FIGHTER_STATE.WALK);
+                    return;
+                }
+            }
         }
 
         // 2. Combo Buffer / Cancel Window Check
         if (move.cancelTo && move.cancelTo.length > 0 && this.stateTimer >= startCancel) {
-            if (input.punchJustPressed) {
+            if (this.inputBuffer.wasRecentlyPressed('punch', 8)) {
                 if (move.cancelTo.includes('UPPERCUT') && this.inputBuffer.checkUppercut(this.facing)) {
                     this.bufferedMove = MOVES.UPPERCUT;
                 } else {
@@ -924,7 +1040,8 @@ export class Fighter {
                         }
                     }
                 }
-            } else if (input.kickJustPressed) {
+                if (this.bufferedMove) this.inputBuffer.consumeBufferedButton('punch', 10);
+            } else if (this.inputBuffer.wasRecentlyPressed('kick', 8)) {
                 if (move.cancelTo.includes('RISING_FURY') && this.inputBuffer.checkRisingFury()) {
                     this.bufferedMove = MOVES.RISING_FURY;
                 } else {
@@ -935,15 +1052,22 @@ export class Fighter {
                         }
                     }
                 }
+                if (this.bufferedMove) this.inputBuffer.consumeBufferedButton('kick', 10);
+            } else if (this.inputBuffer.wasRecentlyPressed('special', 8)) {
+                this.bufferedMove = (this.daodanStage >= 3 || this.daodanOverdrive)
+                    ? MOVES.DEVIL_SPIN_KICK
+                    : MOVES.UPPERCUT;
+                this.inputBuffer.consumeBufferedButton('special', 10);
             }
         }
 
         // Did active window finish and can execute buffered move?
-        const activeEnd = move.startup + move.active;
         if (this.stateTimer >= activeEnd && this.bufferedMove) {
             const nextMove = this.bufferedMove;
-            if (opponent) this.faceTowards(opponent.x, opponent.z, 0.45);
+            if (opponent) this.faceTowards(opponent.x, opponent.z, 0.65);
             this.transitionTo(FIGHTER_STATE.ATTACK, nextMove);
+            const ctx = this.buildMoveContext(input, opponent);
+            this.applyMagneticCombatLunge(nextMove, opponent, ctx);
             return;
         }
 
@@ -1018,8 +1142,10 @@ export class Fighter {
         if (
             move.techable &&
             this.stateTimer <= THROW_TECH_WINDOW &&
-            (input.throwJustPressed || input.punchJustPressed)
+            (this.inputBuffer.wasRecentlyPressed('throw', 8) || this.inputBuffer.wasRecentlyPressed('punch', 8))
         ) {
+            this.inputBuffer.consumeBufferedButton('throw', 10);
+            this.inputBuffer.consumeBufferedButton('punch', 10);
             const { fx, fz } = attacker.getForwardVector();
             attacker.invincible = false;
             attacker.throwTarget = null;
@@ -1078,8 +1204,9 @@ export class Fighter {
             this.hp > 0 &&
             this.stateTimer <= TECH_RECOVERY_WINDOW &&
             input &&
-            input.jumpJustPressed
+            (input.jumpJustPressed || this.inputBuffer.wasRecentlyPressed('jump', 10))
         ) {
+            this.inputBuffer.consumeBufferedButton('jump', 12);
             this.triggerTechRecovery(simEvents);
             return;
         }

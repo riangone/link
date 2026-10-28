@@ -79,6 +79,32 @@ export const I18N = {
         winner_p1: 'KONOKO WINS!',
         winner_p2: 'OPPONENT WINS!',
         draw: 'DRAW!'
+    },
+    ko: {
+        cam_modes: { side: '사이드', diagonal: '대각선', shoulder: '숄더뷰', top: '탑뷰' },
+        title: '오니 대전 · Oni Combat',
+        tagline: '3D 사이버 근접 격투 · 콤보, 슬라이딩, 가드 & 히트스톱',
+        p1_name: '코노코 (TCTF 요원)',
+        p2_name: '신디-봇 (미러 파이터)',
+        controls_title: '기술표 & 조작법',
+        ctrl_move: 'A / D (← / →): 이동 (두 번 눌러 대시)',
+        ctrl_z_move: 'W / S (↑ / ↓): 3D 축 이동',
+        ctrl_punch: 'J / Z: 펀치 (잽 → 스트레이트 → 어퍼컷)',
+        ctrl_kick: 'K / X: 킥 (로우킥 → 돌려차기)',
+        ctrl_slide: 'I / V 또는 대시 중 K / X: 슬라이딩 태클 (다운)',
+        ctrl_uppercut: 'S + D + J (↓ + → + 펀치): 라이징 어퍼 (띄우기)',
+        ctrl_block: 'L / C 또는 뒤로 걷기: 에너지 가드',
+        vs_human: '👥 사람과 대전',
+        vs_bot: '🤖 컴퓨터 대전',
+        start_game: '대전 시작',
+        restart: '한 판 더',
+        back_to_lobby: '로비로',
+        round_time: '시간',
+        moves_btn: '기술표',
+        ko: 'K.O.',
+        winner_p1: '코노코 승리!',
+        winner_p2: '상대 승리!',
+        draw: '무승부!'
     }
 };
 

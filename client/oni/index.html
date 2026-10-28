@@ -18,7 +18,8 @@
                 <div class="fighter-card p1">
                     <div class="fighter-info">
                         <span id="p1-name">KONOKO</span>
-                        <span id="p1-hypo-badge" class="hypo-badge" title="再生剂 (Hypo-Spray) - 按 H 键注射回血">💉×1</span>
+                        <span id="p1-rpg-badge" class="rpg-badge" title="TCTF 战术等级与经验值 (RPG Progression)">Lv.1</span>
+                        <span id="p1-hypo-badge" class="hypo-badge" title="再生剂 (Hypo-Spray) - 按 H 键或点击注射回血">💉×1</span>
                         <span id="p1-weapon-badge" class="weapon-badge">徒手 (UNARMED)</span>
                         <span id="p1-hp-text">100 / 100</span>
                     </div>
@@ -63,12 +64,33 @@
                 </div>
 
                 <!-- Top Right Utility Actions -->
+                <button type="button" id="btn-menu" class="hud-pill-btn" title="打开战役章节与模式选择菜单">
+                    🗺️ <span id="btn-menu-text">章节/模式</span>
+                </button>
+                <button type="button" id="btn-difficulty" class="hud-pill-btn" title="切换人机难度 (简单 / 标准 / 鬼神)">
+                    🤖 <span id="btn-difficulty-text">难度: 新兵</span>
+                </button>
                 <button type="button" id="btn-camera" class="hud-pill-btn" title="切换视角 (1-4) · 拖动画面旋转 · 滚轮缩放 · 双击复位">
                     🎥 <span id="btn-camera-text">侧视</span>
                 </button>
-                <button type="button" id="btn-toggle-moves" class="hud-pill-btn" title="查看出招表">
+                <button type="button" id="btn-fullscreen" class="hud-pill-btn" title="切换全屏显示 (F11 / Z)">
+                    ⛶ <span id="btn-fullscreen-text">全屏</span>
+                </button>
+                <button type="button" id="btn-toggle-moves" class="hud-pill-btn" title="查看出招表与已解锁技能">
                     📖 <span id="btn-moves-text">招式表</span>
                 </button>
+            </div>
+
+            <!-- Shinatama Holographic Tactical Comms & Campaign Objective Banner (Oni 2001 Style) -->
+            <div id="comms-banner" class="comms-banner hidden">
+                <div class="comms-avatar">📡 <span id="comms-speaker">SHINATAMA</span></div>
+                <div class="comms-body">
+                    <div class="comms-header-row">
+                        <strong id="comms-title">🎓 TCTF 训练基地</strong>
+                        <span id="comms-progress" class="comms-progress">0 / 2</span>
+                    </div>
+                    <p id="comms-text">推动摇杆走位，前推+⚡闪避使出疾风滑铲！</p>
+                </div>
             </div>
 
             <!-- Mid Screen Banners: K.O., Combos -->
@@ -82,18 +104,16 @@
                 <div class="command-box moves-panel" id="moves-panel">
                     <strong id="hud-cmd-title">⚡ 战术指令 (Oni 枪人格斗 Gun-Fu 出招表)</strong>
                     <div class="cmd-list">
-                        <span><strong>WASD</strong> 移动 · <strong>双击方向</strong> 疾跑/全向翻滚闪避(无敌脱锁)</span>
+                        <span><strong>WASD</strong> 移动 · <strong>Space</strong> 跳跃/受身 · <strong>R / 双击方向</strong> 翻滚闪避(无敌)</span>
                         <span><strong>J-J-K</strong> 刺拳-直拳-旋踢 · <strong>K-K-K</strong> 三段重踢(踢飞枪械)</span>
-                        <span><strong>疾跑 + J / K / C</strong> 冲刺穿心拳 / 疾风飞踢(缴械) / 滑铲夺枪</span>
-                        <span><strong>疾跑 + Space + J</strong> 腾空缴械踢 (直接踢落并凌空夺取敌人枪械)</span>
-                        <span><strong>F (或持枪远距 J)</strong> 射击 / 掷空枪砸击 · <strong>靠近枪械 J/滑铲</strong> 拾取</span>
-                        <span><strong>U / G / J+K</strong> 贴身抓投 (过肩摔 / 剪刀脚缴械 / 背身过桥摔 / 拆投)</span>
-                        <span><strong>S+D+J</strong> 升龙拳 · <strong>S+D+K</strong> 鬼神烈风脚(S3觉醒) · <strong>倒地 Space</strong> 受身</span>
-                        <span><strong>Q / E</strong> 道弹蛹超载爆发(满50%霸体/增伤/再生) · <strong>H</strong> 注射再生剂回血</span>
+                        <span><strong>跳跃 + J / K</strong> 空中飞踢(缴械) / 腾空夺枪踢 · <strong>I / V</strong> 滑铲夺枪</span>
+                        <span><strong>O / S+D+J</strong> 升龙拳 / 鬼神烈风脚(必杀) · <strong>U / G</strong> 贴身摔投/拆投</span>
+                        <span><strong>F (或远距 J)</strong> 射击 / 掷空枪 · <strong>靠近枪械 J/滑铲</strong> 拾取</span>
+                        <span><strong>Q / E</strong> 道弹蛹超载爆发 · <strong>H</strong> 注射再生剂回血 · <strong>L</strong> 格挡</span>
                     </div>
                 </div>
                 <div class="mobile-tip-bar" id="mobile-tip-bar">
-                    🕹️ 双击方向疾跑/翻滚 · P拳 · K腿 · ⚡滑铲 · B防/跳 · P+K抓投
+                    🕹️ 浮动摇杆环绕移动 · 👊拳(按住连段/上划升龙/贴身摔) · 🦵腿(上划旋风腿) · ⚡闪避(前推滑铲) · ⬆️跳跃
                 </div>
                 <div class="command-box status-panel">
                     <strong id="mode-status-text">🤖 人机战模式</strong>
@@ -102,36 +122,102 @@
             </div>
         </div>
 
-        <!-- On-Screen Touch Controls (Active on Mobile/Touch Devices) -->
+        <!-- On-Screen Action Controls (Oni 2001 Context-Sensitive 4-Core Cluster + Dynamic Floating Joystick) -->
         <div class="touch-controls" id="touch-controls">
-            <!-- Left Virtual Joystick for 3D Movement & Dash -->
+            <!-- Left Dynamic Floating Virtual Joystick Zone for 360° Soft-Strafe & Sprint -->
             <div class="joystick-zone" id="joystick-zone">
                 <div class="joystick-base" id="joystick-base">
                     <div class="joystick-stick" id="joystick-stick"></div>
                 </div>
             </div>
 
-            <!-- Right Action Buttons -->
+            <!-- Right Oni-Style 4-Core Context-Sensitive Combat Cluster (+ Contextual Fire Button) -->
             <div class="touch-btn-pad">
-                <button type="button" class="t-btn block" id="btn-block" aria-label="格挡">B<small>防</small></button>
-                <button type="button" class="t-btn slide" id="btn-slide" aria-label="滑铲">⚡<small>滑</small></button>
-                <button type="button" class="t-btn kick" id="btn-kick" aria-label="踢腿">K<small>腿</small></button>
-                <button type="button" class="t-btn punch" id="btn-punch" aria-label="刺拳">P<small>拳</small></button>
+                <!-- 4 Core Oni Triggers -->
+                <button type="button" class="t-btn punch core-btn" id="btn-punch" aria-label="拳击" title="拳击 / 按住自动连击 / 贴身推前过肩摔 / 上划升龙拳 (J)">
+                    <span class="btn-icon">👊</span>
+                    <small id="lbl-punch">拳·连击</small>
+                </button>
+                <button type="button" class="t-btn kick core-btn" id="btn-kick" aria-label="重腿" title="重腿 / 按住三连踢 / 推前飞踢 / 倒地重踏 / 上划旋风腿 (K)">
+                    <span class="btn-icon">🦵</span>
+                    <small id="lbl-kick">腿·飞踢</small>
+                </button>
+                <button type="button" class="t-btn evade core-btn" id="btn-evade" aria-label="闪避滑铲" title="战术机动：前推摇杆=疾风滑铲夺枪 · 后/侧推=无敌翻滚闪避 (R / I)">
+                    <span class="btn-icon">⚡</span>
+                    <small id="lbl-evade">闪避·滑铲</small>
+                </button>
+                <button type="button" class="t-btn jump core-btn" id="btn-jump" aria-label="跳跃受身" title="跳跃 / 空中飞踢 / 落地受身 / 上划必杀 (Space)">
+                    <span class="btn-icon">⬆️</span>
+                    <small id="lbl-jump">跳跃·受身</small>
+                </button>
+
+                <!-- Context-Sensitive Gun-Fu Action Button (Highlights when armed or weapon is nearby) -->
+                <button type="button" class="t-btn fire context-fire" id="btn-fire" aria-label="射击夺枪" title="开火射击 / 拾取枪械 / 投掷空枪 (F)">
+                    <span class="btn-icon">🔫</span>
+                    <small id="lbl-fire">射击·拾枪</small>
+                </button>
+
+                <!-- Compact Secondary Quick-Pills (Direct overrides for Slide / Special / Throw / Block) -->
+                <button type="button" class="t-btn special sub-pill" id="btn-special" aria-label="升龙必杀" title="升龙拳 / 鬼神烈风脚 (O)">🔥<small>必杀</small></button>
+                <button type="button" class="t-btn slide sub-pill" id="btn-slide" aria-label="滑铲" title="疾风滑铲扫堂腿 (I / V)">💨<small>滑铲</small></button>
+                <button type="button" class="t-btn throw sub-pill" id="btn-throw" aria-label="抓投拆投" title="过肩摔 / 拆投 (U / G)">🤼<small>摔投</small></button>
+                <button type="button" class="t-btn block sub-pill" id="btn-block" aria-label="格挡" title="格挡防御 (后退自动格挡 / L)">🛡️<small>格挡</small></button>
             </div>
         </div>
 
         <!-- Start / Lobby Overlay (Translucent Cyber Floating Card) -->
         <div id="start-overlay" class="overlay">
             <div class="modal start-modal">
-                <div class="modal-badge">3D CYBER BEAT 'EM UP</div>
+                <div class="modal-badge">ONI 2001 · 3D CYBER ACTION RPG &amp; BEAT 'EM UP</div>
                 <h1 id="modal-title">⚔️ 鬼神对决 · ONI</h1>
-                <p id="modal-desc">经典《Oni》纯前端 3D 动作对战 · 搓招缓冲、分层动作状态机、Hitbox 与疾风滑铲。</p>
+                <p id="modal-desc">《Oni》3D 动作闯关 + 格斗对战：TCTF 互动训练营、RPG 招式成长、终端骇入与 1v1 竞技对决。</p>
+
+                <!-- Konoko RPG Status Bar -->
+                <div class="rpg-status-strip" id="rpg-status-strip">
+                    <span id="rpg-strip-rank">🎖️ Lv.1 TCTF 见习特工</span>
+                    <span id="rpg-strip-exp">EXP: 0 / 120</span>
+                    <span id="rpg-strip-moves">招式: 基础连段+滑铲+过肩摔</span>
+                </div>
+
+                <!-- Story Campaign & Training Chapter Selector -->
+                <div class="chapter-selector" id="chapter-selector" role="group" aria-label="选择战役章节或训练营">
+                    <button type="button" class="chapter-card" data-chapter="ch0" id="btn-chapter-0">
+                        <span class="ch-code">🎓 CH.0</span>
+                        <strong class="ch-name">TCTF 训练营</strong>
+                        <small class="ch-sub">Shinatama 实操教学</small>
+                    </button>
+                    <button type="button" class="chapter-card active" data-chapter="ch1" id="btn-chapter-1">
+                        <span class="ch-code">📖 CH.1</span>
+                        <strong class="ch-name">辛迪加仓库</strong>
+                        <small class="ch-sub">终端骇入 · 巴拉巴斯</small>
+                    </button>
+                    <button type="button" class="chapter-card" data-chapter="ch2" id="btn-chapter-2">
+                        <span class="ch-code">🧬 CH.2</span>
+                        <strong class="ch-name">生物实验室</strong>
+                        <small class="ch-sub">道弹觉醒 · 暗影百足</small>
+                    </button>
+                    <button type="button" class="chapter-card" data-chapter="ch3" id="btn-chapter-3">
+                        <span class="ch-code">⚡ CH.3</span>
+                        <strong class="ch-name">天台最终决战</strong>
+                        <small class="ch-sub">高低差擂台 · 宿敌穆罗</small>
+                    </button>
+                </div>
+
+                <div class="difficulty-selector" id="difficulty-selector" role="group" aria-label="选择AI难度">
+                    <button type="button" class="diff-btn active" data-diff="easy">🟢 新兵 (轻松)</button>
+                    <button type="button" class="diff-btn" data-diff="normal">🟡 精锐 (标准)</button>
+                    <button type="button" class="diff-btn" data-diff="hard">🔴 鬼神 (困难)</button>
+                </div>
                 <div class="btn-group">
-                    <button type="button" class="cyber-btn primary-glow" id="btn-start">开始对决 (1v1 VS BOT)</button>
-                    <button type="button" class="cyber-btn survival-glow" id="btn-start-survival">🔥 生存波次模式 (SURVIVAL WAVES)</button>
+                    <button type="button" class="cyber-btn campaign-glow" id="btn-start-campaign">📖 开始战役闯关 (CH.1 辛迪加仓库)</button>
+                    <button type="button" class="cyber-btn tutorial-glow" id="btn-start-tutorial">🎓 进入 TCTF 新手训练营 (互动教学)</button>
+                    <div class="btn-row-split">
+                        <button type="button" class="cyber-btn primary-glow" id="btn-start">⚔️ 1v1 竞技对决</button>
+                        <button type="button" class="cyber-btn survival-glow" id="btn-start-survival">🔥 无尽生存波次</button>
+                    </div>
                     <a href="../play/" class="cyber-btn secondary" style="text-decoration: none; display: block;">返回对战大厅</a>
                 </div>
-                <div class="modal-hint">提示：按 空格键(Space) 或 点击按钮立即开战</div>
+                <div class="modal-hint">提示：点击右上角 ⛶ 可全屏游玩 · 战役模式自动保存等级与解锁招式</div>
             </div>
         </div>
 
@@ -141,7 +227,9 @@
                 <h1 id="ko-title">K.O.</h1>
                 <p id="winner-text">KONOKO 获胜！</p>
                 <div class="btn-group">
+                    <button type="button" class="cyber-btn campaign-glow hidden" id="btn-next-chapter">📖 进入下一章节</button>
                     <button type="button" class="cyber-btn" id="btn-rematch">再来一局</button>
+                    <button type="button" class="cyber-btn secondary" id="btn-back-menu">🗺️ 返回模式/章节选择</button>
                     <a href="../play/" class="cyber-btn secondary" style="text-decoration: none; display: block;">返回对战大厅</a>
                 </div>
             </div>

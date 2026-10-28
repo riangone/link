@@ -849,6 +849,7 @@ export class Simulation {
             facing: f.facing,
             facingAngle: Number(f.facingAngle.toFixed(3)),
             hp: Math.round(f.hp),
+            maxHp: Math.round(f.maxHp),
             poise: Math.round(f.poise),
             daodan: Math.round(f.daodanMeter),
             daodanStage: f.daodanStage,
@@ -857,8 +858,13 @@ export class Simulation {
             state: f.state,
             stateTimer: f.stateTimer,
             moveId: f.currentMove ? f.currentMove.id : null,
+            evadeDir: f.evadeDir,
+            isGrounded: !!f.isGrounded,
+            isBlocking: !!f.isBlocking,
+            invincible: !!f.invincible,
+            ringOut: !!f.ringOut,
             combo: f.comboCount,
-            weapon: f.weapon ? { type: f.weapon.type, ammo: f.weapon.ammo } : null
+            weapon: f.weapon ? { type: f.weapon.type, ammo: f.weapon.ammo, maxAmmo: f.weapon.maxAmmo, color: f.weapon.color } : null
         });
 
         return {
@@ -870,13 +876,135 @@ export class Simulation {
                 id: w.id,
                 type: w.type,
                 ammo: w.ammo,
+                maxAmmo: w.maxAmmo,
+                color: w.color,
                 x: Number(w.x.toFixed(2)),
                 y: Number(w.y.toFixed(2)),
-                z: Number(w.z.toFixed(2))
+                z: Number(w.z.toFixed(2)),
+                spinPitch: Number((w.spinPitch || 0).toFixed(2)),
+                spinYaw: Number((w.spinYaw || 0).toFixed(2)),
+                isGrounded: !!w.isGrounded
             })),
-            projectiles: this.getProjectiles().length,
+            projectiles: this.getProjectiles().map((p) => ({
+                id: p.id,
+                weaponType: p.weaponType,
+                color: p.color,
+                x: Number(p.x.toFixed(2)),
+                y: Number(p.y.toFixed(2)),
+                z: Number(p.z.toFixed(2)),
+                vx: Number(p.vx.toFixed(2)),
+                vy: Number(p.vy.toFixed(2)),
+                vz: Number(p.vz.toFixed(2))
+            })),
             over: this.isMatchOver,
             winner: this.winner
         };
+    }
+
+    /**
+     * Apply authoritative host snapshot on client peer
+     */
+    applySnapshot(snap) {
+        if (!snap) return;
+        this.currentFrame = snap.frame || this.currentFrame;
+        if (typeof snap.time === 'number') {
+            this.roundTimer = snap.time * 60;
+        }
+        this.isMatchOver = !!snap.over;
+        this.winner = snap.winner || null;
+
+        const applyFighter = (f, s) => {
+            if (!s) return;
+            f.x = s.x;
+            f.y = s.y;
+            f.z = s.z;
+            f.vx = s.vx || 0;
+            f.vy = s.vy || 0;
+            f.vz = s.vz || 0;
+            if (typeof s.facingAngle === 'number') {
+                f.setFacingAngle(s.facingAngle);
+            } else if (s.facing) {
+                f.facing = s.facing;
+            }
+            if (typeof s.maxHp === 'number') f.maxHp = s.maxHp;
+            f.hp = s.hp;
+            f.poise = s.poise;
+            f.daodanMeter = s.daodan || 0;
+            f.daodanStage = s.daodanStage || 1;
+            f.daodanOverdrive = !!s.overdrive;
+            if (typeof s.hypo === 'number') f.hypoCount = s.hypo;
+            f.state = s.state;
+            f.stateTimer = s.stateTimer || 0;
+            if (s.moveId && MOVES[s.moveId]) {
+                let m = MOVES[s.moveId];
+                if (m.id === 'FIRE_WEAPON' && s.weapon) {
+                    const spec = WEAPON_SPECS[s.weapon.type] || WEAPON_SPECS.TCTF_PISTOL;
+                    m = { ...m, name: spec.name, startup: spec.startup, active: spec.active, recovery: spec.recovery, weaponSpec: spec };
+                }
+                f.currentMove = m;
+            } else {
+                f.currentMove = null;
+            }
+            if (s.evadeDir) f.evadeDir = s.evadeDir;
+            f.isGrounded = s.isGrounded !== undefined ? !!s.isGrounded : (s.y <= 0.05);
+            f.isBlocking = !!s.isBlocking;
+            f.invincible = !!s.invincible;
+            f.ringOut = !!s.ringOut;
+            f.comboCount = s.combo || 0;
+            if (s.weapon) {
+                f.equipWeapon(s.weapon);
+            } else {
+                f.weapon = null;
+            }
+        };
+
+        applyFighter(this.f1, snap.p1);
+        applyFighter(this.f2, snap.p2);
+
+        // Sync weapons & projectiles in entity map
+        for (const [id, ent] of this.entities.entries()) {
+            if (ent.entityType === 'weapon' || ent.entityType === 'projectile') {
+                this.entities.delete(id);
+            }
+        }
+        if (Array.isArray(snap.weapons)) {
+            for (const w of snap.weapons) {
+                const spec = WEAPON_SPECS[w.type] || WEAPON_SPECS.TCTF_PISTOL;
+                this.registerEntity({
+                    id: w.id,
+                    entityType: 'weapon',
+                    type: spec.id,
+                    name: spec.name,
+                    ammo: w.ammo,
+                    maxAmmo: w.maxAmmo || spec.maxAmmo,
+                    color: w.color || spec.color,
+                    x: w.x,
+                    y: w.y,
+                    z: w.z,
+                    vx: 0,
+                    vy: 0,
+                    vz: 0,
+                    spinPitch: w.spinPitch || 0,
+                    spinYaw: w.spinYaw || 0,
+                    isGrounded: w.isGrounded !== undefined ? w.isGrounded : true
+                });
+            }
+        }
+        if (Array.isArray(snap.projectiles)) {
+            for (const p of snap.projectiles) {
+                this.registerEntity({
+                    id: p.id,
+                    entityType: 'projectile',
+                    weaponType: p.weaponType,
+                    color: p.color || 0xff9900,
+                    x: p.x,
+                    y: p.y,
+                    z: p.z,
+                    vx: p.vx || 0,
+                    vy: p.vy || 0,
+                    vz: p.vz || 0
+                });
+            }
+        }
     }
 }

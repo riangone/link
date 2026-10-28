@@ -349,4 +349,161 @@ test('Oni Combat core module loading and P0+P1 simulation verification', async (
         assert.strictEqual(ringSim.isMatchOver, true, 'Ring-Out should immediately end the match');
         assert.strictEqual(ringSim.winner, 'p1', 'Opponent Ring-Out should award victory to P1');
     });
+
+    await t.test('UX Enhancements: Bot Difficulty Speed Scaling, Jump Attacks, and One-Button Specials', () => {
+        const sim = new Simulation();
+        const easyBot = new BotBrain('easy', 101);
+        const hardBot = new BotBrain('hard', 202);
+        assert.ok(easyBot.profile.speedScale < hardBot.profile.speedScale, 'Easy bot should have lower movement speedScale than Hard bot');
+        assert.ok(easyBot.profile.attackInterval > hardBot.profile.attackInterval, 'Easy bot should attack less frequently than Hard bot');
+
+        // 1. Directional Jump with horizontal momentum + Mid-Air Jump Kick (FLYING_KICK)
+        sim.f1.x = 0;
+        sim.f1.z = 0;
+        sim.tick({ dirX: 1, jump: true }, {});
+        assert.strictEqual(sim.f1.isGrounded, false, 'Pressing jump should launch fighter into the air');
+        assert.ok(sim.f1.vx > 4.0, 'Directional jump should impart forward horizontal velocity');
+
+        sim.tick({ dirX: 1, jump: false, kick: true }, {});
+        assert.strictEqual(sim.f1.state, FIGHTER_STATE.ATTACK, 'Pressing kick in mid-air should trigger aerial attack');
+        assert.strictEqual(sim.f1.currentMove.id, 'FLYING_KICK', 'Mid-air kick should trigger FLYING_KICK');
+
+        // 2. Dedicated one-button Special (Uppercut / Devil Spin Kick) and Evade button
+        const sim2 = new Simulation();
+        sim2.tick({ special: true }, {});
+        assert.strictEqual(sim2.f1.state, FIGHTER_STATE.ATTACK);
+        assert.strictEqual(sim2.f1.currentMove.id, 'UPPERCUT', 'Dedicated special button should trigger UPPERCUT');
+
+        const sim3 = new Simulation();
+        sim3.tick({ evade: true }, {});
+        assert.strictEqual(sim3.f1.state, FIGHTER_STATE.EVADE, 'Dedicated evade button should trigger EVADE roll/backflip');
+
+        // 3. 10-Frame Input Pre-Buffer & Magnetic Combat Lunge
+        const sim4 = new Simulation();
+        sim4.f1.x = 0;
+        sim4.f2.x = 2.1; // mid-close gap (2.1m)
+        sim4.f2.z = 0.4; // slight Z offset
+        sim4.tick({ punch: true }, {});
+        assert.strictEqual(sim4.f1.state, FIGHTER_STATE.ATTACK);
+        assert.ok(sim4.f1.vx > 3.5, 'Magnetic combat lunge should propel attacker toward mid-range opponent');
+        assert.ok(sim4.f1.vz > 0.5, 'Magnetic combat lunge should gently align Z-axis toward opponent');
+
+        // Press slide 3 frames before recovery finishes -> should automatically fire SLIDE_KICK via pre-buffer!
+        const sim5 = new Simulation();
+        sim5.f1.transitionTo(FIGHTER_STATE.HIT_STUN);
+        sim5.f1.hitStunDuration = 4;
+        sim5.tick({ slide: true }, {}); // pressed while still in HIT_STUN!
+        sim5.tick({}, {});
+        sim5.tick({}, {});
+        sim5.tick({}, {}); // exits HIT_STUN on frame 4
+        sim5.tick({}, {}); // IDLE evaluates pre-buffered slide press!
+        assert.strictEqual(sim5.f1.state, FIGHTER_STATE.ATTACK, 'Pre-buffered button pressed during hit-stun should fire immediately upon recovery');
+        assert.strictEqual(sim5.f1.currentMove.id, 'SLIDE_KICK', 'Pre-buffered slide input should execute SLIDE_KICK');
+
+        // 4. Oni 2001 Context-Sensitive Controls:
+        // (a) Forward + Evade button triggers SLIDE_KICK
+        const sim6 = new Simulation();
+        sim6.f1.facing = 1;
+        sim6.tick({ dirX: 1, evade: true }, {});
+        assert.strictEqual(sim6.f1.state, FIGHTER_STATE.ATTACK);
+        assert.strictEqual(sim6.f1.currentMove.id, 'SLIDE_KICK', 'Holding forward + Evade should contextually trigger SLIDE_KICK');
+
+        // (b) Close-range Forward + Punch triggers THROW_FRONT without needing a separate Throw button
+        const sim7 = new Simulation();
+        sim7.f1.x = 0;
+        sim7.f2.x = 1.1;
+        sim7.f1.facing = 1;
+        sim7.f2.facing = -1;
+        sim7.tick({ dirX: 1, punch: true }, {});
+        assert.strictEqual(sim7.f1.state, FIGHTER_STATE.THROW, 'Close-range Forward + Punch should contextually trigger THROW_FRONT');
+        assert.strictEqual(sim7.f1.currentMove.id, 'THROW_FRONT');
+
+        // (c) Soft Target Strafe: pushing Z-axis in close range circle-strafes around opponent while keeping eyes locked
+        const sim8 = new Simulation();
+        sim8.f1.x = 0;
+        sim8.f1.z = 0;
+        sim8.f2.x = 2.2;
+        sim8.f2.z = 0;
+        for (let i = 0; i < 12; i++) {
+            sim8.tick({ dirX: 0, dirZ: 1 }, {});
+        }
+        assert.ok(sim8.f1.z > 0.2, 'Soft target strafe should smoothly orbit laterally around opponent');
+        const angleToOpp = Math.atan2(sim8.f2.z - sim8.f1.z, sim8.f2.x - sim8.f1.x);
+        assert.ok(Math.abs(sim8.f1.facingAngle - angleToOpp) < 0.25, 'Fighter should stay locked facing opponent during lateral circle strafe');
+    });
+
+    await t.test('P6 TCTF Training Dojo, Story Campaign Zones, Console Hacking & RPG Progression', async () => {
+        const { CampaignManager } = await import('../../client/oni/src/core/CampaignManager.js');
+        const sim = new Simulation();
+        const campaign = new CampaignManager(sim);
+        const bot = new BotBrain('easy', 303);
+
+        // 1. Tutorial Dojo Stage 1 -> Stage 2 progression
+        campaign.startTutorial();
+        assert.strictEqual(campaign.mode, 'TUTORIAL');
+        assert.strictEqual(campaign.tutorialStageIdx, 0);
+        assert.strictEqual(campaign.commsState.visible, true);
+
+        // Execute 2 Slide Kicks to complete Stage 1
+        sim.tick({ dirX: 1, evade: true }, campaign.getTutorialBotInput(bot));
+        campaign.updateTick({ dirX: 1, evade: true }, sim.events);
+        assert.strictEqual(campaign.tutorialProgress, 1, 'First Slide Kick should advance tutorial progress to 1/2');
+        for (let i = 0; i < 35; i++) {
+            sim.tick({}, campaign.getTutorialBotInput(bot));
+            campaign.updateTick({}, sim.events);
+        }
+        sim.tick({ dirX: 1, evade: true }, campaign.getTutorialBotInput(bot));
+        campaign.updateTick({ dirX: 1, evade: true }, sim.events);
+        assert.strictEqual(campaign.tutorialProgress, 2, 'Second Slide Kick should complete Stage 1 goal (2/2)');
+        for (let i = 0; i < 40; i++) {
+            sim.tick({}, campaign.getTutorialBotInput(bot));
+            campaign.updateTick({}, sim.events);
+        }
+        assert.strictEqual(campaign.tutorialStageIdx, 1, 'Tutorial should automatically advance to Stage 2');
+
+        // 2. Story Campaign Ch.1: Zone 1 combat, Console Hacking, Medkit Pickup & RPG EXP Level Up
+        campaign.startChapter('ch1');
+        assert.strictEqual(campaign.mode, 'CAMPAIGN');
+        assert.strictEqual(campaign.activeChapterId, 'ch1');
+        assert.strictEqual(campaign.zoneIndex, 0);
+        assert.strictEqual(campaign.consoleHacked, false, 'Zone 1 requires hacking the security console');
+
+        // Move Konoko onto the Medkit Crate (-3.8, -2.2) while damaged
+        sim.f1.hp = 60;
+        sim.f1.x = -3.8;
+        sim.f1.z = -2.2;
+        const events1 = [];
+        campaign.updateTick({}, events1);
+        assert.ok(sim.f1.hp >= 95, 'Walking over Medkit Crate should restore +40 HP');
+
+        // Walk near the Security Console (4.2, -2.6) to hack it
+        sim.f1.x = 4.1;
+        sim.f1.z = -2.5;
+        const events2 = [];
+        campaign.updateTick({ punch: true }, events2);
+        assert.strictEqual(campaign.consoleHacked, true, 'Interacting with Console should unlock security gate');
+
+        // Defeat Zone 1 Sentry -> should NOT end match, instead should transition to Zone 2!
+        sim.f2.hp = 0;
+        const events3 = [{ type: 'KO', winner: 'p1' }];
+        sim.isMatchOver = true;
+        campaign.updateTick({}, events3);
+        assert.strictEqual(sim.isMatchOver, false, 'Defeating Zone 1 guard must not end the chapter');
+        assert.strictEqual(campaign.zoneCleared, true);
+
+        // Advance transition timer to enter Zone 2
+        for (let i = 0; i < 90; i++) {
+            campaign.updateTick({}, []);
+        }
+        assert.strictEqual(campaign.zoneIndex, 1, 'Chapter should advance to Zone 2 after Zone 1 clear + console hack');
+        assert.ok(sim.f2.hp > 90, 'Zone 2 enemy should spawn with full HP');
+
+        // 3. RPG EXP & Level Up unlocks new moves and increases Max HP
+        const lvBefore = campaign.rpg.level;
+        const leveled = campaign.addExp(300, []);
+        assert.strictEqual(leveled, true, 'Adding 300 EXP should level up Konoko');
+        assert.ok(campaign.rpg.level > lvBefore);
+        assert.ok(sim.f1.maxHp >= 125, 'Leveling up should increase Konoko Max HP');
+        assert.strictEqual(sim.f1.unlockedMoves.has('RISING_FURY'), true, 'Lv.3 should unlock RISING_FURY');
+    });
 });
