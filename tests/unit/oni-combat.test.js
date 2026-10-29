@@ -505,5 +505,38 @@ test('Oni Combat core module loading and P0+P1 simulation verification', async (
         assert.ok(campaign.rpg.level > lvBefore);
         assert.ok(sim.f1.maxHp >= 125, 'Leveling up should increase Konoko Max HP');
         assert.strictEqual(sim.f1.unlockedMoves.has('RISING_FURY'), true, 'Lv.3 should unlock RISING_FURY');
+
+        // 4. TCTF Training Dojo Zero-Fall-Risk Flat Indoor Mode Verification
+        campaign.startTutorial();
+        assert.strictEqual(CollisionSystem.stageType, 'INDOOR_FLAT');
+        assert.strictEqual(CollisionSystem.isIndoor(), true);
+        assert.strictEqual(CollisionSystem.getFloorHeightAt(0, 0), 0, 'Indoor dojo center is flat y = 0');
+        assert.strictEqual(CollisionSystem.getFloorHeightAt(7.5, 0), 0, 'Indoor dojo x=7.5 is flat y = 0 (no lower catwalk)');
+        assert.strictEqual(CollisionSystem.getFloorHeightAt(11.0, 0), 0, 'Indoor dojo x=11.0 is flat y = 0 (no outer abyss)');
+
+        // Verify no fall damage on heavy downward impact in indoor mode
+        sim.f2.x = 2.0;
+        sim.f2.y = 3.0;
+        sim.f2.vy = -16.5;
+        sim.f2.isGrounded = false;
+        const hpBeforeIndoorImpact = sim.f2.hp;
+        for (let i = 0; i < 25; i++) {
+            sim.tick({}, {});
+            if (sim.f2.isGrounded) break;
+        }
+        assert.strictEqual(sim.f2.y, 0, 'Fighter should land on flat indoor floor (y = 0)');
+        assert.strictEqual(sim.f2.hp, hpBeforeIndoorImpact, 'Zero fall damage risk in indoor flat training mode');
+
+        // Verify no ring-out and horizontal containment in indoor mode
+        sim.f2.x = 8.5;
+        sim.f2.vx = 20.0;
+        for (let i = 0; i < 30; i++) {
+            sim.tick({}, {});
+        }
+        assert.strictEqual(sim.f2.ringOut, false, 'No ring-out permitted in indoor dojo');
+        assert.ok(sim.f2.x <= 8.61, 'Fighter should be physically contained by indoor perimeter wall');
+
+        campaign.disableCampaign();
+        assert.strictEqual(CollisionSystem.stageType, 'ROOFTOP', 'Disabling campaign restores default rooftop arena mode');
     });
 });

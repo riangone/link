@@ -46,7 +46,8 @@
         volley: { emoji: '🏐', key: 'game_name_volley' },
         soccer: { emoji: '⚽', key: 'game_name_soccer' },
         tennis: { emoji: '🎾', key: 'game_name_tennis' },
-        hoops:  { emoji: '🏀', key: 'game_name_hoops' }
+        hoops:  { emoji: '🏀', key: 'game_name_hoops' },
+        oni:    { emoji: '🥋', key: 'game_name_oni' }
     };
 
     const scriptEl = document.currentScript;
@@ -61,7 +62,7 @@
     const STRINGS = {
         en: {
             game_name_hockey: 'Air Hockey', game_name_brawl: 'Mochi Brawl', game_name_tanks: 'Ricochet Tanks',
-            game_name_gomoku: 'Blitz Gomoku', game_name_pong: 'Neon Pong', game_name_tron: 'Neon Tron', game_name_blaster: 'Bubble Blaster', game_name_blocks: 'Candy Blocks', game_name_bombs: 'Water Balloon Battle', game_name_tag: 'Bubble Tag', game_name_paint: 'Roller Paint', game_name_kart: 'Link Kart', game_name_kart3d: 'Link Kart 3D', game_name_spin: 'Link Spin', game_name_armor: 'Link Armor', game_name_volley: 'Mech Volley', game_name_soccer: 'Mech Soccer', game_name_tennis: 'Mech Tennis', game_name_hoops: 'Mech Hoops',
+            game_name_gomoku: 'Blitz Gomoku', game_name_pong: 'Neon Pong', game_name_tron: 'Neon Tron', game_name_blaster: 'Bubble Blaster', game_name_blocks: 'Candy Blocks', game_name_bombs: 'Water Balloon Battle', game_name_tag: 'Bubble Tag', game_name_paint: 'Roller Paint', game_name_kart: 'Link Kart', game_name_kart3d: 'Link Kart 3D', game_name_spin: 'Link Spin', game_name_armor: 'Link Armor', game_name_volley: 'Mech Volley', game_name_soccer: 'Mech Soccer', game_name_tennis: 'Mech Tennis', game_name_hoops: 'Mech Hoops', game_name_oni: 'Oni Combat',
             game_invite_button: 'Challenge',
             game_invite_button_title: 'Invite to a game',
             game_picker_title: 'Challenge {name}',
@@ -84,7 +85,7 @@
         },
         zh: {
             game_name_hockey: '霓虹气垫球', game_name_brawl: '萌团大乱斗', game_name_tanks: '弹射坦克',
-            game_name_gomoku: '闪电五子棋', game_name_pong: '霓虹弹球', game_name_tron: '光轮对决', game_name_blaster: '萌萌泡泡枪', game_name_blocks: '萌萌方块', game_name_bombs: '水弹大作战', game_name_tag: '泡泡鬼抓人', game_name_paint: '滚筒涂地', game_name_kart: '萌萌卡丁车', game_name_kart3d: '3D 卡丁车', game_name_spin: '爆旋陀螺', game_name_armor: '装甲对决', game_name_volley: '机甲排球', game_name_soccer: '机甲足球', game_name_tennis: '机甲网球', game_name_hoops: '机甲篮球',
+            game_name_gomoku: '闪电五子棋', game_name_pong: '霓虹弹球', game_name_tron: '光轮对决', game_name_blaster: '萌萌泡泡枪', game_name_blocks: '萌萌方块', game_name_bombs: '水弹大作战', game_name_tag: '泡泡鬼抓人', game_name_paint: '滚筒涂地', game_name_kart: '萌萌卡丁车', game_name_kart3d: '3D 卡丁车', game_name_spin: '爆旋陀螺', game_name_armor: '装甲对决', game_name_volley: '机甲排球', game_name_soccer: '机甲足球', game_name_tennis: '机甲网球', game_name_hoops: '机甲篮球', game_name_oni: '鬼神对决',
             game_invite_button: '约战',
             game_invite_button_title: '邀请对战',
             game_picker_title: '向 {name} 发起约战',
@@ -107,7 +108,7 @@
         },
         ja: {
             game_name_hockey: 'エアホッケー', game_name_brawl: 'もちもち大乱闘', game_name_tanks: '跳弾タンク',
-            game_name_gomoku: '電光五目並べ', game_name_pong: 'ネオンポン', game_name_tron: 'ネオントロン', game_name_blaster: 'バブルブラスター', game_name_blocks: 'キャンディブロック', game_name_bombs: '水風船バトル', game_name_tag: 'バブル鬼ごっこ', game_name_paint: 'ローラーぬりぬり', game_name_kart: 'もちもちカート', game_name_kart3d: '3D カート', game_name_spin: 'ベイバトル', game_name_armor: 'タンク対決', game_name_volley: 'メカバレー', game_name_soccer: 'メカサッカー', game_name_tennis: 'メカテニス', game_name_hoops: 'メカバスケ',
+            game_name_gomoku: '電光五目並べ', game_name_pong: 'ネオンポン', game_name_tron: 'ネオントロン', game_name_blaster: 'バブルブラスター', game_name_blocks: 'キャンディブロック', game_name_bombs: '水風船バトル', game_name_tag: 'バブル鬼ごっこ', game_name_paint: 'ローラーぬりぬり', game_name_kart: 'もちもちカート', game_name_kart3d: '3D カート', game_name_spin: 'ベイバトル', game_name_armor: 'タンク対決', game_name_volley: 'メカバレー', game_name_soccer: 'メカサッカー', game_name_tennis: 'メカテニス', game_name_hoops: 'メカバスケ', game_name_oni: 'オニ・コンバット',
             game_invite_button: '対戦',
             game_invite_button_title: '対戦に招待',
             game_picker_title: '{name} に対戦を申し込む',
@@ -130,7 +131,7 @@
         },
         ko: {
             game_name_hockey: '에어하키', game_name_brawl: '모찌 난투', game_name_tanks: '리코셰 탱크',
-            game_name_gomoku: '번개 오목', game_name_pong: '네온 퐁', game_name_tron: '네온 트론', game_name_blaster: '버블 블래스터', game_name_blocks: '캔디 블록', game_name_bombs: '물풍선 대작전', game_name_tag: '버블 술래잡기', game_name_paint: '롤러 땅따먹기', game_name_kart: '모찌 카트', game_name_kart3d: '3D 카트', game_name_spin: '팽이 배틀', game_name_armor: '탱크 대결', game_name_volley: '메카 배구', game_name_soccer: '메카 축구', game_name_tennis: '메카 테니스', game_name_hoops: '메카 농구',
+            game_name_gomoku: '번개 오목', game_name_pong: '네온 퐁', game_name_tron: '네온 트론', game_name_blaster: '버블 블래스터', game_name_blocks: '캔디 블록', game_name_bombs: '물풍선 대작전', game_name_tag: '버블 술래잡기', game_name_paint: '롤러 땅따먹기', game_name_kart: '모찌 카트', game_name_kart3d: '3D 카트', game_name_spin: '팽이 배틀', game_name_armor: '탱크 대결', game_name_volley: '메카 배구', game_name_soccer: '메카 축구', game_name_tennis: '메카 테니스', game_name_hoops: '메카 농구', game_name_oni: '오니 대전',
             game_invite_button: '대전',
             game_invite_button_title: '대전 초대',
             game_picker_title: '{name}에게 대전 신청',

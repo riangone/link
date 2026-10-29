@@ -3,17 +3,41 @@
  * Pure mathematical intersection checks in 3D (supporting arbitrary yaw facingAngle).
  */
 
-import { FIGHTER_STATE, STAGE_CONFIG } from './Constants.js';
+import { FIGHTER_STATE, STAGE_BOUNDS, INDOOR_BOUNDS, STAGE_CONFIG } from './Constants.js';
 
 export class CollisionSystem {
     /**
-     * P5 Rooftop Arena Elevation Query
+     * Active Stage Geometry Mode:
+     *   - 'ROOFTOP': Multi-elevation rooftop deck (y = 0), lower catwalk (y = -1.8), outer abyss (-Infinity)
+     *   - 'INDOOR_FLAT': Enclosed flat indoor dojo / warehouse / lab floor (y = 0 everywhere, zero fall/ring-out risk)
+     */
+    static stageType = 'ROOFTOP';
+
+    static setStageType(type = 'ROOFTOP') {
+        this.stageType = type === 'INDOOR_FLAT' ? 'INDOOR_FLAT' : 'ROOFTOP';
+    }
+
+    static isIndoor() {
+        return this.stageType === 'INDOOR_FLAT';
+    }
+
+    static getActiveBounds() {
+        return this.stageType === 'INDOOR_FLAT' ? INDOOR_BOUNDS : STAGE_BOUNDS;
+    }
+
+    /**
+     * P5 Rooftop / Indoor Arena Elevation Query
      * Returns the floor height Y at world coordinates (x, z):
-     *   - Upper Rooftop Deck: |x| <= 6.4, |z| <= 4.6 -> y = 0.0
-     *   - Lower Perimeter Catwalk: |x| <= 9.8, |z| <= 5.8 -> y = -1.8
-     *   - Outer Cyberpunk Abyss: beyond catwalk -> -Infinity (Ring-Out!)
+     *   - In 'INDOOR_FLAT' mode: flat y = 0.0 everywhere (no ledges, no fall damage, no Ring-Out)
+     *   - In 'ROOFTOP' mode:
+     *       * Upper Rooftop Deck: |x| <= 6.4, |z| <= 4.6 -> y = 0.0
+     *       * Lower Perimeter Catwalk: |x| <= 9.8, |z| <= 5.8 -> y = -1.8
+     *       * Outer Cyberpunk Abyss: beyond catwalk -> -Infinity (Ring-Out!)
      */
     static getFloorHeightAt(x, z) {
+        if (this.stageType === 'INDOOR_FLAT') {
+            return STAGE_CONFIG.UPPER_DECK_Y;
+        }
         const ax = Math.abs(x);
         const az = Math.abs(z);
         if (ax <= STAGE_CONFIG.UPPER_DECK_X && az <= STAGE_CONFIG.UPPER_DECK_Z) {
@@ -29,6 +53,9 @@ export class CollisionSystem {
      * Returns which platform zone (x, z) belongs to: 'UPPER_DECK' | 'LOWER_CATWALK' | 'ABYSS'
      */
     static getPlatformZone(x, z) {
+        if (this.stageType === 'INDOOR_FLAT') {
+            return 'UPPER_DECK';
+        }
         const ax = Math.abs(x);
         const az = Math.abs(z);
         if (ax <= STAGE_CONFIG.UPPER_DECK_X && az <= STAGE_CONFIG.UPPER_DECK_Z) {

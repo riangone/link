@@ -85,6 +85,10 @@ test.describe('Oni Combat 3D Fighting Game', () => {
         await expect(page.locator('#comms-banner')).toBeVisible();
         await expect(page.locator('#comms-title')).toContainText('第 1 课');
 
+        const dojoState = await page.evaluate(() => window.__oni.getState());
+        expect(dojoState.stageType).toBe('INDOOR_FLAT');
+        expect(dojoState.stageMode).toBe('INDOOR_DOJO');
+
         // Open mode menu and start Story Campaign Ch.1
         await page.click('#btn-menu');
         await expect(page.locator('#start-overlay')).not.toHaveClass(/hidden/);

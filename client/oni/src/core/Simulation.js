@@ -84,6 +84,10 @@ export class Simulation {
         this.applyWaveEnemyConfig(1);
     }
 
+    setStageType(type = 'ROOFTOP') {
+        CollisionSystem.setStageType(type);
+    }
+
     applyWaveEnemyConfig(waveNum) {
         const idx = Math.min(this.WAVE_ROSTER.length - 1, (waveNum - 1) % this.WAVE_ROSTER.length);
         const cfg = this.WAVE_ROSTER[idx];
@@ -644,7 +648,7 @@ export class Simulation {
                         wpn.spinPitch = 0;
                         wpn.spinSpeed = 1.8;
                     }
-                } else if (wpn.y <= STAGE_CONFIG.ABYSS_DEATH_Y) {
+                } else if (!CollisionSystem.isIndoor() && wpn.y <= STAGE_CONFIG.ABYSS_DEATH_Y) {
                     // Weapon fell into the abyss
                     this.removeEntity(wpn.id);
                     continue;
@@ -658,8 +662,9 @@ export class Simulation {
                 }
             }
 
-            wpn.x = Math.max(STAGE_BOUNDS.minX + 0.5, Math.min(STAGE_BOUNDS.maxX - 0.5, wpn.x));
-            wpn.z = Math.max(STAGE_BOUNDS.minZ + 0.5, Math.min(STAGE_BOUNDS.maxZ - 0.5, wpn.z));
+            const bounds = CollisionSystem.getActiveBounds();
+            wpn.x = Math.max(bounds.minX + 0.4, Math.min(bounds.maxX - 0.4, wpn.x));
+            wpn.z = Math.max(bounds.minZ + 0.4, Math.min(bounds.maxZ - 0.4, wpn.z));
         }
     }
 
@@ -723,13 +728,14 @@ export class Simulation {
 
             // Remove if hits floor or out of stage bounds
             const projFloorY = CollisionSystem.getFloorHeightAt(p.x, p.z);
+            const bounds = CollisionSystem.getActiveBounds();
             if (
                 (Number.isFinite(projFloorY) && p.y <= projFloorY + 0.05) ||
-                p.y <= STAGE_CONFIG.ABYSS_DEATH_Y ||
-                p.x < STAGE_BOUNDS.minX - 2 ||
-                p.x > STAGE_BOUNDS.maxX + 2 ||
-                p.z < STAGE_BOUNDS.minZ - 2 ||
-                p.z > STAGE_BOUNDS.maxZ + 2
+                (!CollisionSystem.isIndoor() && p.y <= STAGE_CONFIG.ABYSS_DEATH_Y) ||
+                p.x < bounds.minX - 1.5 ||
+                p.x > bounds.maxX + 1.5 ||
+                p.z < bounds.minZ - 1.5 ||
+                p.z > bounds.maxZ + 1.5
             ) {
                 this.removeEntity(p.id);
             }

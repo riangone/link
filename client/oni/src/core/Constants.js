@@ -14,6 +14,18 @@ export const STAGE_BOUNDS = {
     maxZ: 6
 };
 
+export const INDOOR_BOUNDS = {
+    minX: -8.6,
+    maxX: 8.6,
+    minZ: -5.0,
+    maxZ: 5.0
+};
+
+export const STAGE_TYPE = {
+    ROOFTOP: 'ROOFTOP',
+    INDOOR_FLAT: 'INDOOR_FLAT'
+};
+
 export const STAGE_CONFIG = {
     UPPER_DECK_X: 6.4,            // |x| <= 6.4 & |z| <= 4.6 is the main elevated rooftop dojo (y = 0)
     UPPER_DECK_Z: 4.6,

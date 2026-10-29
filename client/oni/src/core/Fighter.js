@@ -424,8 +424,19 @@ export class Fighter {
         }
 
         // Clamp within outer simulation bounds
-        this.x = Math.max(STAGE_BOUNDS.minX, Math.min(STAGE_BOUNDS.maxX, this.x));
-        this.z = Math.max(STAGE_BOUNDS.minZ, Math.min(STAGE_BOUNDS.maxZ, this.z));
+        const bounds = CollisionSystem.getActiveBounds();
+        this.x = Math.max(bounds.minX, Math.min(bounds.maxX, this.x));
+        this.z = Math.max(bounds.minZ, Math.min(bounds.maxZ, this.z));
+
+        // Soft wall impact damping in indoor flat mode
+        if (CollisionSystem.isIndoor()) {
+            if (this.x <= bounds.minX + 0.02 || this.x >= bounds.maxX - 0.02) {
+                this.vx = -this.vx * 0.15;
+            }
+            if (this.z <= bounds.minZ + 0.02 || this.z >= bounds.maxZ - 0.02) {
+                this.vz = -this.vz * 0.15;
+            }
+        }
 
         const targetFloorY = CollisionSystem.getFloorHeightAt(this.x, this.z);
         this.floorY = targetFloorY;
@@ -460,7 +471,8 @@ export class Fighter {
                     this.isGrounded = true;
 
                     // P5 Fall Damage: landing from a high launch or dropping off the upper rooftop onto the lower catwalk
-                    if (impactVy < STAGE_CONFIG.FALL_DAMAGE_THRESHOLD_VY && !this.invincible && this.hp > 0) {
+                    // (Strictly disabled in indoor mode to ensure zero fall risk!)
+                    if (!CollisionSystem.isIndoor() && impactVy < STAGE_CONFIG.FALL_DAMAGE_THRESHOLD_VY && !this.invincible && this.hp > 0) {
                         const excessSpeed = Math.abs(impactVy) - Math.abs(STAGE_CONFIG.FALL_DAMAGE_THRESHOLD_VY);
                         const fallDmg = Math.max(4, Math.round(excessSpeed * STAGE_CONFIG.FALL_DAMAGE_SCALE));
                         const fallPoise = Math.round(excessSpeed * STAGE_CONFIG.FALL_POISE_SCALE);
@@ -483,8 +495,8 @@ export class Fighter {
                         this.vx *= 0.3;
                         this.vz *= 0.3;
                     }
-                } else if (!this.ringOut && this.y <= STAGE_CONFIG.ABYSS_DEATH_Y) {
-                    // P5 Ring-Out into the cyberpunk abyss!
+                } else if (!CollisionSystem.isIndoor() && !this.ringOut && this.y <= STAGE_CONFIG.ABYSS_DEATH_Y) {
+                    // P5 Ring-Out into the cyberpunk abyss! (Only outside on Rooftop)
                     this.ringOut = true;
                     this.hp = 0;
                     this.transitionTo(FIGHTER_STATE.DEFEAT);

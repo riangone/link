@@ -6,6 +6,7 @@
 
 import { Simulation } from './src/core/Simulation.js';
 import { FIXED_DT } from './src/core/Constants.js';
+import { CollisionSystem } from './src/core/CollisionSystem.js';
 import { BotBrain } from './src/core/BotBrain.js';
 import { CampaignManager, CAMPAIGN_CHAPTERS } from './src/core/CampaignManager.js';
 import { ThreeScene } from './src/render/ThreeScene.js';
@@ -626,6 +627,8 @@ function init() {
             zoneIndex: campaign.zoneIndex,
             rpgLevel: campaign.rpg.level,
             rpgExp: campaign.rpg.exp,
+            stageType: CollisionSystem.stageType,
+            stageMode: threeScene.stageMode,
             botDifficulty: botMode,
             isFullscreen: isFullscreenActive(),
             p1: { hp: sim.f1.hp, maxHp: sim.f1.maxHp, state: sim.f1.state, x: sim.f1.x, y: sim.f1.y, z: sim.f1.z, combo: sim.f1.comboCount },
@@ -671,6 +674,7 @@ function init() {
         koBanner.style.display = 'none';
         isMultiplayer = false;
         campaign.startTutorial();
+        threeScene.setStageMode('INDOOR_DOJO');
         setBotDifficulty('easy');
         isPlaying = true;
         document.body.classList.add('in-fight');
@@ -690,6 +694,7 @@ function init() {
         koBanner.style.display = 'none';
         isMultiplayer = false;
         campaign.startChapter(chapterId);
+        threeScene.setStageMode(chapterId === 'ch3' ? 'ROOFTOP' : 'INDOOR_DOJO');
         setBotDifficulty(sim.f2.aiProfileLevel || 'easy');
         isPlaying = true;
         document.body.classList.add('in-fight');
@@ -706,6 +711,7 @@ function init() {
         const useP2P = forceP2P !== null ? forceP2P : (!survival && peerConnected);
         isMultiplayer = useP2P;
         campaign.disableCampaign();
+        threeScene.setStageMode('ROOFTOP');
         campaign.mode = survival ? 'SURVIVAL' : 'VERSUS';
         sim.survivalMode = !useP2P && !!survival;
         sim.reset();

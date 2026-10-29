@@ -10,6 +10,7 @@
  */
 
 import { FIGHTER_STATE, WEAPON_SPECS, MOVES } from './Constants.js';
+import { CollisionSystem } from './CollisionSystem.js';
 
 export const RPG_LEVEL_TABLE = [
     {
@@ -482,6 +483,7 @@ export class CampaignManager {
     // =========================================================================
 
     startTutorial() {
+        CollisionSystem.setStageType('INDOOR_FLAT');
         this.mode = 'TUTORIAL';
         this.activeChapterId = 'ch0';
         this.tutorialStageIdx = 0;
@@ -569,6 +571,11 @@ export class CampaignManager {
             return;
         }
         const chapter = CAMPAIGN_CHAPTERS.find((c) => c.id === chapterId) || CAMPAIGN_CHAPTERS[1];
+        if (chapter.id === 'ch3') {
+            CollisionSystem.setStageType('ROOFTOP');
+        } else {
+            CollisionSystem.setStageType('INDOOR_FLAT');
+        }
         this.mode = 'CAMPAIGN';
         this.activeChapterId = chapter.id;
         this.zoneIndex = 0;
@@ -686,6 +693,7 @@ export class CampaignManager {
     }
 
     disableCampaign() {
+        CollisionSystem.setStageType('ROOFTOP');
         this.mode = 'VERSUS';
         this.interactables = [];
         this.commsState.visible = false;

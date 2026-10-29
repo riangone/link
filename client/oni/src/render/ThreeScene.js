@@ -68,11 +68,21 @@ export class ThreeScene {
         this.shakeDecay = 0.9;
         this.clock = 0;
 
+        this.rooftopGroup = new THREE.Group();
+        this.skylineGroup = new THREE.Group();
+        this.indoorGroup = new THREE.Group();
+        this.scene.add(this.rooftopGroup);
+        this.scene.add(this.skylineGroup);
+        this.scene.add(this.indoorGroup);
+
         this.setupSky();
         this.setupLights();
         this.setupStage();
+        this.setupIndoorStage();
         this.setupSkyline();
         this.setupRain();
+
+        this.setStageMode('ROOFTOP');
 
         window.addEventListener('resize', () => this.onResize());
     }
@@ -199,24 +209,24 @@ export class ThreeScene {
         upperDeck.position.set(0, -0.9, 0);
         upperDeck.receiveShadow = true;
         upperDeck.castShadow = true;
-        this.scene.add(upperDeck);
+        this.rooftopGroup.add(upperDeck);
 
         // Tactical industrial hazard trim along the upper deck edge (|x| = 6.4, |z| = 4.6)
         const edgeGlowC = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x3a88a8) });
         const edgeGlowWarn = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xd88418) });
         const upperRimX1 = new THREE.Mesh(new THREE.BoxGeometry(12.88, 0.06, 0.08), edgeGlowC);
         upperRimX1.position.set(0, 0.01, 4.6);
-        this.scene.add(upperRimX1);
+        this.rooftopGroup.add(upperRimX1);
         const upperRimX2 = upperRimX1.clone();
         upperRimX2.position.set(0, 0.01, -4.6);
-        this.scene.add(upperRimX2);
+        this.rooftopGroup.add(upperRimX2);
 
         const upperRimZ1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 9.28), edgeGlowWarn);
         upperRimZ1.position.set(-6.4, 0.01, 0);
-        this.scene.add(upperRimZ1);
+        this.rooftopGroup.add(upperRimZ1);
         const upperRimZ2 = upperRimZ1.clone();
         upperRimZ2.position.set(6.4, 0.01, 0);
-        this.scene.add(upperRimZ2);
+        this.rooftopGroup.add(upperRimZ2);
 
         // P5 Tier 2: Lower Perimeter Catwalk (matte industrial concrete & dark grating)
         const catwalkMat = new THREE.MeshStandardMaterial({
@@ -229,29 +239,29 @@ export class ThreeScene {
         const lowerCatwalk = new THREE.Mesh(new THREE.BoxGeometry(19.6, 2.2, 11.6), catwalkMat);
         lowerCatwalk.position.set(0, -2.9, 0);
         lowerCatwalk.receiveShadow = true;
-        this.scene.add(lowerCatwalk);
+        this.rooftopGroup.add(lowerCatwalk);
 
         // Fatal Abyss Danger Trim around outer catwalk edge (|x| = 9.8, |z| = 5.8, y = -1.8)
         const dangerMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xc83232) });
         const lowerRimX1 = new THREE.Mesh(new THREE.BoxGeometry(19.68, 0.07, 0.09), dangerMat);
         lowerRimX1.position.set(0, -1.79, 5.8);
-        this.scene.add(lowerRimX1);
+        this.rooftopGroup.add(lowerRimX1);
         const lowerRimX2 = lowerRimX1.clone();
         lowerRimX2.position.set(0, -1.79, -5.8);
-        this.scene.add(lowerRimX2);
+        this.rooftopGroup.add(lowerRimX2);
         const lowerRimZ1 = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.07, 11.68), dangerMat);
         lowerRimZ1.position.set(-9.8, -1.79, 0);
-        this.scene.add(lowerRimZ1);
+        this.rooftopGroup.add(lowerRimZ1);
         const lowerRimZ2 = lowerRimZ1.clone();
         lowerRimZ2.position.set(9.8, -1.79, 0);
-        this.scene.add(lowerRimZ2);
+        this.rooftopGroup.add(lowerRimZ2);
 
         // Painted TCTF tactical combat ring on the upper concrete deck
         const ringMat = new THREE.MeshBasicMaterial({ color: 0x3b7898, transparent: true, opacity: 0.65 });
         const ring = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.035, 8, 96), ringMat);
         ring.rotation.x = -Math.PI / 2;
         ring.position.y = 0.025;
-        this.scene.add(ring);
+        this.rooftopGroup.add(ring);
 
         // Perimeter concrete/steel barrier posts + subdued warning bars along the back of the lower catwalk
         const postMat = new THREE.MeshStandardMaterial({ color: 0x222630, roughness: 0.82, metalness: 0.18 });
@@ -262,17 +272,17 @@ export class ThreeScene {
             const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.3, 0.18), postMat);
             post.position.set(x, -1.15, -5.7);
             post.castShadow = true;
-            this.scene.add(post);
+            this.rooftopGroup.add(post);
             const bar = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.0, 0.04), i % 2 ? barM : barC);
             bar.position.set(x, -1.1, -5.59);
-            this.scene.add(bar);
+            this.rooftopGroup.add(bar);
         }
         const rail = new THREE.Mesh(new THREE.BoxGeometry(19.2, 0.05, 0.05), barC);
         rail.position.set(0, -0.55, -5.62);
-        this.scene.add(rail);
+        this.rooftopGroup.add(rail);
         const rail2 = new THREE.Mesh(new THREE.BoxGeometry(19.2, 0.03, 0.03), barM);
         rail2.position.set(0, -1.55, -5.62);
-        this.scene.add(rail2);
+        this.rooftopGroup.add(rail2);
     }
 
     makeWindowTexture(seed) {
@@ -319,20 +329,20 @@ export class ThreeScene {
                 });
                 const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
                 b.position.set(x, h / 2 - 3, z0 - r() * zJitter);
-                this.scene.add(b);
+                this.skylineGroup.add(b);
 
                 if (r() > 0.55) { // vertical industrial sign
                     const c = neonCols[Math.floor(r() * neonCols.length)];
                     const sign = new THREE.Mesh(new THREE.BoxGeometry(0.35, 2 + r() * 3, 0.1),
                         new THREE.MeshBasicMaterial({ color: new THREE.Color(c) }));
                     sign.position.set(x + w / 2 + 0.25, 1.5 + r() * (h * 0.5), b.position.z + d / 2);
-                    this.scene.add(sign);
+                    this.skylineGroup.add(sign);
                 }
                 if (r() > 0.6) { // rooftop aircraft warning beacon
                     const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6),
                         new THREE.MeshBasicMaterial({ color: new THREE.Color(0xd93838) }));
                     beacon.position.set(x, h - 3 + 0.2, b.position.z);
-                    this.scene.add(beacon);
+                    this.skylineGroup.add(beacon);
                 }
             }
         };
@@ -343,7 +353,7 @@ export class ThreeScene {
         const holo = new THREE.Mesh(new THREE.PlaneGeometry(7, 2.2),
             new THREE.MeshBasicMaterial({ map: this.makeBillboardTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
         holo.position.set(-3, 9, -18);
-        this.scene.add(holo);
+        this.skylineGroup.add(holo);
     }
 
     makeBillboardTexture() {
@@ -386,6 +396,7 @@ export class ThreeScene {
     }
 
     updateRain(dt) {
+        if (!this.rain || !this.rain.visible) return;
         const a = this.rain.geometry.attributes.position.array;
         for (let i = 0; i < this.rainSpeed.length; i++) {
             const o = i * 6;
@@ -394,6 +405,252 @@ export class ThreeScene {
             if (a[o + 4] < 0) { a[o + 1] += 14; a[o + 4] += 14; }
         }
         this.rain.geometry.attributes.position.needsUpdate = true;
+    }
+
+    makeIndoorFloorTextures() {
+        const S = 512;
+        const c = document.createElement('canvas');
+        c.width = c.height = S;
+        const g = c.getContext('2d');
+        g.fillStyle = '#1c2230';
+        g.fillRect(0, 0, S, S);
+        for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+            const v = 30 + Math.floor(this.rand() * 8);
+            g.fillStyle = `rgb(${v},${v + 4},${v + 10})`;
+            g.fillRect(i * 128 + 3, j * 128 + 3, 122, 122);
+            // Fine non-slip diamond grid pattern
+            g.fillStyle = 'rgba(0,0,0,0.2)';
+            g.fillRect(i * 128 + 6, j * 128 + 6, 56, 56);
+            g.fillRect(i * 128 + 66, j * 128 + 66, 56, 56);
+        }
+        g.strokeStyle = '#10141d';
+        g.lineWidth = 4;
+        for (let i = 0; i <= 4; i++) {
+            g.beginPath(); g.moveTo(i * 128, 0); g.lineTo(i * 128, S); g.stroke();
+            g.beginPath(); g.moveTo(0, i * 128); g.lineTo(S, i * 128); g.stroke();
+        }
+        const map = new THREE.CanvasTexture(c);
+        map.colorSpace = THREE.SRGBColorSpace;
+
+        const e = document.createElement('canvas');
+        e.width = e.height = S;
+        const ge = e.getContext('2d');
+        ge.fillStyle = '#000';
+        ge.fillRect(0, 0, S, S);
+        ge.strokeStyle = '#00f0ff';
+        ge.lineWidth = 1.5;
+        for (let i = 0; i <= 4; i++) {
+            ge.beginPath(); ge.moveTo(i * 128, 0); ge.lineTo(i * 128, S); ge.stroke();
+        }
+        ge.fillStyle = '#d88418';
+        for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) {
+            ge.fillRect(i * 128 - 2, j * 128 - 2, 4, 4);
+        }
+        const emissive = new THREE.CanvasTexture(e);
+        emissive.colorSpace = THREE.SRGBColorSpace;
+
+        for (const t of [map, emissive]) {
+            t.wrapS = t.wrapT = THREE.RepeatWrapping;
+            t.repeat.set(8, 5);
+            t.anisotropy = 8;
+        }
+        return { map, emissive };
+    }
+
+    makeIndoorBannerTexture() {
+        const c = document.createElement('canvas');
+        c.width = 512; c.height = 160;
+        const g = c.getContext('2d');
+        g.fillStyle = '#0b1120';
+        g.fillRect(0, 0, 512, 160);
+        g.strokeStyle = '#00f0ff';
+        g.lineWidth = 4;
+        g.strokeRect(6, 6, 500, 148);
+        g.fillStyle = 'rgba(0, 240, 255, 0.12)';
+        g.fillRect(8, 8, 496, 44);
+
+        g.font = 'bold 26px "Hiragino Sans", "Noto Sans", monospace';
+        g.textAlign = 'center';
+        g.fillStyle = '#38bdf8';
+        g.fillText('TCTF HQ // COMBAT TRAINING DOJO', 256, 38);
+
+        g.font = 'bold 22px "Hiragino Sans", "Noto Sans", sans-serif';
+        g.fillStyle = '#00ff88';
+        g.fillText('● SIMULATION ACTIVE · ZERO FALL RISK', 256, 84);
+
+        g.font = '16px monospace';
+        g.fillStyle = '#94a3b8';
+        g.fillText('SAFETY FORCEFIELDS ENGAGED · SECTOR 0', 256, 126);
+
+        const t = new THREE.CanvasTexture(c);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+    }
+
+    makeForcefieldTexture() {
+        const S = 256;
+        const c = document.createElement('canvas');
+        c.width = c.height = S;
+        const g = c.getContext('2d');
+        g.fillStyle = 'rgba(0,0,0,0)';
+        g.fillRect(0, 0, S, S);
+        g.strokeStyle = 'rgba(0, 240, 255, 0.65)';
+        g.lineWidth = 2;
+        const step = 32;
+        for (let x = 0; x <= S; x += step) {
+            g.beginPath(); g.moveTo(x, 0); g.lineTo(x, S); g.stroke();
+        }
+        for (let y = 0; y <= S; y += step) {
+            g.beginPath(); g.moveTo(0, y); g.lineTo(S, y); g.stroke();
+        }
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(6, 3);
+        return t;
+    }
+
+    setupIndoorStage() {
+        const { map, emissive } = this.makeIndoorFloorTextures();
+
+        // 1. Solid Flat Indoor Dojo Floor (Zero fall risk, flat at y = 0.0)
+        const indoorFloorMat = new THREE.MeshStandardMaterial({
+            map,
+            emissiveMap: emissive,
+            emissive: 0xffffff,
+            emissiveIntensity: 0.15,
+            roughness: 0.86,
+            metalness: 0.1
+        });
+        const indoorFloor = new THREE.Mesh(new THREE.BoxGeometry(18.6, 1.0, 11.4), indoorFloorMat);
+        indoorFloor.position.set(0, -0.5, 0);
+        indoorFloor.receiveShadow = true;
+        this.indoorGroup.add(indoorFloor);
+
+        // Tactical Concentric Sparring Rings on Floor
+        const ringOuterMat = new THREE.MeshBasicMaterial({ color: 0xd88418, transparent: true, opacity: 0.8 });
+        const ringOuter = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.04, 8, 96), ringOuterMat);
+        ringOuter.rotation.x = -Math.PI / 2;
+        ringOuter.position.y = 0.02;
+        this.indoorGroup.add(ringOuter);
+
+        const ringInnerMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.75 });
+        const ringInner = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.03, 8, 96), ringInnerMat);
+        ringInner.rotation.x = -Math.PI / 2;
+        ringInner.position.y = 0.02;
+        this.indoorGroup.add(ringInner);
+
+        // 2. North Enclosure Wall (Heavy composite concrete + glowing cyan status strip)
+        const northWallMat = new THREE.MeshStandardMaterial({
+            color: 0x141a24,
+            roughness: 0.9,
+            metalness: 0.12
+        });
+        const northWall = new THREE.Mesh(new THREE.BoxGeometry(18.6, 5.5, 0.8), northWallMat);
+        northWall.position.set(0, 2.75, -5.5);
+        this.indoorGroup.add(northWall);
+
+        // Lower kickplate along north wall
+        const kickplateMat = new THREE.MeshStandardMaterial({ color: 0x1e2533, roughness: 0.85, metalness: 0.15 });
+        const kickplate = new THREE.Mesh(new THREE.BoxGeometry(18.6, 0.45, 0.12), kickplateMat);
+        kickplate.position.set(0, 0.22, -5.04);
+        this.indoorGroup.add(kickplate);
+
+        // Horizontal glowing cyan status strip
+        const glowStripMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x00f0ff) });
+        const glowStrip = new THREE.Mesh(new THREE.BoxGeometry(18.2, 0.08, 0.06), glowStripMat);
+        glowStrip.position.set(0, 1.35, -5.04);
+        this.indoorGroup.add(glowStrip);
+
+        // Holographic TCTF Training Dojo Billboard
+        const bannerMat = new THREE.MeshBasicMaterial({
+            map: this.makeIndoorBannerTexture(),
+            transparent: true,
+            depthWrite: false
+        });
+        const banner = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 2.0), bannerMat);
+        banner.position.set(0, 3.2, -5.02);
+        this.indoorGroup.add(banner);
+
+        // 3. West & East Safety Containment Pillars & Holographic Forcefields (x = ±8.8)
+        const pillarMat = new THREE.MeshStandardMaterial({ color: 0x1e2430, roughness: 0.8, metalness: 0.2 });
+        const warnLampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xd88418) });
+        const cyanLampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x00f0ff) });
+        const zPillars = [-4.2, -1.4, 1.4, 4.2];
+
+        for (const xSign of [-1, 1]) {
+            const x = xSign * 8.8;
+            for (let i = 0; i < zPillars.length; i++) {
+                const z = zPillars[i];
+                const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 5.5, 0.5), pillarMat);
+                pillar.position.set(x, 2.75, z);
+                this.indoorGroup.add(pillar);
+
+                const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.6, 0.12), i % 2 === 0 ? cyanLampMat : warnLampMat);
+                lamp.position.set(x - (xSign * 0.22), 2.5, z);
+                this.indoorGroup.add(lamp);
+            }
+
+            // Holographic containment grid forcefield
+            const ffMat = new THREE.MeshBasicMaterial({
+                map: this.makeForcefieldTexture(),
+                transparent: true,
+                opacity: 0.24,
+                blending: THREE.AdditiveBlending,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            const ff = new THREE.Mesh(new THREE.PlaneGeometry(10.8, 5.0), ffMat);
+            ff.position.set(xSign * 8.75, 2.5, 0);
+            ff.rotation.y = Math.PI / 2;
+            this.indoorGroup.add(ff);
+        }
+
+        // 4. South Front Safety Curb (Low profile to keep camera view completely unobstructed)
+        const curbMat = new THREE.MeshStandardMaterial({ color: 0x181e28, roughness: 0.85, metalness: 0.15 });
+        const curb = new THREE.Mesh(new THREE.BoxGeometry(18.2, 0.38, 0.25), curbMat);
+        curb.position.set(0, 0.19, 5.3);
+        this.indoorGroup.add(curb);
+
+        const curbGlow = new THREE.Mesh(new THREE.BoxGeometry(18.2, 0.05, 0.05), warnLampMat);
+        curbGlow.position.set(0, 0.37, 5.25);
+        this.indoorGroup.add(curbGlow);
+
+        // 5. Ceiling Steel Trusses & Industrial Downlights
+        const trussMat = new THREE.MeshStandardMaterial({ color: 0x121720, roughness: 0.8, metalness: 0.3 });
+        for (const z of [-1.8, 1.8]) {
+            const truss = new THREE.Mesh(new THREE.BoxGeometry(18.2, 0.3, 0.3), trussMat);
+            truss.position.set(0, 5.2, z);
+            this.indoorGroup.add(truss);
+
+            for (const x of [-5, 0, 5]) {
+                const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 0.25, 12), pillarMat);
+                lamp.position.set(x, 5.0, z);
+                this.indoorGroup.add(lamp);
+
+                const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), cyanLampMat);
+                bulb.position.set(x, 4.85, z);
+                this.indoorGroup.add(bulb);
+            }
+        }
+    }
+
+    setStageMode(mode = 'ROOFTOP') {
+        const isIndoor = mode === 'INDOOR_DOJO';
+        this.stageMode = isIndoor ? 'INDOOR_DOJO' : 'ROOFTOP';
+
+        if (this.rooftopGroup) this.rooftopGroup.visible = !isIndoor;
+        if (this.skylineGroup) this.skylineGroup.visible = !isIndoor;
+        if (this.rain) this.rain.visible = !isIndoor;
+        if (this.sky) this.sky.visible = !isIndoor;
+        if (this.indoorGroup) this.indoorGroup.visible = isIndoor;
+
+        if (isIndoor) {
+            this.scene.fog.density = 0.010;
+            this.scene.fog.color.setHex(0x101520);
+        } else {
+            this.scene.fog.density = 0.024;
+            this.scene.fog.color.setHex(0x0b0f18);
+        }
     }
 
     // ------------------------------------------------------------------ camera

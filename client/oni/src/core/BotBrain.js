@@ -148,6 +148,11 @@ export class BotBrain {
      * and jumps back up onto the main rooftop deck if knocked onto the lower catwalk.
      */
     branchLedgeHazardAwareness(bb) {
+        // In indoor flat dojo mode there are no outer abysses or lower catwalk ledges
+        if (CollisionSystem.isIndoor && CollisionSystem.isIndoor()) {
+            return BT_STATUS.FAILURE;
+        }
+
         const { bot, opp, input } = bb;
 
         // If dangerously close to the outer abyss edge of the lower catwalk, steer inward immediately!

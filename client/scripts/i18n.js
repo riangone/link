@@ -206,7 +206,9 @@ class I18n {
                 game_name_tennis: "Mech Tennis",
                 game_desc_tennis: "Auto-running tennis: just swipe to pick your shot",
                 game_name_hoops: "Mech Hoops",
-                game_desc_hoops: "1v1 mech streetball: jump shots, steals, blocks and dunks"
+                game_desc_hoops: "1v1 mech streetball: jump shots, steals, blocks and dunks",
+                game_name_oni: "Oni Combat",
+                game_desc_oni: "3D Gun-Fu martial arts duel: combos, disarms, throws and rooftop ring-out"
             },
             zh: {
                 header_about_title: "关于 Link",
@@ -406,7 +408,9 @@ class I18n {
                 game_name_tennis: "机甲网球",
                 game_desc_tennis: "自动跑位 · 划一下决定回球方向和力度",
                 game_name_hoops: "机甲篮球",
-                game_desc_hoops: "1v1 斗牛 · 跳投 · 抢断 · 盖帽 · 扣篮"
+                game_desc_hoops: "1v1 斗牛 · 跳投 · 抢断 · 盖帽 · 扣篮",
+                game_name_oni: "鬼神对决",
+                game_desc_oni: "3D 枪斗术格斗 · 拳脚连招 · 缴械夺枪 · 天台对决"
             },
             ja: {
                 header_about_title: "Link について",

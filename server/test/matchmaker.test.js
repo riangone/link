@@ -7,7 +7,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const WebSocket = require('ws');
+const fs = require('node:fs');
+const path = require('node:path');
 const { SnapdropServer } = require('../index.js');
+const { GAMES } = require('../matchmaker.js');
 
 function listen() {
     return new Promise(resolve => {
@@ -109,4 +112,13 @@ test('disconnect while waiting leaves the queue; bad game rejected; names saniti
         assert.equal(st2.waiting.brawl[0], 'bEve/b');
         [b, c, a2].forEach(w => w.close());
     } finally { s.close(); }
+});
+
+test('all games listed in client/play/index.html are registered in Matchmaker.GAMES', async () => {
+    const html = fs.readFileSync(path.join(__dirname, '../../client/play/index.html'), 'utf8');
+    const ids = [...html.matchAll(/\{\s*id:\s*'([a-z0-9]+)'/g)].map(m => m[1]);
+    assert.ok(ids.length >= 20);
+    for (const id of ids) {
+        assert.ok(GAMES.includes(id), `Game "${id}" in client/play/index.html is missing from server/matchmaker.js GAMES`);
+    }
 });
