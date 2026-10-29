@@ -346,9 +346,11 @@ export class Fighter {
             this.state === FIGHTER_STATE.WALK ||
             this.state === FIGHTER_STATE.CROUCH
         ) {
-            if (opponent) {
-                const distToOpp = Math.hypot(opponent.x - this.x, opponent.z - this.z);
-                this.faceTowards(opponent.x, opponent.z, distToOpp < 5.2 ? 0.55 : 0.28);
+            const distToOpp = opponent ? Math.hypot(opponent.x - this.x, opponent.z - this.z) : Infinity;
+            if (opponent && distToOpp < 5.2) {
+                this.faceTowards(opponent.x, opponent.z, 0.55);
+            } else if (this.state === FIGHTER_STATE.WALK && (Math.abs(input.dirX) > 0.1 || Math.abs(input.dirZ) > 0.1)) {
+                this.faceTowards(this.x + input.dirX, this.z + input.dirZ, 0.35);
             }
         }
 
@@ -766,8 +768,8 @@ export class Fighter {
             this.isGrounded = false;
             const speedMult = (this.daodanOverdrive ? 1.18 : 1.0) * (this.speedScale || 1.0);
             if (Math.abs(input.dirX) > 0.1 || Math.abs(input.dirZ) > 0.1) {
-                this.vx = input.dirX * MOVE_SPEED.WALK_FORWARD * 1.35 * speedMult;
-                this.vz = input.dirZ * MOVE_SPEED.WALK_FORWARD * 1.15 * speedMult;
+                this.vx = input.dirX * Math.max(4.5, MOVE_SPEED.WALK_FORWARD * 1.75) * speedMult;
+                this.vz = input.dirZ * Math.max(3.8, MOVE_SPEED.WALK_FORWARD * 1.45) * speedMult;
             }
             return;
         }
@@ -815,8 +817,8 @@ export class Fighter {
             this.vy = 12.2;
             this.isGrounded = false;
             const speedMult = (this.daodanOverdrive ? 1.18 : 1.0) * (this.speedScale || 1.0);
-            this.vx = input.dirX * MOVE_SPEED.WALK_FORWARD * 1.35 * speedMult;
-            this.vz = input.dirZ * MOVE_SPEED.WALK_FORWARD * 1.15 * speedMult;
+            this.vx = input.dirX * Math.max(4.5, MOVE_SPEED.WALK_FORWARD * 1.75) * speedMult;
+            this.vz = input.dirZ * Math.max(3.8, MOVE_SPEED.WALK_FORWARD * 1.45) * speedMult;
             return;
         }
 
@@ -891,16 +893,30 @@ export class Fighter {
             return;
         }
 
-        const { fx, fz } = this.getForwardVector();
-        const fwdDot = input.dirX * fx + input.dirZ * fz;
-        const runSpd = MOVE_SPEED.RUN * (this.daodanOverdrive ? 1.18 : 1.0) * (this.speedScale || 1.0);
-
-        if (fwdDot > 0.2) {
-            this.vx = fx * runSpd;
-            this.vz = fz * runSpd + input.dirZ * runSpd * 0.35;
-        } else {
+        const dirMag = Math.hypot(input.dirX, input.dirZ);
+        if (dirMag < 0.15) {
+            this.vx *= 0.6;
+            this.vz *= 0.6;
             this.transitionTo(FIGHTER_STATE.IDLE);
+            return;
         }
+
+        // Agile 360-degree running steering
+        if (dirMag > 0.25) {
+            const desired = Math.atan2(input.dirZ, input.dirX);
+            const diff = wrapAngle(desired - this.facingAngle);
+            const maxTurn = 0.24; // ~14 deg per tick, fluid responsive carving
+            if (Math.abs(diff) <= maxTurn) {
+                this.setFacingAngle(desired);
+            } else {
+                this.setFacingAngle(this.facingAngle + Math.sign(diff) * maxTurn);
+            }
+        }
+
+        const { fx, fz } = this.getForwardVector();
+        const runSpd = MOVE_SPEED.RUN * (this.daodanOverdrive ? 1.18 : 1.0) * (this.speedScale || 1.0);
+        this.vx = fx * runSpd;
+        this.vz = fz * runSpd;
     }
 
     handleCrouch(input, opponent, simEvents) {

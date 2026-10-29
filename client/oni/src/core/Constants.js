@@ -82,11 +82,11 @@ export const STAGE_CONFIG = {
 // Physics
 export const GRAVITY = -32;
 export const MOVE_SPEED = {
-    WALK_FORWARD: 3.2,
-    WALK_BACK: 2.3,
-    RUN: 6.2,
-    DASH: 8.6,
-    EVADE_IMPULSE: 7.6
+    WALK_FORWARD: 2.6,
+    WALK_BACK: 1.8,
+    RUN: 5.6,
+    DASH: 8.0,
+    EVADE_IMPULSE: 7.2
 };
 
 // Poise & Stun

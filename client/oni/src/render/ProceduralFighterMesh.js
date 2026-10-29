@@ -306,9 +306,15 @@ export class ProceduralFighterMesh {
 
     // ------------------------------------------------------------------ per-frame
     update(fighter, timeSeconds, dtIn) {
+        const isFirst = (this.lastTime === null);
         const dt = dtIn !== undefined ? dtIn
-            : (this.lastTime === null ? 1 / 60 : Math.min(0.1, Math.max(0, timeSeconds - this.lastTime)));
+            : (isFirst ? 1 / 60 : Math.min(0.1, Math.max(0, timeSeconds - this.lastTime)));
         this.lastTime = timeSeconds;
+
+        if (isFirst) {
+            this.lastX = fighter.x;
+            this.lastZ = fighter.z;
+        }
 
         // gait phase advances with full 3D distance travelled (forward, back, or lateral strafe) -> planted feet never slide
         const dx = fighter.x - this.lastX, dz = fighter.z - this.lastZ;
@@ -342,7 +348,7 @@ export class ProceduralFighterMesh {
 
         resolvePose(this.target, fighter, this.loco, timeSeconds);
         this.detectHit(fighter);
-        this.integrateSprings(fighter.state, dt);
+        this.integrateSprings(fighter, dt);
 
         this.applyRoot(fighter);
         this.applyPose(this.pose, !this.target.gait);
@@ -383,24 +389,68 @@ export class ProceduralFighterMesh {
     }
 
     /**
-     * Second-order (mass-spring-damper) joint dynamics. Underdamped arms whip and overshoot,
-     * the torso leads and head/arms trail it (overlapping action), feet are critically damped.
+     * Second-order (mass-spring-damper) joint dynamics with martial-arts strike snappiness.
+     * Attacks feature high-stiffness explosive drives and crisp lockout holds on hit frames.
      */
-    integrateSprings(state, dt) {
-        const attack = state === FIGHTER_STATE.ATTACK || state === FIGHTER_STATE.THROW || state === FIGHTER_STATE.EVADE;
-        const hurt = state === FIGHTER_STATE.HIT_STUN || state === FIGHTER_STATE.BEING_THROWN;
-        const loco = state === FIGHTER_STATE.WALK || state === FIGHTER_STATE.RUN;
-        const speed = attack ? 0.90 : (hurt ? 0.85 : (loco ? 0.95 : 0.75));
+    integrateSprings(fighter, dt) {
+        const state = fighter.state;
+        const isAttack = state === FIGHTER_STATE.ATTACK || state === FIGHTER_STATE.THROW;
+        const isHurt = state === FIGHTER_STATE.HIT_STUN || state === FIGHTER_STATE.BEING_THROWN;
+        const isLoco = state === FIGHTER_STATE.WALK || state === FIGHTER_STATE.RUN;
+
+        // Snappy martial arts: attack strikes snap instantly into apex and hold with zero sponge delay
+        let activeSnap = false;
+        let snapLimb = null;
+        if (isAttack && fighter.currentMove) {
+            const m = fighter.currentMove;
+            const fr = fighter.stateTimer;
+            if (fr >= m.startup && fr <= (m.startup + m.active + 1)) {
+                activeSnap = true;
+                const anim = ATTACK_ANIMS[m.id];
+                snapLimb = anim ? anim.trail : null;
+            }
+        }
+
         const steps = Math.max(1, Math.ceil(dt / (1 / 300)));
         const h = dt / steps;
         const P = this.pose, V = this.vel, T = this.target;
+
         for (const k of POSE_KEYS) {
             const foot = FOOT_KEYS.has(k);
-            const [w0, z] = foot ? FOOT_SPRING : (SPRING[k] || SPRING_DEFAULT);
-            const w = foot ? w0 : w0 * speed;
-            const ww = w * w, c = 2 * z * w;
+            let [w0, z] = foot ? FOOT_SPRING : (SPRING[k] || SPRING_DEFAULT);
+
+            // Responsive martial-arts cadence
+            let w = w0;
+            if (isAttack) {
+                w = w0 * 2.2; // crisp strike acceleration & snappy lockout
+            } else if (isHurt) {
+                w = w0 * 0.90;
+            } else if (isLoco) {
+                w = w0 * 1.05;
+            } else {
+                w = w0 * 0.85;
+            }
+
             const target = T[k];
             let p = P[k], v = V[k];
+
+            if (activeSnap && snapLimb) {
+                // Strike apex hold: lock attacking limb rigidly to the keyframe pose for maximum impact
+                if (snapLimb === 'lFist' && (k.startsWith('lS') || k.startsWith('lE') || k.startsWith('lW'))) {
+                    P[k] = target; V[k] = 0; continue;
+                }
+                if (snapLimb === 'rFist' && (k.startsWith('rS') || k.startsWith('rE') || k.startsWith('rW'))) {
+                    P[k] = target; V[k] = 0; continue;
+                }
+                if (snapLimb === 'lFoot' && (k.startsWith('lH') || k.startsWith('lK') || k.startsWith('lF'))) {
+                    P[k] = target; V[k] = 0; continue;
+                }
+                if (snapLimb === 'rFoot' && (k.startsWith('rH') || k.startsWith('rK') || k.startsWith('rF'))) {
+                    P[k] = target; V[k] = 0; continue;
+                }
+            }
+
+            const ww = w * w, c = 2 * z * w;
             for (let i = 0; i < steps; i++) {
                 const err = k === 'spin' ? wrapAngle(target - p) : target - p;
                 v += (ww * err - c * v) * h;
@@ -414,18 +464,13 @@ export class ProceduralFighterMesh {
     }
 
     applyRoot(f) {
-        const facing = f.facing === -1 ? -1 : 1;
         const p = this.pose;
-        // mirror so both fighters present their right (near) side to the camera
-        this.root.scale.x = facing;
-        // open the stance toward the viewer only when the camera looks from the side (+Z)
+        this.root.scale.set(1, 1, 1);
         const toCam = Math.max(0, Math.cos(this.camYaw));
-        let baseRotY = facing * (Math.PI / 2 - CAM_TURN * p.turn * toCam);
-        if (typeof f.facingAngle === 'number' && Number.isFinite(f.facingAngle)) {
-            const worldYaw = Math.PI / 2 - f.facingAngle;
-            baseRotY = worldYaw - facing * CAM_TURN * p.turn * toCam;
-        }
-        this.root.rotation.y = baseRotY + facing * p.spin;
+        const facingSign = f.facing === -1 ? -1 : 1;
+        let baseRotY = Math.PI / 2 - (typeof f.facingAngle === 'number' && Number.isFinite(f.facingAngle) ? f.facingAngle : (facingSign === -1 ? Math.PI : 0));
+        baseRotY -= facingSign * CAM_TURN * p.turn * toCam * 0.5;
+        this.root.rotation.y = baseRotY + p.spin;
         this.root.position.set(f.x, f.y + Math.max(-0.05, p.lift), f.z);
     }
 
@@ -460,7 +505,7 @@ export class ProceduralFighterMesh {
     /**
      * Leg = blend(FK angles, analytic two-bone IK to a foot target) by weight w.
      * IK is solved in pelvis space; the knee tracks over the toes; the sole stays flat
-     * (or pivots on the ball of the foot when the heel is raised).
+     * (or pivots on the ball of the foot when the heel is raised / pivots on heel at heel-strike).
      */
     applyLeg(L, side, HP, HR, KB, Fx, Fy, Fz, FY, FP, w) {
         const d = this.dims;
@@ -472,13 +517,24 @@ export class ProceduralFighterMesh {
         if (w > 0.001) {
             const yaw = FY * side;
             const cy = Math.cos(yaw), sy = Math.sin(yaw);
-            const heel = Math.max(0, FP);
-            // ball of the foot stays on the target; ankle rises as the heel lifts
-            const ballZ = d.toeZ;
-            const ax = side * Fx + sy * ballZ, az = Fz + cy * ballZ; // ball position
-            const ry = -d.ankleH * Math.cos(heel) - ballZ * Math.sin(heel);
-            const rz = -d.ankleH * Math.sin(heel) + ballZ * Math.cos(heel);
-            const target = _v1.set(ax - sy * rz, Fy - ry, az - cy * rz);
+            const pitch = FP;
+            let target;
+
+            if (pitch >= 0) {
+                // Ball of foot on target; ankle rises with heel lift (plantarflexion)
+                const ballZ = d.toeZ;
+                const ax = side * Fx + sy * ballZ, az = Fz + cy * ballZ;
+                const ry = -d.ankleH * Math.cos(pitch) - ballZ * Math.sin(pitch);
+                const rz = -d.ankleH * Math.sin(pitch) + ballZ * Math.cos(pitch);
+                target = _v1.set(ax - sy * rz, Fy - ry, az - cy * rz);
+            } else {
+                // Heel strike: heel on ground (heelZ = -0.05), toe pitches up (dorsiflexion)
+                const heelZ = -0.05;
+                const ax = side * Fx + sy * heelZ, az = Fz + cy * heelZ;
+                const ry = -d.ankleH * Math.cos(pitch) - heelZ * Math.sin(pitch);
+                const rz = -d.ankleH * Math.sin(pitch) + heelZ * Math.cos(pitch);
+                target = _v1.set(ax - sy * rz, Fy - ry, az - cy * rz);
+            }
 
             // hip joint position (body space) and direction to target in pelvis space
             _hip.copy(L.hip.position).applyMatrix4(this.pelvis.matrix);
@@ -487,10 +543,12 @@ export class ProceduralFighterMesh {
             _pole.set(sy + side * 0.12, 0, cy).applyQuaternion(_qInv);
 
             const a = d.thigh, b = d.shin;
-            const len = Math.max(0.05, Math.min(a + b - 1e-4, dir.length()));
+            // Limit reach to 96.5% of max length so the knee maintains organic bend and NEVER locks/pops straight
+            const maxReach = (a + b) * 0.965;
+            const len = Math.max(0.05, Math.min(maxReach, dir.length()));
             const dn = dir.normalize();
             const cosA = Math.max(-1, Math.min(1, (a * a + len * len - b * b) / (2 * a * len)));
-            const cosK = Math.max(-1, Math.min(1, (a * a + b * b - len * len) / (2 * a * b)));
+            const cosK = Math.max(-0.95, Math.min(1, (a * a + b * b - len * len) / (2 * a * b)));
             const alpha = Math.acos(cosA);
             const kneeIK = Math.PI - Math.acos(cosK);
             const pp = _pole.addScaledVector(dn, -_pole.dot(dn));
@@ -506,8 +564,8 @@ export class ProceduralFighterMesh {
             knee = KB + (kneeIK - KB) * w;
             L.knee.rotation.set(knee, 0, 0);
 
-            // foot orientation: flat on the floor, yawed, pitched by heel lift (body space)
-            const qFoot = _q3.setFromAxisAngle(AX_Y, yaw).multiply(_q2.setFromAxisAngle(AX_X, heel));
+            // foot orientation: yawed and smoothly pitched by heel-toe roll
+            const qFoot = _q3.setFromAxisAngle(AX_Y, yaw).multiply(_q2.setFromAxisAngle(AX_X, pitch));
             const qShin = _q1.copy(this.pelvis.quaternion).multiply(L.hip.quaternion).multiply(L.knee.quaternion);
             const qAnkleIK = qShin.invert().multiply(qFoot);
             const qAnkleFK = _q2.setFromAxisAngle(AX_X, FP);
