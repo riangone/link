@@ -16,21 +16,22 @@ import { CharacterModel, SIDE_L, SIDE_R } from './CharacterModel.js';
 
 const CAM_TURN = 0.38; // rad the stance opens toward the camera at turn = 1
 
-// [angular frequency rad/s, damping ratio] per semantic key at full speed (attack)
-// High omega (85-105 rad/s) ensures fast 4-6 frame startup moves reach full extension + snappy overshoot
-const SPRING_DEFAULT = [88, 0.44];
+// [angular frequency rad/s, damping ratio] per semantic key
+// Controlled, organic frequencies (44-64 rad/s) & critical damping (0.68-0.78)
+// eliminate robotic jitter and snap, producing deliberate, martial-arts weight and follow-through.
+const SPRING_DEFAULT = [52, 0.72];
 const SPRING = {
-    hipY: [82, 0.50], hipP: [86, 0.52], hipT: [92, 0.44], hipR: [80, 0.48], hipS: [76, 0.55], fwd: [88, 0.50],
-    spP: [92, 0.44], spY: [96, 0.40], spR: [86, 0.46],
-    hdP: [52, 0.48], hdY: [52, 0.48],
-    lSP: [98, 0.36], lSR: [92, 0.40], lSY: [92, 0.42], lEB: [106, 0.38], lWB: [72, 0.38],
-    rSP: [98, 0.36], rSR: [92, 0.40], rSY: [92, 0.42], rEB: [106, 0.38], rWB: [72, 0.38],
-    lHP: [102, 0.44], lHR: [98, 0.46], lKB: [110, 0.42],
-    rHP: [102, 0.42], rHR: [98, 0.45], rKB: [110, 0.42],
-    lift: [84, 0.58], spin: [94, 0.65], turn: [36, 0.78]
+    hipY: [48, 0.75], hipP: [50, 0.72], hipT: [54, 0.70], hipR: [48, 0.75], hipS: [46, 0.75], fwd: [50, 0.72],
+    spP: [52, 0.70], spY: [54, 0.68], spR: [48, 0.72],
+    hdP: [38, 0.82], hdY: [38, 0.82],
+    lSP: [58, 0.68], lSR: [54, 0.70], lSY: [54, 0.70], lEB: [62, 0.68], lWB: [48, 0.72],
+    rSP: [58, 0.68], rSR: [54, 0.70], rSY: [54, 0.70], rEB: [62, 0.68], rWB: [48, 0.72],
+    lHP: [60, 0.70], lHR: [56, 0.72], lKB: [64, 0.68],
+    rHP: [60, 0.70], rHR: [56, 0.72], rKB: [64, 0.68],
+    lift: [48, 0.78], spin: [56, 0.75], turn: [32, 0.82]
 };
-// feet/IK weights: fast and critically damped (no foot skating, no wobble); not slowed in idle
-const FOOT_SPRING = [96, 0.92];
+// feet/IK weights: smooth and critically damped (no skating or abrupt pops)
+const FOOT_SPRING = [62, 0.88];
 const FOOT_KEYS = new Set(['lFx', 'lFy', 'lFz', 'lFY', 'lFP', 'rFx', 'rFy', 'rFz', 'rFY', 'rFP', 'lIK', 'rIK']);
 
 function wrapAngle(a) {
@@ -389,7 +390,7 @@ export class ProceduralFighterMesh {
         const attack = state === FIGHTER_STATE.ATTACK || state === FIGHTER_STATE.THROW || state === FIGHTER_STATE.EVADE;
         const hurt = state === FIGHTER_STATE.HIT_STUN || state === FIGHTER_STATE.BEING_THROWN;
         const loco = state === FIGHTER_STATE.WALK || state === FIGHTER_STATE.RUN;
-        const speed = attack ? 1.15 : (hurt ? 1.0 : (loco ? 1.02 : 0.78));
+        const speed = attack ? 0.90 : (hurt ? 0.85 : (loco ? 0.95 : 0.75));
         const steps = Math.max(1, Math.ceil(dt / (1 / 300)));
         const h = dt / steps;
         const P = this.pose, V = this.vel, T = this.target;

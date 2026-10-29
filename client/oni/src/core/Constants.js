@@ -82,11 +82,11 @@ export const STAGE_CONFIG = {
 // Physics
 export const GRAVITY = -32;
 export const MOVE_SPEED = {
-    WALK_FORWARD: 5.2,
-    WALK_BACK: 3.8,
-    RUN: 9.8,
-    DASH: 13.0,
-    EVADE_IMPULSE: 10.2
+    WALK_FORWARD: 3.2,
+    WALK_BACK: 2.3,
+    RUN: 6.2,
+    DASH: 8.6,
+    EVADE_IMPULSE: 7.6
 };
 
 // Poise & Stun
@@ -185,9 +185,9 @@ export const WEAPON_SPECS = {
         hitStun: 12,
         blockStun: 6,
         knockback: { x: 1.5, y: 0 },
-        startup: 3,
-        active: 2,
-        recovery: 7,
+        startup: 5,
+        active: 3,
+        recovery: 10,
         color: 0x00f0ff
     },
     SCRAM_CANNON: {
@@ -197,17 +197,17 @@ export const WEAPON_SPECS = {
         maxAmmo: 4,
         fireType: 'HOMING_SWARM',
         swarmCount: 3,
-        projectileSpeed: 9.5,
-        turnRate: 0.048,
+        projectileSpeed: 8.5,
+        turnRate: 0.045,
         lifetime: 110,
         damage: 8,
         poiseDamage: 22,
         hitStun: 16,
         blockStun: 8,
         knockback: { x: 2.2, y: 1.8 },
-        startup: 7,
+        startup: 9,
         active: 4,
-        recovery: 14,
+        recovery: 16,
         color: 0xff9900
     },
     MERCURY_BOW: {
@@ -224,9 +224,9 @@ export const WEAPON_SPECS = {
         knockback: { x: 5.2, y: 3.5 },
         knockdown: true,
         piercesGuard: true,
-        startup: 9,
-        active: 3,
-        recovery: 16,
+        startup: 11,
+        active: 4,
+        recovery: 18,
         color: 0x00ffaa
     }
 };

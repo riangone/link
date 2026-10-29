@@ -646,7 +646,7 @@ export class Fighter {
 
         // Compute adaptive forward lunge impulse when outside point-blank range
         if (gap > 0.08 && dist <= 2.75) {
-            const lungeBoost = Math.min(8.2, 2.6 + gap * 3.1);
+            const lungeBoost = Math.min(6.2, 2.2 + gap * 2.4);
             if (Math.hypot(this.vx, this.vz) < lungeBoost) {
                 this.vx = fx * lungeBoost;
                 this.vz = fz * lungeBoost;
@@ -655,7 +655,7 @@ export class Fighter {
 
         // Soft Z-axis lateral alignment so 3D depth misalignment doesn't cause frustrating whiffs
         if (Math.abs(dz) > 0.06 && Math.abs(dz) < 1.35 && dist < 2.65) {
-            this.vz += Math.max(-3.6, Math.min(3.6, dz * 4.2));
+            this.vz += Math.max(-2.4, Math.min(2.4, dz * 2.8));
         }
     }
 
@@ -766,8 +766,8 @@ export class Fighter {
             this.isGrounded = false;
             const speedMult = (this.daodanOverdrive ? 1.18 : 1.0) * (this.speedScale || 1.0);
             if (Math.abs(input.dirX) > 0.1 || Math.abs(input.dirZ) > 0.1) {
-                this.vx = input.dirX * MOVE_SPEED.WALK_FORWARD * 1.12 * speedMult;
-                this.vz = input.dirZ * MOVE_SPEED.WALK_FORWARD * 0.95 * speedMult;
+                this.vx = input.dirX * MOVE_SPEED.WALK_FORWARD * 1.35 * speedMult;
+                this.vz = input.dirZ * MOVE_SPEED.WALK_FORWARD * 1.15 * speedMult;
             }
             return;
         }
@@ -815,8 +815,8 @@ export class Fighter {
             this.vy = 12.2;
             this.isGrounded = false;
             const speedMult = (this.daodanOverdrive ? 1.18 : 1.0) * (this.speedScale || 1.0);
-            this.vx = input.dirX * MOVE_SPEED.WALK_FORWARD * 1.15 * speedMult;
-            this.vz = input.dirZ * MOVE_SPEED.WALK_FORWARD * 0.95 * speedMult;
+            this.vx = input.dirX * MOVE_SPEED.WALK_FORWARD * 1.35 * speedMult;
+            this.vz = input.dirZ * MOVE_SPEED.WALK_FORWARD * 1.15 * speedMult;
             return;
         }
 
@@ -875,8 +875,8 @@ export class Fighter {
         }
 
         // Smooth athletic acceleration (eliminates robotic instant velocity snapping)
-        this.vx += (targetVx - this.vx) * 0.44;
-        this.vz += (targetVz - this.vz) * 0.44;
+        this.vx += (targetVx - this.vx) * 0.35;
+        this.vz += (targetVz - this.vz) * 0.35;
     }
 
     handleRun(input, opponent, simEvents) {
@@ -897,7 +897,7 @@ export class Fighter {
 
         if (fwdDot > 0.2) {
             this.vx = fx * runSpd;
-            this.vz = fz * runSpd + input.dirZ * runSpd * 0.4;
+            this.vz = fz * runSpd + input.dirZ * runSpd * 0.35;
         } else {
             this.transitionTo(FIGHTER_STATE.IDLE);
         }
