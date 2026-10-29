@@ -468,23 +468,28 @@ test('Oni Combat core module loading and P0+P1 simulation verification', async (
         assert.strictEqual(campaign.zoneIndex, 0);
         assert.strictEqual(campaign.consoleHacked, false, 'Zone 1 requires hacking the security console');
 
-        // Move Konoko onto the Medkit Crate (-3.8, -2.2) while damaged
+        // Move Konoko onto the Medkit Crate while damaged
+        const medkit = campaign.interactables.find((i) => i.type === 'MEDKIT_CRATE');
+        assert.ok(medkit !== undefined, 'Zone 1 should contain a Medkit Crate');
         sim.f1.hp = 60;
-        sim.f1.x = -3.8;
-        sim.f1.z = -2.2;
+        sim.f1.x = medkit.x;
+        sim.f1.z = medkit.z;
         const events1 = [];
         campaign.updateTick({}, events1);
         assert.ok(sim.f1.hp >= 95, 'Walking over Medkit Crate should restore +40 HP');
 
-        // Walk near the Security Console (4.2, -2.6) to hack it
-        sim.f1.x = 4.1;
-        sim.f1.z = -2.5;
+        // Walk near the Security Console to hack it
+        const consoleItem = campaign.interactables.find((i) => i.type === 'CONSOLE');
+        assert.ok(consoleItem !== undefined, 'Zone 1 should contain a Security Console');
+        sim.f1.x = consoleItem.x;
+        sim.f1.z = consoleItem.z;
         const events2 = [];
         campaign.updateTick({ punch: true }, events2);
         assert.strictEqual(campaign.consoleHacked, true, 'Interacting with Console should unlock security gate');
 
-        // Defeat Zone 1 Sentry -> should NOT end match, instead should transition to Zone 2!
+        // Defeat Zone 1 Sentry and squad -> should NOT end match, instead should transition to Zone 2!
         sim.f2.hp = 0;
+        for (const e of sim.extraEnemies) e.hp = 0;
         const events3 = [{ type: 'KO', winner: 'p1' }];
         sim.isMatchOver = true;
         campaign.updateTick({}, events3);
@@ -538,5 +543,299 @@ test('Oni Combat core module loading and P0+P1 simulation verification', async (
 
         campaign.disableCampaign();
         assert.strictEqual(CollisionSystem.stageType, 'ROOFTOP', 'Disabling campaign restores default rooftop arena mode');
+    });
+
+    await t.test('P7 Oni Immersive Campaign: Squad Encounters, Sector Obstacles, Collateral Throw Splash & Tokens', async () => {
+        const { CampaignManager } = await import('../../client/oni/src/core/CampaignManager.js');
+        const sim = new Simulation();
+        const campaign = new CampaignManager(sim);
+
+        // 1. Sector AABB Obstacles & Collision Slidewall
+        CollisionSystem.clearObstacles();
+        CollisionSystem.setObstacles([
+            { id: 'cargo_crate', minX: 1.0, maxX: 3.0, minZ: -1.0, maxZ: 1.0, height: 3.0, blocksProjectiles: true, active: true }
+        ]);
+
+        sim.f1.x = 0.5;
+        sim.f1.z = 0.0;
+        sim.f1.vx = 8.0;
+        sim.tick({ dirX: 1.0 }, {});
+        assert.ok(sim.f1.x <= 1.01, `Fighter should slide against obstacle boundary, got x=${sim.f1.x}`);
+
+        // Obstacle raycast blocking bullets
+        const rayBlocked = CollisionSystem.checkRayObstacles(0, 0, 4.0, 0);
+        assert.ok(rayBlocked !== null, 'Obstacle should intercept line of fire');
+        assert.strictEqual(rayBlocked.obstacle.id, 'cargo_crate');
+
+        // 2. Multi-enemy squad spawn & target switching
+        sim.clearExtraEnemies();
+        const extraGrunt = sim.spawnExtraEnemy({
+            id: 'extra_sentry',
+            name: 'EXTRA SENTRY',
+            x: 4.5,
+            z: 0.0,
+            maxHp: 80
+        });
+        const enemies = sim.getEnemies();
+        assert.strictEqual(enemies.length, 2, 'Should have 2 enemies registered in the sector');
+        assert.strictEqual(sim.entities.has('extra_sentry'), true);
+
+        // Soft target selection
+        sim.f1.x = 0;
+        sim.f1.z = 0;
+        sim.f1.setFacingAngle(0); // facing +X towards extraGrunt
+        const bestTarget = sim.f1.findBestTarget(enemies);
+        assert.ok(bestTarget !== null);
+
+        // 3. Collateral Throw Splash (Body Bowling over adjacent enemies)
+        sim.f2.x = 0.9;
+        sim.f2.z = 0.0;
+        sim.f2.poise = 0;
+        sim.f2.transitionTo(FIGHTER_STATE.DIZZY);
+        extraGrunt.x = 1.8;
+        extraGrunt.z = 0.5;
+        extraGrunt.hp = 80;
+        extraGrunt.poise = 100;
+
+        // Perform frontal throw on f2
+        sim.tick({ punch: true }, {});
+        assert.strictEqual(sim.f1.state, FIGHTER_STATE.THROW);
+
+        // Advance until throw release impact
+        let collateralTriggered = false;
+        for (let i = 0; i < 40; i++) {
+            sim.tick({}, {});
+            for (const ev of sim.events) {
+                if (ev.type === 'COLLATERAL_SPLASH') {
+                    collateralTriggered = true;
+                }
+            }
+        }
+        assert.strictEqual(collateralTriggered, true, 'Throw slam should emit COLLATERAL_SPLASH event');
+        assert.ok(extraGrunt.hp < 80, 'Nearby squad enemy should take collateral splash damage');
+        assert.strictEqual(extraGrunt.state, FIGHTER_STATE.KNOCKED_DOWN, 'Nearby squad enemy should be bowled over');
+
+        // 4. Squad Attack Token Management
+        BotBrain.releaseAttackToken('enemy_1');
+        const token1 = BotBrain.requestAttackToken('enemy_1', 10, 30);
+        assert.strictEqual(token1, true, 'First enemy requests and gets attack token');
+        const token2 = BotBrain.requestAttackToken('enemy_2', 12, 30);
+        assert.strictEqual(token2, false, 'Second enemy request denied while token is actively held');
+        const token1Again = BotBrain.requestAttackToken('enemy_1', 15, 30);
+        assert.strictEqual(token1Again, true, 'Same token holder retains access');
+        const tokenAfterExpire = BotBrain.requestAttackToken('enemy_2', 45, 30);
+        assert.strictEqual(tokenAfterExpire, true, 'Second enemy acquires token after previous expired');
+
+        CollisionSystem.clearObstacles();
+        sim.clearExtraEnemies();
+    });
+
+    await t.test('P8 Oni Continuous Sectors, Stealth Vision Cone & Boss Cinematic Cutscenes', async () => {
+        const { CampaignManager, CAMPAIGN_CHAPTERS } = await import('../../client/oni/src/core/CampaignManager.js');
+        const sim = new Simulation();
+        const campaign = new CampaignManager(sim);
+
+        // 1. P1: Continuous 3-Sector Map Layout & Seamless Transition Across Security Gates
+        campaign.startChapter('ch1');
+        assert.strictEqual(campaign.mode, 'CAMPAIGN');
+        const bounds = CollisionSystem.getActiveBounds();
+        assert.ok(bounds.minX <= -20.0 && bounds.maxX >= 30.0, 'Custom bounds should span full grand warehouse');
+        assert.strictEqual(sim.f1.x, -22.0, 'Player starts at Sector 1 western entrance (x = -22.0)');
+        assert.strictEqual(campaign.zoneIndex, 0);
+
+        // Hack Console 1
+        const console1 = campaign.interactables.find((i) => i.type === 'CONSOLE');
+        sim.f1.x = console1.x;
+        sim.f1.z = console1.z;
+        campaign.updateTick({ punch: true }, []);
+        assert.strictEqual(campaign.consoleHacked, true);
+
+        // Defeat all Sector 1 enemies
+        sim.f2.hp = 0;
+        for (const e of sim.extraEnemies) e.hp = 0;
+        campaign.updateTick({}, [{ type: 'KO', winner: 'p1' }]);
+        assert.strictEqual(campaign.zoneCleared, true);
+
+        // Physically run eastwards across Gate 1 (x = -6.0)
+        sim.f1.x = -5.5; // crossed threshold
+        campaign.updateTick({ dirX: 1.0 }, []);
+        assert.strictEqual(campaign.zoneIndex, 1, 'Running across open Gate 1 should advance to Sector 2 seamlessly');
+        assert.strictEqual(sim.f1.x, -5.5, 'Player physical coordinates must NOT be reset on sector advance');
+        assert.ok(sim.f2.x >= 1.5, 'Sector 2 Striker Trooper should be positioned in Sector 2 (x >= 1.5)');
+
+        // 2. P2: Stealth Patrol, Vision Cone & Squad Alert Escalation
+        const sentry = sim.f2;
+        sentry.isAlerted = false;
+        sentry.facing = 1; // looking east (+X)
+        sentry.x = 4.0;
+        sentry.z = 0.0;
+
+        // Player sneaks up directly behind the sentry (at x = 2.5, facing east)
+        sim.f1.x = 2.5;
+        sim.f1.z = 0.0;
+        const bb = new BotBrain('normal');
+        const blankInput = bb.createBlankInput();
+        const status = bb.branchPatrolAndAlert({
+            bot: sentry,
+            opp: sim.f1,
+            dist: 1.5,
+            input: blankInput,
+            sim
+        });
+        assert.strictEqual(sentry.isAlerted, false, 'Approaching from rear blindspot should not alert the sentry');
+
+        // Performing an attack from behind deals +50% stealth critical damage
+        const hpBeforeStealth = sentry.hp;
+        sim.events = [];
+        sim.applyDamageResult(sim.f1, sentry, {
+            hitPoint: { x: 3.5, y: 1.0, z: 0 },
+            move: { damage: 20, knockdown: false, knockback: { x: 2.0, y: 0 } }
+        });
+        assert.strictEqual(sentry.isAlerted, true, 'Suffering a stealth attack immediately triggers alert');
+        const stealthEvent = sim.events.find((e) => e.type === 'STEALTH_CRIT');
+        assert.ok(stealthEvent !== undefined, 'Stealth takedown must trigger STEALTH_CRIT event');
+        assert.strictEqual(sentry.hp, hpBeforeStealth - 30, 'Stealth takedown deals base 20 + 50% bonus (30 total)');
+
+        // 3. P3: Boss Battle Cinematic Cutscene, Typewriter & Instant Skip
+        // Transition into Sector 3 (Boss Barabas)
+        campaign.setupCampaignZone(CAMPAIGN_CHAPTERS[1], 2, false);
+        assert.strictEqual(campaign.zoneIndex, 2);
+        assert.strictEqual(campaign.cinematic.active, true, 'Entering Boss zone initiates cinematic cutscene');
+        assert.strictEqual(campaign.cinematic.bossName, 'BARABAS (巴拉巴斯)');
+
+        // Typewriter advances progressively
+        const initialText = campaign.cinematic.typedText;
+        campaign.updateTick({}, []);
+        campaign.updateTick({}, []);
+        assert.ok(campaign.cinematic.typeIndex > 0, 'Typewriter character index advances during cutscene');
+
+        // Instant Skip on user input / keypress
+        sim.events = [];
+        campaign.skipBossCinematic();
+        assert.strictEqual(campaign.cinematic.active, false, 'Skipping cutscene deactivates cinematic mode');
+        const engageEvent = sim.events.find((e) => e.type === 'BOSS_ENGAGE');
+        assert.ok(engageEvent !== undefined, 'Skipping cutscene emits BOSS_ENGAGE combat event');
+
+        campaign.disableCampaign();
+    });
+
+    await t.test('P9 Global Difficulty Scaling (Recruit / Elite / Master) & Player Damage Mitigation', async () => {
+        const { DIFFICULTY_PRESETS } = await import('../../client/oni/src/core/Constants.js');
+        const sim = new Simulation();
+
+        // 1. Default difficulty must be 'easy' (Recruit) for approachable combat
+        assert.strictEqual(sim.difficulty, 'easy');
+        assert.strictEqual(sim.f1.damageTakenMult, DIFFICULTY_PRESETS.easy.playerDamageTakenMult);
+        assert.ok(sim.f1.damageTakenMult < 1.0, 'Player takes mitigated damage in Recruit mode (0.65x)');
+
+        // Test damage mitigation on incoming strike
+        const hitResultRecruit = sim.f1.takeHit({ move: { damage: 20, poiseDamage: 40, knockback: { x: 2, y: 0 } }, isBlock: false }, 1);
+        assert.strictEqual(hitResultRecruit.damage, 13, '20 base damage scaled by 0.65 = 13');
+
+        // 2. Switch difficulty to 'hard' (Master)
+        sim.setDifficulty('hard');
+        assert.strictEqual(sim.difficulty, 'hard');
+        assert.strictEqual(sim.f1.damageTakenMult, DIFFICULTY_PRESETS.hard.playerDamageTakenMult);
+        const hitResultMaster = sim.f1.takeHit({ move: { damage: 20, poiseDamage: 40, knockback: { x: 2, y: 0 } }, isBlock: false }, 1);
+        assert.strictEqual(hitResultMaster.damage, 26, '20 base damage scaled by 1.3 = 26 in Master mode');
+
+        // 3. Enemy HP scaling based on difficulty
+        sim.setDifficulty('easy');
+        const recruitEnemy = sim.spawnExtraEnemy({ maxHp: 100 });
+        assert.strictEqual(recruitEnemy.hp, 75, 'Enemy HP scaled by 0.75 in Recruit mode');
+
+        sim.setDifficulty('hard');
+        const masterEnemy = sim.spawnExtraEnemy({ maxHp: 100 });
+        assert.strictEqual(masterEnemy.hp, 125, 'Enemy HP scaled by 1.25 in Master mode');
+        sim.clearExtraEnemies();
+    });
+
+    await t.test('P10 Dynamic Alarm & Reinforcements Engine, Run-To-Alarm & Stealth Intercept', async () => {
+        const { CampaignManager, CAMPAIGN_CHAPTERS } = await import('../../client/oni/src/core/CampaignManager.js');
+        const sim = new Simulation();
+        const campaign = new CampaignManager(sim);
+        sim.campaignManager = campaign;
+
+        campaign.startChapter('ch1');
+        assert.strictEqual(campaign.alarmActive, false);
+
+        // Verify alarm console presence in Sector 1
+        const alarmConsole = campaign.interactables.find((i) => i.type === 'ALARM_CONSOLE');
+        assert.ok(alarmConsole !== undefined, 'Sector 1 must contain an ALARM_CONSOLE interactable');
+
+        // 1. Sentry runs towards alarm console when alerted
+        const sentry = sim.f2;
+        sentry.canTriggerAlarm = true;
+        sentry.isAlerted = true;
+        sentry.x = alarmConsole.x + 4.0;
+        sentry.z = alarmConsole.z;
+
+        const bb = new BotBrain('easy');
+        const input = bb.createBlankInput();
+        const status = bb.branchRunToAlarm({
+            bot: sentry,
+            input,
+            sim
+        });
+        assert.strictEqual(status, 'RUNNING');
+        assert.strictEqual(sentry.isRunningToAlarm, true);
+        assert.strictEqual(input.dirX, -1, 'Sentry moves westwards towards alarm console');
+
+        // 2. Sentry triggers alarm upon reaching console
+        sentry.x = alarmConsole.x + 0.5;
+        const statusAtConsole = bb.branchRunToAlarm({
+            bot: sentry,
+            input,
+            sim
+        });
+        assert.strictEqual(statusAtConsole, 'SUCCESS');
+        assert.strictEqual(campaign.alarmActive, true, 'Alarm must be triggered');
+        assert.strictEqual(alarmConsole.alarmTriggered, true);
+
+        // Reinforcements squad should spawn
+        assert.ok(sim.extraEnemies.length >= 2, 'Alarm must spawn dynamic reinforcement squad');
+
+        // 3. Player approaches console and overrides/disables alarm
+        sim.f1.x = alarmConsole.x;
+        sim.f1.z = alarmConsole.z;
+        const tickEvents = [];
+        campaign.updateTick({ punch: true }, tickEvents);
+        assert.strictEqual(campaign.alarmActive, false, 'Interacting with tripped console disables alarm');
+        const disabledEv = tickEvents.find((e) => e.type === 'ALARM_DISABLED');
+        assert.ok(disabledEv !== undefined, 'Should emit ALARM_DISABLED event');
+
+        campaign.disableCampaign();
+        sim.clearExtraEnemies();
+    });
+
+    await t.test('P11 Distinct Enemy Archetypes (Striker, Fury, Tanker, Sniper, Black-Ops)', async () => {
+        const sim = new Simulation();
+        sim.setDifficulty('normal');
+
+        // 1. TANKER: Big scale, high poise, ground stomp
+        const tanker = sim.spawnExtraEnemy({ archetype: 'TANKER', maxHp: 160 });
+        assert.strictEqual(tanker.archetype, 'TANKER');
+        assert.strictEqual(tanker.scale, 1.25, 'Tanker model scale should be 1.25x');
+        assert.strictEqual(tanker.maxPoise, 180, 'Tanker has high poise (180)');
+        assert.strictEqual(tanker.unlockedMoves.has('GROUND_STOMP'), true);
+
+        // 2. FURY: Agile female assassin, slide kick, willow kick, throw
+        const fury = sim.spawnExtraEnemy({ archetype: 'FURY', maxHp: 80 });
+        assert.strictEqual(fury.archetype, 'FURY');
+        assert.strictEqual(fury.scale, 0.94, 'Fury model scale should be 0.94x');
+        assert.strictEqual(fury.unlockedMoves.has('SLIDE_KICK'), true);
+        assert.strictEqual(fury.unlockedMoves.has('WILLOW_KICK'), true);
+
+        // 3. BLACK_OPS: Optical camouflage stealth
+        const blackOps = sim.spawnExtraEnemy({ archetype: 'BLACK_OPS' });
+        assert.strictEqual(blackOps.archetype, 'BLACK_OPS');
+        assert.strictEqual(blackOps.isCamouflage, true, 'Black-Ops features active camouflage');
+
+        // 4. SNIPER: Long-range marksman
+        const sniper = sim.spawnExtraEnemy({ archetype: 'SNIPER' });
+        assert.strictEqual(sniper.archetype, 'SNIPER');
+        assert.strictEqual(sniper.isSniper, true);
+
+        sim.clearExtraEnemies();
     });
 });

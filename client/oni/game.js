@@ -19,7 +19,9 @@ function init() {
 
     const locale = getLocale();
     const qs = new URLSearchParams(location.search);
-    let botMode = qs.get('bot') || 'easy'; // Default to 'easy' so players can comfortably learn and win
+    let botMode = qs.get('bot') || (function() {
+        try { return localStorage.getItem('oni_difficulty'); } catch(_) { return null; }
+    })() || 'easy'; // Default to 'easy' (Recruit) so players can comfortably learn and enjoy fluid combat
 
     // DOM Elements
     const appEl = document.getElementById('app');
@@ -76,6 +78,42 @@ function init() {
     const joystickZone = document.getElementById('joystick-zone');
     const joystickBase = document.getElementById('joystick-base');
     const joystickStick = document.getElementById('joystick-stick');
+    const cinematicOverlay = document.getElementById('cinematic-overlay');
+    const cinematicSpeaker = document.getElementById('cinematic-speaker');
+    const cinematicTitle = document.getElementById('cinematic-title');
+    const cinematicText = document.getElementById('cinematic-text');
+
+    // Web Audio Sound Synthesizer for Tactical Feedback (Alerts, Boss Chords)
+    let audioCtx = null;
+    function getAudioContext() {
+        if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AC();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        return audioCtx;
+    }
+
+    function playAlertSound() {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            const now = ctx.currentTime;
+            osc.frequency.setValueAtTime(880, now);
+            osc.frequency.setValueAtTime(1175, now + 0.08);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.26);
+        } catch (_) {}
+    }
 
     // Toggle Moves Panel on mobile / compact screens
     if (btnToggleMoves && movesPanel) {
@@ -94,10 +132,13 @@ function init() {
     const threeScene = new ThreeScene(container);
     const sim = new Simulation();
     const campaign = new CampaignManager(sim);
+    sim.campaignManager = campaign;
     const meshP1 = new ProceduralFighterMesh(threeScene.scene, true);
     const meshP2 = new ProceduralFighterMesh(threeScene.scene, false);
     const vfx = new VFXSystem(threeScene.scene);
     const botBrain = new BotBrain(botMode);
+    const extraMeshes = new Map();
+    const extraBrains = new Map();
 
     let selectedChapterId = 'ch1';
     function updateRpgModalStrip() {
@@ -155,9 +196,13 @@ function init() {
     function setBotDifficulty(level) {
         if (!DIFF_LABELS[level]) level = 'easy';
         botMode = level;
+        try { localStorage.setItem('oni_difficulty', botMode); } catch (_) {}
         botBrain.setLevel(botMode);
-        if (sim && sim.f2 && botBrain.profile) {
-            sim.f2.speedScale = botBrain.profile.speedScale || 1.0;
+        if (sim) {
+            sim.setDifficulty(botMode);
+            if (sim.f2 && botBrain.profile) {
+                sim.f2.speedScale = botBrain.profile.speedScale || 1.0;
+            }
         }
         if (btnDifficultyText) {
             btnDifficultyText.textContent = DIFF_LABELS[botMode];
@@ -177,6 +222,7 @@ function init() {
             if (!btn) return;
             e.stopPropagation();
             setBotDifficulty(btn.getAttribute('data-diff'));
+            showActionNotice(`${DIFF_LABELS[botMode]}!`);
         });
     }
     if (btnDifficulty) {
@@ -290,6 +336,10 @@ function init() {
     // Keyboard & Input State
     const keysDown = {};
     window.addEventListener('keydown', (e) => {
+        if (trySkipCinematic()) {
+            e.preventDefault();
+            return;
+        }
         keysDown[e.code] = true;
         const camKeys = { Digit1: 'side', Digit2: 'diagonal', Digit3: 'shoulder', Digit4: 'top' };
         if (camKeys[e.code]) setCam(threeScene.setCameraMode(camKeys[e.code]));
@@ -667,6 +717,35 @@ function init() {
         }
     }
 
+    function syncCinematicUI() {
+        if (!cinematicOverlay) return;
+        const c = campaign ? campaign.cinematic : null;
+        if (!c || !c.active || !isPlaying) {
+            cinematicOverlay.classList.add('hidden');
+            return;
+        }
+        cinematicOverlay.classList.remove('hidden');
+        if (cinematicSpeaker) cinematicSpeaker.textContent = c.bossName || 'BOSS';
+        if (cinematicTitle) cinematicTitle.textContent = c.bossTitle || '';
+        if (cinematicText) cinematicText.textContent = c.typedText || '';
+    }
+
+    function trySkipCinematic() {
+        if (campaign && campaign.cinematic && campaign.cinematic.active) {
+            campaign.skipBossCinematic();
+            syncCinematicUI();
+            return true;
+        }
+        return false;
+    }
+
+    if (cinematicOverlay) {
+        cinematicOverlay.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            trySkipCinematic();
+        });
+    }
+
     function startTutorialDojo() {
         startOverlay.classList.add('hidden');
         gameoverOverlay.classList.add('hidden');
@@ -694,7 +773,8 @@ function init() {
         koBanner.style.display = 'none';
         isMultiplayer = false;
         campaign.startChapter(chapterId);
-        threeScene.setStageMode(chapterId === 'ch3' ? 'ROOFTOP' : 'INDOOR_DOJO');
+        const stage = chapterId === 'ch3' ? 'ROOFTOP' : (chapterId === 'ch0' ? 'INDOOR_DOJO' : 'WAREHOUSE');
+        threeScene.setStageMode(stage);
         setBotDifficulty(sim.f2.aiProfileLevel || 'easy');
         isPlaying = true;
         document.body.classList.add('in-fight');
@@ -914,6 +994,27 @@ function init() {
                 botBrain.setLevel(ev.level || 'normal');
                 vfx.spawnShockwave(ev.x, 0.15, ev.z, 0xff0077);
                 showActionNotice(`WAVE ${ev.wave}: ${ev.enemyName}!`);
+            } else if (ev.type === 'COLLATERAL_SPLASH') {
+                vfx.spawnShockwave(ev.x, 0.2, ev.z, 0xffaa00);
+                threeScene.addTrauma(0.42);
+                showActionNotice('BODY BOWLING! 摔投范围波及!');
+            } else if (ev.type === 'ENEMY_ALERT') {
+                showActionNotice(`⚠️ 警报: ${ev.name} 已察觉!`);
+                vfx.spawnShockwave(ev.x, 0.5, ev.z, 0xff0055);
+                playAlertSound();
+            } else if (ev.type === 'STEALTH_CRIT') {
+                vfx.spawnShockwave(sim.f1.x, 0.5, sim.f1.z, 0xffaa00);
+                threeScene.addTrauma(0.45);
+                showActionNotice(ev.text || 'STEALTH TAKEDOWN!');
+            } else if (ev.type === 'BOSS_CINEMATIC_START') {
+                syncCinematicUI();
+            } else if (ev.type === 'BOSS_ENGAGE') {
+                threeScene.addTrauma(0.6);
+                threeScene.hitFlash(0.25);
+                showActionNotice(`ENGAGE BOSS: ${ev.bossName}!`);
+                syncCinematicUI();
+            } else if (ev.type === 'OBSTACLE_IMPACT') {
+                vfx.spawnHitSpark(ev.x, ev.y, ev.z, true, 8);
             } else if (ev.type === 'TUTORIAL_STEP_CLEAR') {
                 vfx.spawnShockwave(sim.f1.x, 0.2, sim.f1.z, 0x00ff88);
                 showActionNotice(`STAGE ${ev.step} UNLOCKED! 下一项训练!`);
@@ -1027,6 +1128,19 @@ function init() {
                         p2Input = botBrain.think(sim.f2, sim.f1, sim);
                     }
 
+                    // Multi-agent squad enemy AI updates
+                    if (Array.isArray(sim.extraEnemies) && sim.extraEnemies.length > 0) {
+                        for (let i = 0; i < sim.extraEnemies.length; i++) {
+                            const extra = sim.extraEnemies[i];
+                            let eb = extraBrains.get(extra.id);
+                            if (!eb) {
+                                eb = new BotBrain(extra.aiProfileLevel || 'normal');
+                                extraBrains.set(extra.id, eb);
+                            }
+                            extra.cachedAiInput = eb.think(extra, sim.f1, sim);
+                        }
+                    }
+
                     // Tick simulation
                     sim.tick(p1Input, p2Input);
 
@@ -1034,6 +1148,7 @@ function init() {
                     if (!isMultiplayer && (campaign.mode === 'TUTORIAL' || campaign.mode === 'CAMPAIGN')) {
                         campaign.updateTick(p1Input, tickEvents);
                         syncCommsBannerUI();
+                        syncCinematicUI();
                     }
                     // Drain and handle events
                     if (tickEvents.length > 0) {
@@ -1058,19 +1173,45 @@ function init() {
         meshP1.update(sim.f1, timeSec);
         meshP2.update(sim.f2, timeSec);
 
+        // Update squad enemy procedural meshes & recycle defeated ones
+        if (Array.isArray(sim.extraEnemies)) {
+            const activeIds = new Set();
+            for (let i = 0; i < sim.extraEnemies.length; i++) {
+                const extra = sim.extraEnemies[i];
+                activeIds.add(extra.id);
+                let eMesh = extraMeshes.get(extra.id);
+                if (!eMesh) {
+                    eMesh = new ProceduralFighterMesh(threeScene.scene, false);
+                    extraMeshes.set(extra.id, eMesh);
+                }
+                eMesh.camYaw = threeScene.camYaw;
+                eMesh.update(extra, timeSec);
+            }
+            for (const [id, eMesh] of extraMeshes.entries()) {
+                if (!activeIds.has(id)) {
+                    if (eMesh.group && eMesh.group.parent) {
+                        eMesh.group.parent.remove(eMesh.group);
+                    }
+                    extraMeshes.delete(id);
+                }
+            }
+        }
+
         vfx.syncEntities(sim);
         vfx.syncInteractables(campaign, timeSec);
         vfx.update(delta);
-        threeScene.updateCamera(sim.f1, sim.f2, !isPlaying, timeSec);
+        const focusedEnemy = (typeof sim.f1.findBestTarget === 'function' ? sim.f1.findBestTarget(sim.getEnemies()) : null) || sim.f2;
+        threeScene.updateCamera(sim.f1, focusedEnemy, !isPlaying, timeSec, campaign ? campaign.cinematic : null);
         threeScene.render();
 
-        // Update HUD
+        // Update HUD (smartly mirrors the currently locked/focused active enemy)
+        const activeEnemy = focusedEnemy;
         if (p1NameEl) p1NameEl.textContent = sim.f1.name || 'KONOKO';
-        if (p2NameEl) p2NameEl.textContent = sim.f2.name || 'SYNDI-BOT';
+        if (p2NameEl) p2NameEl.textContent = activeEnemy.name || 'SYNDI-BOT';
         p1HpFill.style.width = `${Math.max(0, (sim.f1.hp / sim.f1.maxHp) * 100)}%`;
-        p2HpFill.style.width = `${Math.max(0, (sim.f2.hp / sim.f2.maxHp) * 100)}%`;
+        p2HpFill.style.width = `${Math.max(0, (activeEnemy.hp / activeEnemy.maxHp) * 100)}%`;
         if (p1PoiseFill) p1PoiseFill.style.width = `${Math.max(0, (sim.f1.poise / sim.f1.maxPoise) * 100)}%`;
-        if (p2PoiseFill) p2PoiseFill.style.width = `${Math.max(0, (sim.f2.poise / sim.f2.maxPoise) * 100)}%`;
+        if (p2PoiseFill) p2PoiseFill.style.width = `${Math.max(0, (activeEnemy.poise / activeEnemy.maxPoise) * 100)}%`;
         if (p1DaodanFill) {
             p1DaodanFill.style.width = `${Math.max(0, (sim.f1.daodanMeter / sim.f1.maxDaodanMeter) * 100)}%`;
             if (p1DaodanFill.parentElement) {
@@ -1090,8 +1231,8 @@ function init() {
             p1HypoBadge.classList.toggle('empty', sim.f1.hypoCount <= 0);
         }
         if (p2HypoBadge) {
-            p2HypoBadge.textContent = `💉×${sim.f2.hypoCount}`;
-            p2HypoBadge.classList.toggle('empty', sim.f2.hypoCount <= 0);
+            p2HypoBadge.textContent = `💉×${activeEnemy.hypoCount || 0}`;
+            p2HypoBadge.classList.toggle('empty', (activeEnemy.hypoCount || 0) <= 0);
         }
         if (p1RpgBadge) {
             p1RpgBadge.textContent = `Lv.${campaign.rpg.level}`;

@@ -12,6 +12,8 @@ export class CollisionSystem {
      *   - 'INDOOR_FLAT': Enclosed flat indoor dojo / warehouse / lab floor (y = 0 everywhere, zero fall/ring-out risk)
      */
     static stageType = 'ROOFTOP';
+    static obstacles = [];
+    static customBounds = null;
 
     static setStageType(type = 'ROOFTOP') {
         this.stageType = type === 'INDOOR_FLAT' ? 'INDOOR_FLAT' : 'ROOFTOP';
@@ -21,8 +23,126 @@ export class CollisionSystem {
         return this.stageType === 'INDOOR_FLAT';
     }
 
+    static setCustomBounds(bounds = null) {
+        this.customBounds = bounds;
+    }
+
     static getActiveBounds() {
+        if (this.customBounds) return this.customBounds;
         return this.stageType === 'INDOOR_FLAT' ? INDOOR_BOUNDS : STAGE_BOUNDS;
+    }
+
+    /**
+     * Set active tactical obstacles for campaign sectors (cargo containers, terminals, laser gates)
+     */
+    static setObstacles(list = []) {
+        this.obstacles = Array.isArray(list) ? list : [];
+    }
+
+    static clearObstacles() {
+        this.obstacles = [];
+    }
+
+    /**
+     * Resolve character collision against static obstacles in the zone.
+     * Pushes the character out along the penetration vector (AABB sliding).
+     */
+    static resolveObstacles(fighter, radius = 0.45) {
+        if (!this.obstacles || this.obstacles.length === 0) return;
+        const fy = fighter.y || 0;
+
+        for (let i = 0; i < this.obstacles.length; i++) {
+            const obs = this.obstacles[i];
+            if (obs.active === false) continue;
+            // Height check
+            const obsHeight = obs.height || 3.0;
+            if (fy < (obs.minY || 0) - 0.2 || fy > (obs.minY || 0) + obsHeight) continue;
+
+            const minX = obs.minX - radius;
+            const maxX = obs.maxX + radius;
+            const minZ = obs.minZ - radius;
+            const maxZ = obs.maxZ + radius;
+
+            if (fighter.x > minX && fighter.x < maxX && fighter.z > minZ && fighter.z < maxZ) {
+                // Find shallowest axis to push out
+                const dLeft = fighter.x - minX;
+                const dRight = maxX - fighter.x;
+                const dTop = fighter.z - minZ;
+                const dBottom = maxZ - fighter.z;
+                const minPen = Math.min(dLeft, dRight, dTop, dBottom);
+
+                if (minPen === dLeft) {
+                    fighter.x = minX;
+                    if (fighter.vx > 0) fighter.vx = 0;
+                } else if (minPen === dRight) {
+                    fighter.x = maxX;
+                    if (fighter.vx < 0) fighter.vx = 0;
+                } else if (minPen === dTop) {
+                    fighter.z = minZ;
+                    if (fighter.vz > 0) fighter.vz = 0;
+                } else {
+                    fighter.z = maxZ;
+                    if (fighter.vz < 0) fighter.vz = 0;
+                }
+            }
+        }
+    }
+
+    /**
+     * Check if a 2D line segment (x1, z1) -> (x2, z2) hits any projectile-blocking obstacle
+     * @returns {Object|null} { hit: true, x, z, obstacle }
+     */
+    static checkRayObstacles(x1, z1, x2, z2) {
+        if (!this.obstacles || this.obstacles.length === 0) return null;
+        let nearestHit = null;
+        let minDistSq = Infinity;
+
+        for (let i = 0; i < this.obstacles.length; i++) {
+            const obs = this.obstacles[i];
+            if (obs.active === false || obs.blocksProjectiles === false) continue;
+
+            // Liang-Barsky / Slab method for 2D line vs AABB
+            const minX = obs.minX, maxX = obs.maxX;
+            const minZ = obs.minZ, maxZ = obs.maxZ;
+            const dx = x2 - x1;
+            const dz = z2 - z1;
+
+            let t0 = 0.0;
+            let t1 = 1.0;
+
+            const p = [-dx, dx, -dz, dz];
+            const q = [x1 - minX, maxX - x1, z1 - minZ, maxZ - z1];
+
+            let parallelAndOutside = false;
+            for (let k = 0; k < 4; k++) {
+                if (Math.abs(p[k]) < 1e-6) {
+                    if (q[k] < 0) {
+                        parallelAndOutside = true;
+                        break;
+                    }
+                } else {
+                    const r = q[k] / p[k];
+                    if (p[k] < 0) {
+                        if (r > t1) { parallelAndOutside = true; break; }
+                        if (r > t0) t0 = r;
+                    } else {
+                        if (r < t0) { parallelAndOutside = true; break; }
+                        if (r < t1) t1 = r;
+                    }
+                }
+            }
+
+            if (!parallelAndOutside && t0 <= t1 && t0 >= 0 && t0 <= 1.0) {
+                const hitX = x1 + dx * t0;
+                const hitZ = z1 + dz * t0;
+                const dSq = (hitX - x1) * (hitX - x1) + (hitZ - z1) * (hitZ - z1);
+                if (dSq < minDistSq) {
+                    minDistSq = dSq;
+                    nearestHit = { hit: true, x: hitX, z: hitZ, obstacle: obs };
+                }
+            }
+        }
+        return nearestHit;
     }
 
     /**

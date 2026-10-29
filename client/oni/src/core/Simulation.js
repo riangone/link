@@ -14,6 +14,7 @@ import {
     WEAPON_PICKUP_RANGE,
     WEAPON_SPECS,
     DAODAN_CONFIG,
+    DIFFICULTY_PRESETS,
     MOVES
 } from './Constants.js';
 
@@ -45,6 +46,7 @@ export class Simulation {
 
         this.f1 = new Fighter('p1', 'Konoko', -2.6, 1, false);
         this.f2 = new Fighter('p2', 'Syndi-Bot', 2.6, -1, true);
+        this.extraEnemies = [];
 
         // Unified Entity Registry (Fighters, dropped weapons, projectiles)
         this.entities = new Map();
@@ -65,6 +67,10 @@ export class Simulation {
 
         // Event queue for render/audio listeners (drained each frame)
         this.events = [];
+
+        // Global difficulty scaling (default 'easy' for relaxed, fluid combat)
+        this.difficulty = 'easy';
+        this.setDifficulty('easy');
 
         // P3 Survival Wave Mode (optional continuous enemy reinforcements)
         this.survivalMode = false;
@@ -111,6 +117,146 @@ export class Simulation {
 
     removeEntity(id) {
         this.entities.delete(id);
+        this.extraEnemies = this.extraEnemies.filter((e) => e.id !== id);
+    }
+
+    /**
+     * Get all active enemy fighters (including f2 and any campaign reinforcements)
+     */
+    getEnemies() {
+        const list = [];
+        if (this.entities.has(this.f2.id)) list.push(this.f2);
+        for (let i = 0; i < this.extraEnemies.length; i++) {
+            const e = this.extraEnemies[i];
+            if (this.entities.has(e.id)) list.push(e);
+        }
+        return list;
+    }
+
+    /**
+     * Set global match difficulty ('easy' / 'normal' / 'hard') and scale all current fighters
+     */
+    setDifficulty(diffMode = 'easy') {
+        const preset = DIFFICULTY_PRESETS[diffMode] || DIFFICULTY_PRESETS.easy;
+        this.difficulty = preset.id;
+        if (this.f1) {
+            this.f1.damageTakenMult = preset.playerDamageTakenMult;
+            this.f1.poiseTakenMult = preset.playerPoiseTakenMult;
+        }
+        if (this.f2) {
+            this.f2.speedScale = preset.enemySpeedMult;
+        }
+        for (let i = 0; i < this.extraEnemies.length; i++) {
+            this.extraEnemies[i].speedScale = preset.enemySpeedMult;
+        }
+        return preset;
+    }
+
+    /**
+     * Spawn an extra campaign sector enemy (adds to unified registry & extraEnemies list)
+     */
+    spawnExtraEnemy(cfg = {}) {
+        const seq = this.nextEntitySeq++;
+        const id = cfg.id || `enemy_${seq}`;
+        const name = cfg.name || `SYNDICATE GRUNT #${seq}`;
+        const x = cfg.x !== undefined ? cfg.x : 4.0;
+        const z = cfg.z !== undefined ? cfg.z : 1.2;
+        const facing = cfg.facing !== undefined ? cfg.facing : -1;
+        const preset = DIFFICULTY_PRESETS[this.difficulty] || DIFFICULTY_PRESETS.easy;
+
+        const enemy = new Fighter(id, name, x, facing, true);
+        enemy.z = z;
+        enemy.archetype = cfg.archetype || 'STRIKER';
+
+        // Apply archetype baseline stats
+        let baseHp = cfg.maxHp || 90;
+        let basePoise = cfg.maxPoise || 100;
+        let baseSpeed = cfg.speedScale || 1.0;
+
+        if (enemy.archetype === 'TANKER') {
+            baseHp = cfg.maxHp || 155;
+            basePoise = 180;
+            baseSpeed = 0.76;
+            enemy.scale = 1.25;
+            enemy.unlockMove('GROUND_STOMP');
+        } else if (enemy.archetype === 'FURY') {
+            baseHp = cfg.maxHp || 80;
+            basePoise = 90;
+            baseSpeed = 1.06;
+            enemy.scale = 0.94;
+            enemy.unlockMove('SLIDE_KICK');
+            enemy.unlockMove('WILLOW_KICK');
+            enemy.unlockMove('THROW_FRONT');
+        } else if (enemy.archetype === 'BLACK_OPS') {
+            baseHp = cfg.maxHp || 110;
+            basePoise = 110;
+            baseSpeed = 1.02;
+            enemy.isCamouflage = true;
+            enemy.unlockMove('BACK_SPIN_FIST');
+        } else if (enemy.archetype === 'SNIPER') {
+            baseHp = cfg.maxHp || 85;
+            basePoise = 95;
+            baseSpeed = 0.88;
+            enemy.isSniper = true;
+        }
+
+        // Apply global difficulty scaling
+        enemy.maxHp = Math.max(30, Math.round(baseHp * preset.enemyHpMult));
+        enemy.hp = enemy.maxHp;
+        enemy.maxPoise = basePoise;
+        enemy.poise = enemy.maxPoise;
+        enemy.speedScale = baseSpeed * preset.enemySpeedMult;
+        enemy.maxHypo = cfg.hypo || 0;
+        enemy.hypoCount = cfg.hypo || 0;
+        enemy.aiProfileLevel = cfg.level || (this.difficulty === 'easy' ? 'easy' : 'normal');
+        enemy.expReward = cfg.expReward || 65;
+        enemy.isBoss = !!cfg.isBoss;
+        enemy.patrolMinX = cfg.patrolMinX !== undefined ? cfg.patrolMinX : (x - 2.5);
+        enemy.patrolMaxX = cfg.patrolMaxX !== undefined ? cfg.patrolMaxX : (x + 2.5);
+        enemy.isAlerted = cfg.isAlerted !== undefined ? cfg.isAlerted : true;
+        enemy.canTriggerAlarm = cfg.canTriggerAlarm !== undefined ? cfg.canTriggerAlarm : false;
+
+        if (cfg.weapon) {
+            enemy.equipWeapon({ type: cfg.weapon, id: `wpn_${id}` });
+        }
+
+        this.registerEntity(enemy);
+        this.extraEnemies.push(enemy);
+        return enemy;
+    }
+
+    /**
+     * Spawn dynamic reinforcements when an alarm is tripped
+     */
+    spawnReinforcements(squadList = []) {
+        const spawned = [];
+        for (let i = 0; i < squadList.length; i++) {
+            const cfg = squadList[i];
+            const enemy = this.spawnExtraEnemy({
+                ...cfg,
+                isAlerted: true,
+                canTriggerAlarm: false // Reinforcements don't re-trigger alarms
+            });
+            spawned.push(enemy);
+            if (this.events) {
+                this.events.push({
+                    type: 'REINFORCEMENT_SPAWN',
+                    id: enemy.id,
+                    name: enemy.name,
+                    x: enemy.x,
+                    y: 0,
+                    z: enemy.z
+                });
+            }
+        }
+        return spawned;
+    }
+
+    clearExtraEnemies() {
+        for (let i = 0; i < this.extraEnemies.length; i++) {
+            this.entities.delete(this.extraEnemies[i].id);
+        }
+        this.extraEnemies = [];
     }
 
     getFighters() {
@@ -251,6 +397,7 @@ export class Simulation {
     reset() {
         this.rng.setState(this.initialSeed);
         this.nextEntitySeq = 1;
+        this.clearExtraEnemies();
         this.f1.reset(-2.6, 1);
         this.f2.reset(2.6, -1);
         this.entities.clear();
@@ -290,6 +437,9 @@ export class Simulation {
             // Still run basic physics for falling fighters
             this.f1.update({ dirX: 0, dirZ: 0 }, this.f2, this.events);
             this.f2.update({ dirX: 0, dirZ: 0 }, this.f1, this.events);
+            for (let i = 0; i < this.extraEnemies.length; i++) {
+                this.extraEnemies[i].update({ dirX: 0, dirZ: 0 }, this.f1, this.events);
+            }
             return;
         }
 
@@ -326,21 +476,35 @@ export class Simulation {
             }
         }
 
+        const enemies = this.getEnemies();
+        const activeTarget = (typeof this.f1.findBestTarget === 'function' ? this.f1.findBestTarget(enemies) : null) || this.f2;
+
         // 1. Check weapon pickup before fighter update (if Punch or Fire pressed near a weapon while unarmed)
         const p1In = { ...input1 };
         const p2In = { ...input2 };
-        this.tryPickupWeapon(this.f1, p1In, this.f2);
+        this.tryPickupWeapon(this.f1, p1In, activeTarget);
         this.tryPickupWeapon(this.f2, p2In, this.f1);
+        for (let i = 0; i < this.extraEnemies.length; i++) {
+            const extra = this.extraEnemies[i];
+            const extraIn = extra.cachedAiInput || { dirX: 0, dirZ: 0 };
+            this.tryPickupWeapon(extra, extraIn, this.f1);
+        }
 
         // 2. Update Fighters in deterministic order
-        this.f1.update(p1In, this.f2, this.events);
+        this.f1.update(p1In, activeTarget, this.events);
         this.f2.update(p2In, this.f1, this.events);
+        for (let i = 0; i < this.extraEnemies.length; i++) {
+            const extra = this.extraEnemies[i];
+            const extraIn = extra.cachedAiInput || { dirX: 0, dirZ: 0 };
+            extra.update(extraIn, this.f1, this.events);
+        }
 
         // Process firearm discharge & weapon throw requests emitted by fighters
         this.processFighterRequests();
 
-        // Check if a throw finished and caused a KO
-        if (this.f2.hp <= 0 && !this.isMatchOver) {
+        // Check if player or all enemies are defeated
+        const allEnemiesDown = enemies.every((e) => e.hp <= 0);
+        if (allEnemiesDown && !this.isMatchOver) {
             this.declareWinner('p1');
             return;
         }
@@ -355,7 +519,7 @@ export class Simulation {
 
         if (this.isMatchOver) return;
 
-        // 4. Resolve Pushbox overlap among all fighters
+        // 4. Resolve Pushbox overlap among all active fighters
         const fighters = this.getFighters();
         for (let i = 0; i < fighters.length; i++) {
             for (let j = i + 1; j < fighters.length; j++) {
@@ -364,9 +528,42 @@ export class Simulation {
         }
 
         // 5. Collision & Combat Detection
-        this.resolveAttackHit(this.f1, this.f2);
-        if (!this.isMatchOver) {
-            this.resolveAttackHit(this.f2, this.f1);
+        // Konoko attacks can strike all enemies within range (P7 Collateral Sweep/Chains)
+        for (let i = 0; i < enemies.length; i++) {
+            const e = enemies[i];
+            if (e.hp > 0) {
+                this.resolveAttackHit(this.f1, e);
+            }
+        }
+        // Active enemies strike back against Konoko
+        for (let i = 0; i < enemies.length; i++) {
+            const e = enemies[i];
+            if (e.hp > 0 && !this.isMatchOver) {
+                this.resolveAttackHit(e, this.f1);
+            }
+        }
+
+        // 6. Resolve Collateral Body Splash (Throwing one enemy bowls over adjacent foes)
+        for (let i = 0; i < this.events.length; i++) {
+            const ev = this.events[i];
+            if (ev.type === 'COLLATERAL_SPLASH') {
+                for (let k = 0; k < enemies.length; k++) {
+                    const se = enemies[k];
+                    if (se.id === ev.thrownFighter || se.hp <= 0 || se.invincible) continue;
+                    const d = Math.hypot(se.x - ev.x, se.z - ev.z);
+                    if (d <= ev.radius) {
+                        se.hp = Math.max(0, se.hp - ev.damage);
+                        se.poise = 0;
+                        se.transitionTo(FIGHTER_STATE.KNOCKED_DOWN);
+                        const nx = d > 0.01 ? (se.x - ev.x) / d : 1;
+                        const nz = d > 0.01 ? (se.z - ev.z) / d : 0;
+                        se.vx = nx * 4.8;
+                        se.vz = nz * 4.8;
+                        se.vy = 4.0;
+                        se.isGrounded = false;
+                    }
+                }
+            }
         }
     }
 
@@ -465,6 +662,13 @@ export class Simulation {
         const muzzleY = attacker.y + 1.32;
         const muzzleZ = attacker.z + fz * 0.65;
 
+        // Check obstacle collision along line of fire
+        const maxRange = spec.range;
+        const rayEndX = muzzleX + fx * maxRange;
+        const rayEndZ = muzzleZ + fz * maxRange;
+        const obsHit = CollisionSystem.checkRayObstacles ? CollisionSystem.checkRayObstacles(muzzleX, muzzleZ, rayEndX, rayEndZ) : null;
+        const effectiveRange = obsHit ? Math.hypot(obsHit.x - muzzleX, obsHit.z - muzzleZ) : maxRange;
+
         if (spec.fireType === 'HITSCAN' || spec.fireType === 'PIERCING_BEAM') {
             const syntheticMove = {
                 id: spec.id,
@@ -478,19 +682,33 @@ export class Simulation {
                 piercesGuard: !!spec.piercesGuard
             };
 
-            const hit = CollisionSystem.checkRayHit(
-                attacker,
-                defender,
-                muzzleX,
-                muzzleY,
-                muzzleZ,
-                fx,
-                fz,
-                spec.range,
-                syntheticMove
-            );
+            const candidates = attacker.id === 'p1' ? this.getEnemies() : [this.f1];
+            let bestHit = null;
+            let hitDefender = null;
+            let minHitDist = effectiveRange;
 
-            const endDist = hit && spec.fireType !== 'PIERCING_BEAM' ? hit.distance : spec.range;
+            for (let i = 0; i < candidates.length; i++) {
+                const targetFighter = candidates[i];
+                if (targetFighter.hp <= 0) continue;
+                const hit = CollisionSystem.checkRayHit(
+                    attacker,
+                    targetFighter,
+                    muzzleX,
+                    muzzleY,
+                    muzzleZ,
+                    fx,
+                    fz,
+                    effectiveRange,
+                    syntheticMove
+                );
+                if (hit && hit.distance < minHitDist) {
+                    minHitDist = hit.distance;
+                    bestHit = hit;
+                    hitDefender = targetFighter;
+                }
+            }
+
+            const endDist = bestHit && spec.fireType !== 'PIERCING_BEAM' ? bestHit.distance : effectiveRange;
             const endPoint = {
                 x: muzzleX + fx * endDist,
                 y: muzzleY,
@@ -507,10 +725,21 @@ export class Simulation {
                 endPoint
             });
 
-            if (hit) {
-                this.applyDamageResult(attacker, defender, hit);
+            if (bestHit && hitDefender) {
+                this.applyDamageResult(attacker, hitDefender, bestHit);
+            } else if (obsHit && endDist >= effectiveRange - 0.05) {
+                this.events.push({
+                    type: 'OBSTACLE_IMPACT',
+                    x: endPoint.x,
+                    y: muzzleY,
+                    z: endPoint.z
+                });
             }
         } else if (spec.fireType === 'HOMING_SWARM') {
+            const targetCandidate = attacker.id === 'p1'
+                ? ((typeof attacker.findBestTarget === 'function' ? attacker.findBestTarget(this.getEnemies()) : null) || this.f2)
+                : this.f1;
+            const targetId = targetCandidate.id;
             const count = spec.swarmCount || 3;
             for (let k = 0; k < count; k++) {
                 const spreadAngle = (k - (count - 1) * 0.5) * 0.28;
@@ -518,37 +747,35 @@ export class Simulation {
                 const sa = Math.sin(spreadAngle);
                 const dirX = fx * ca - fz * sa;
                 const dirZ = fx * sa + fz * ca;
-                const proj = {
+
+                const missile = {
                     id: `proj_${this.nextEntitySeq++}`,
                     entityType: 'projectile',
                     ownerId: attacker.id,
-                    targetId: defender.id,
+                    targetId,
                     weaponType: spec.id,
                     color: spec.color,
-                    x: muzzleX + dirX * 0.2,
-                    y: muzzleY + (k - 1) * 0.12,
-                    z: muzzleZ + dirZ * 0.2,
-                    vx: dirX * spec.projectileSpeed,
-                    vy: 1.2 + k * 0.5,
-                    vz: dirZ * spec.projectileSpeed,
+                    x: muzzleX,
+                    y: muzzleY,
+                    z: muzzleZ,
+                    vx: dirX * (spec.projectileSpeed * 0.4),
+                    vy: (this.random() - 0.5) * 1.5,
+                    vz: dirZ * (spec.projectileSpeed * 0.4),
                     speed: spec.projectileSpeed,
-                    turnRate: spec.turnRate,
-                    life: spec.lifetime,
-                    maxLife: spec.lifetime,
+                    turnRate: 0.12,
+                    life: spec.projectileLife,
                     syntheticMove: {
                         id: spec.id,
-                        name: spec.name,
                         damage: spec.damage,
                         poiseDamage: spec.poiseDamage,
                         hitStun: spec.hitStun,
                         blockStun: spec.blockStun,
                         knockback: spec.knockback,
-                        knockdown: false
+                        knockdown: true
                     }
                 };
-                this.registerEntity(proj);
+                this.registerEntity(missile);
             }
-
             this.events.push({
                 type: 'WEAPON_FIRE',
                 attacker: attacker.id,
@@ -556,7 +783,7 @@ export class Simulation {
                 fireType: spec.fireType,
                 color: spec.color,
                 muzzle: { x: muzzleX, y: muzzleY, z: muzzleZ },
-                endPoint: { x: muzzleX + fx * 3, y: muzzleY, z: muzzleZ + fz * 3 }
+                endPoint: { x: muzzleX + fx * 2.0, y: muzzleY, z: muzzleZ + fz * 2.0 }
             });
         }
     }
@@ -612,21 +839,26 @@ export class Simulation {
                 // Check if thrown weapon hits opponent in flight
                 if (wpn.isThrownAttack && wpn.throwAttackerId) {
                     const attacker = wpn.throwAttackerId === 'p1' ? this.f1 : this.f2;
-                    const defender = wpn.throwAttackerId === 'p1' ? this.f2 : this.f1;
-                    const hit = CollisionSystem.checkSphereHit(
-                        attacker,
-                        defender,
-                        wpn.x,
-                        wpn.y,
-                        wpn.z,
-                        0.32,
-                        wpn.throwMove || MOVES.THROW_WEAPON
-                    );
-                    if (hit) {
-                        wpn.isThrownAttack = false;
-                        wpn.vx = -wpn.vx * 0.25;
-                        wpn.vy = 3.5;
-                        this.applyDamageResult(attacker, defender, hit);
+                    const defenders = wpn.throwAttackerId === 'p1' ? this.getEnemies() : [this.f1];
+                    for (let dIdx = 0; dIdx < defenders.length; dIdx++) {
+                        const defender = defenders[dIdx];
+                        if (defender.hp <= 0) continue;
+                        const hit = CollisionSystem.checkSphereHit(
+                            attacker,
+                            defender,
+                            wpn.x,
+                            wpn.y,
+                            wpn.z,
+                            0.32,
+                            wpn.throwMove || MOVES.THROW_WEAPON
+                        );
+                        if (hit) {
+                            wpn.isThrownAttack = false;
+                            wpn.vx = -wpn.vx * 0.25;
+                            wpn.vy = 3.5;
+                            this.applyDamageResult(attacker, defender, hit);
+                            break;
+                        }
                     }
                 }
 
@@ -681,8 +913,16 @@ export class Simulation {
                 continue;
             }
 
-            const attacker = p.ownerId === 'p1' ? this.f1 : this.f2;
-            const defender = p.targetId === 'p1' ? this.f1 : this.f2;
+            const attacker = p.ownerId === 'p1' ? this.f1 : (this.entities.get(p.ownerId) || this.f2);
+            let defender = null;
+            if (p.targetId === 'p1') {
+                defender = this.f1;
+            } else {
+                defender = this.entities.get(p.targetId) || this.f2;
+                if (!defender || defender.hp <= 0) {
+                    defender = (typeof this.f1.findBestTarget === 'function' ? this.f1.findBestTarget(this.getEnemies()) : null) || this.f2;
+                }
+            }
 
             // Homing steering toward target's chest unless target is in I-frames (EVADE breaks tracking!)
             if (defender && !defender.invincible && defender.hp > 0) {
@@ -704,9 +944,17 @@ export class Simulation {
                 }
             }
 
-            p.x += p.vx * FIXED_DT;
+            // Check obstacle interception
+            const nextPx = p.x + p.vx * FIXED_DT;
+            const nextPz = p.z + p.vz * FIXED_DT;
+            if (CollisionSystem.checkRayObstacles && CollisionSystem.checkRayObstacles(p.x, p.z, nextPx, nextPz)) {
+                this.removeEntity(p.id);
+                continue;
+            }
+
+            p.x = nextPx;
             p.y += p.vy * FIXED_DT;
-            p.z += p.vz * FIXED_DT;
+            p.z = nextPz;
 
             // Check collision with defender
             if (defender) {
@@ -761,6 +1009,26 @@ export class Simulation {
             hitResult.move.damage >= 18 ||
             hitInfo.poiseBroken;
         this.hitstopFrames = hitInfo.blocked ? 4 : (isHeavy ? 10 : 6);
+
+        // P2 Stealth Strike: attacking an unalerted enemy deals +50% stealth critical damage
+        let isStealthCrit = false;
+        if (defender.isAlerted === false && !hitInfo.blocked) {
+            isStealthCrit = true;
+            const bonus = Math.max(5, Math.round(hitInfo.damage * 0.5));
+            defender.hp = Math.max(0, defender.hp - bonus);
+            defender.isAlerted = true;
+            defender.alertTimer = 120;
+            this.events.push({
+                type: 'STEALTH_CRIT',
+                attacker: attacker.id,
+                defender: defender.id,
+                bonusDamage: bonus,
+                text: 'STEALTH TAKEDOWN! 潜行暴击 (+50% 伤害)'
+            });
+        } else if (defender.isAlerted === false) {
+            defender.isAlerted = true;
+            defender.alertTimer = 120;
+        }
 
         // P4 Daodan Chrysalis resonance gain on dealing / taking damage
         if (attacker.gainDaodan) {

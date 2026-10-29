@@ -6,6 +6,43 @@
 export const TICK_RATE = 60;
 export const FIXED_DT = 1 / TICK_RATE;
 
+// Global Game Difficulty Presets (Default: 'easy' / Recruit for relaxed, fluid combat)
+export const DIFFICULTY_PRESETS = {
+    easy: {
+        id: 'easy',
+        label: '新兵 (Recruit)',
+        playerDamageTakenMult: 0.65,
+        playerPoiseTakenMult: 0.70,
+        enemyHpMult: 0.75,
+        enemySpeedMult: 0.78,
+        enemyReactionFrames: 24,
+        enemyAggression: 0.35,
+        enemyStunBonusFrames: 5
+    },
+    normal: {
+        id: 'normal',
+        label: '精锐 (Elite)',
+        playerDamageTakenMult: 1.0,
+        playerPoiseTakenMult: 1.0,
+        enemyHpMult: 1.0,
+        enemySpeedMult: 1.0,
+        enemyReactionFrames: 14,
+        enemyAggression: 0.7,
+        enemyStunBonusFrames: 0
+    },
+    hard: {
+        id: 'hard',
+        label: '鬼神 (Master)',
+        playerDamageTakenMult: 1.3,
+        playerPoiseTakenMult: 1.3,
+        enemyHpMult: 1.25,
+        enemySpeedMult: 1.15,
+        enemyReactionFrames: 6,
+        enemyAggression: 0.95,
+        enemyStunBonusFrames: -2
+    }
+};
+
 // Stage bounds & P5 Multi-Elevation Rooftop / Ring-Out Geometry
 export const STAGE_BOUNDS = {
     minX: -14,

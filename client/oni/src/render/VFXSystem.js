@@ -365,6 +365,23 @@ export class VFXSystem {
             beacon.position.y = 0.02;
             group.add(pedestal, hood, screen, beacon);
             group.userData = { screenMat, beacon };
+        } else if (item.type === 'ALARM_CONSOLE') {
+            // Syndicate Emergency Alarm Console (red/amber flashing beacon + tactical button)
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 1.1, 12), darkSteel);
+            post.position.y = 0.55;
+            const topBox = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.26, 0.38), slateSteel);
+            topBox.position.set(0, 1.18, 0);
+            const beaconMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+            const beaconBulb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), beaconMat);
+            beaconBulb.position.set(0, 1.42, 0);
+            const ring = new THREE.Mesh(
+                new THREE.RingGeometry(0.36, 0.46, 24),
+                new THREE.MeshBasicMaterial({ color: 0xffaa00, side: THREE.DoubleSide, transparent: true, opacity: 0.7 })
+            );
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.y = 0.02;
+            group.add(post, topBox, beaconBulb, ring);
+            group.userData = { beaconMat, ring, beaconBulb };
         } else if (item.type === 'SECURITY_GATE') {
             // Security Laser Barrier Pillars + Energy Bars
             const postL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.7, 10), darkSteel);
@@ -462,6 +479,11 @@ export class VFXSystem {
                 mesh.userData.beacon.material.color.setHex(col);
             } else if (item.type === 'SECURITY_GATE' && mesh.userData.laserGroup) {
                 mesh.userData.laserGroup.visible = !item.unlocked;
+            } else if (item.type === 'ALARM_CONSOLE' && mesh.userData.beaconMat) {
+                const isTripped = !!item.alarmTriggered;
+                const col = isTripped ? (Math.sin(timeSec * 16.0) > 0 ? 0xff1744 : 0xffea00) : 0xf59e0b;
+                mesh.userData.beaconMat.color.setHex(col);
+                mesh.userData.ring.material.color.setHex(col);
             } else if (item.type === 'SHIELD_CELL' && mesh.userData.crystal) {
                 mesh.userData.crystal.rotation.y = timeSec * 2.4;
                 mesh.userData.crystal.position.y = 0.48 + Math.sin(timeSec * 3.5) * 0.07;

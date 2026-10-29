@@ -27,6 +27,26 @@ export const BT_STATUS = {
 };
 
 export class BotBrain {
+    // Attack Token Bucket for coordinating multiple squad enemies (prevents unfair multi-striking)
+    static activeAttackerId = null;
+    static tokenExpireFrame = 0;
+
+    static requestAttackToken(botId, currentFrame = 0, duration = 45) {
+        if (!this.activeAttackerId || this.activeAttackerId === botId || currentFrame >= this.tokenExpireFrame) {
+            this.activeAttackerId = botId;
+            this.tokenExpireFrame = currentFrame + duration;
+            return true;
+        }
+        return false;
+    }
+
+    static releaseAttackToken(botId) {
+        if (this.activeAttackerId === botId) {
+            this.activeAttackerId = null;
+            this.tokenExpireFrame = 0;
+        }
+    }
+
     constructor(level = 'normal', seed = 0xB07A1) {
         this.setLevel(level);
         this.actionTimer = 0;
@@ -89,6 +109,8 @@ export class BotBrain {
     buildBehaviorTree() {
         const branches = [
             { name: 'SURVIVAL_REFLEX', fn: (bb) => this.branchSurvivalReflex(bb) },
+            { name: 'PATROL_AND_ALERT', fn: (bb) => this.branchPatrolAndAlert(bb) },
+            { name: 'RUN_TO_ALARM', fn: (bb) => this.branchRunToAlarm(bb) },
             { name: 'STUNNED_IDLE', fn: (bb) => this.branchStunnedGuard(bb) },
             { name: 'LEDGE_HAZARD_AWARENESS', fn: (bb) => this.branchLedgeHazardAwareness(bb) },
             { name: 'PROJECTILE_EVADE', fn: (bb) => this.branchProjectileEvade(bb) },
@@ -115,6 +137,120 @@ export class BotBrain {
                 return BT_STATUS.FAILURE;
             }
         };
+    }
+
+    /**
+     * Branch 0: Patrol & Vision Cone Alert Detection (P2)
+     * Unalerted sentries patrol between bounds with directional vision cone.
+     * Backwards blindspot enables stealth sneak-ups and takedowns.
+     */
+    branchPatrolAndAlert(bb) {
+        const { bot, opp, dist, input, sim } = bb;
+        if (bot.isAlerted === undefined || bot.isAlerted === true) return BT_STATUS.FAILURE;
+
+        // Vision cone & perception check:
+        // Bot faces along X: bot.facing > 0 means looking towards +X (right), < 0 means looking towards -X (left)
+        const facingSign = (bot.facing !== undefined && bot.facing !== 0) ? Math.sign(bot.facing) : (bot.patrolDir || -1);
+        const isOppInFront = opp ? ((opp.x - bot.x) * facingSign > -0.4) : false;
+
+        // Triggers for becoming alerted:
+        // 1. Sighted: player within vision cone in front (dist <= 7.0m)
+        // 2. Audible Footsteps: sprinting/dashing loudly from behind within 2.2m
+        // 3. Gunfire: player firing firearms nearby within 12.0m
+        // 4. Physical Impact: bot suffered damage
+        const sawPlayerInFront = isOppInFront && dist <= 7.0;
+        const heardLoudRun = opp && (opp.state === FIGHTER_STATE.RUN || opp.state === FIGHTER_STATE.DASH) && dist <= 2.2;
+        const heardGunfire = opp && opp.state === FIGHTER_STATE.ATTACK && opp.currentMove && opp.currentMove.isFirearmMove && dist <= 12.0;
+        const tookDamage = bot.hp < (bot.maxHp || 100);
+
+        if (sawPlayerInFront || heardLoudRun || heardGunfire || tookDamage) {
+            bot.isAlerted = true;
+            bot.alertTimer = 120; // 2 seconds alert bubble
+            if (sim && Array.isArray(sim.events)) {
+                sim.events.push({
+                    type: 'ENEMY_ALERT',
+                    id: bot.id,
+                    name: bot.name,
+                    x: bot.x,
+                    y: bot.y,
+                    z: bot.z
+                });
+                // Chain-alert squad comrades within 7.5m
+                const squad = typeof sim.getEnemies === 'function' ? sim.getEnemies() : [];
+                for (let k = 0; k < squad.length; k++) {
+                    const mate = squad[k];
+                    if (mate.id !== bot.id && !mate.isAlerted) {
+                        const d = Math.hypot(mate.x - bot.x, mate.z - bot.z);
+                        if (d <= 7.5) {
+                            mate.isAlerted = true;
+                            mate.alertTimer = 120;
+                        }
+                    }
+                }
+            }
+            return BT_STATUS.FAILURE;
+        }
+
+        // Unalerted: gently patrol back and forth along X with correct facing orientation
+        const minX = bot.patrolMinX !== undefined ? bot.patrolMinX : (bot.x - 2.5);
+        const maxX = bot.patrolMaxX !== undefined ? bot.patrolMaxX : (bot.x + 2.5);
+        if (bot.patrolDir === undefined) bot.patrolDir = -1;
+
+        if (bot.x <= minX) {
+            bot.patrolDir = 1;
+            bot.facing = 1;
+        } else if (bot.x >= maxX) {
+            bot.patrolDir = -1;
+            bot.facing = -1;
+        } else {
+            bot.facing = bot.patrolDir;
+        }
+
+        input.dirX = bot.patrolDir * 0.55;
+        input.dirZ = 0;
+        return BT_STATUS.SUCCESS;
+    }
+
+    /**
+     * Branch: Run To Alarm Station (🚨 Oni Sentry Alarm Protocol)
+     * Alerted sentries who have alarm authorization sprint towards the nearest active console
+     * to trigger emergency reinforcements unless intercepted or neutralized.
+     */
+    branchRunToAlarm(bb) {
+        const { bot, input, sim } = bb;
+        if (!bot.canTriggerAlarm || !bot.isAlerted || bot.hasTriggeredAlarm) {
+            bot.isRunningToAlarm = false;
+            return BT_STATUS.FAILURE;
+        }
+        const camp = sim && sim.campaignManager;
+        if (!camp || camp.alarmActive) {
+            bot.isRunningToAlarm = false;
+            return BT_STATUS.FAILURE;
+        }
+        // Find nearest active ALARM_CONSOLE in current sector
+        const alarmConsole = Array.isArray(camp.interactables)
+            ? camp.interactables.find((item) => item.type === 'ALARM_CONSOLE' && !item.alarmTriggered && item.active)
+            : null;
+        if (!alarmConsole) {
+            bot.isRunningToAlarm = false;
+            return BT_STATUS.FAILURE;
+        }
+
+        const distToAlarm = Math.hypot(alarmConsole.x - bot.x, alarmConsole.z - bot.z);
+        if (distToAlarm <= 1.35) {
+            bot.hasTriggeredAlarm = true;
+            bot.isRunningToAlarm = false;
+            camp.triggerAlarm(bot);
+            return BT_STATUS.SUCCESS;
+        }
+
+        // Sprint towards alarm console
+        bot.isRunningToAlarm = true;
+        const dx = alarmConsole.x - bot.x;
+        const dz = alarmConsole.z - bot.z;
+        input.dirX = Math.abs(dx) > 0.2 ? Math.sign(dx) * 1.0 : 0;
+        input.dirZ = Math.abs(dz) > 0.2 ? Math.sign(dz) * 1.0 : 0;
+        return BT_STATUS.RUNNING;
     }
 
     /**
@@ -374,12 +510,60 @@ export class BotBrain {
      * Branch 9: Close-Range Martial Arts Pressure (3-hit chains, Uppercut, Devil Spin Kick, Throws)
      */
     branchCloseCombat(bb) {
-        const { bot, dist, nx, nz, input, sim } = bb;
+        const { bot, dist, dz, nx, nz, input, sim } = bb;
         if (dist >= 1.48) return BT_STATUS.FAILURE;
+
+        // Squad attack token coordination: only token holder presses melee attack chains
+        if (sim && typeof sim.getEnemies === 'function') {
+            const squad = sim.getEnemies();
+            if (squad.length > 1) {
+                const currentFrame = sim.currentFrame || 0;
+                if (!BotBrain.requestAttackToken(bot.id, currentFrame, 50)) {
+                    // Secondary flanker: circles laterally or guards
+                    input.dirX = -nx * 0.4;
+                    input.dirZ = Math.sign(dz || 1) * 0.7;
+                    input.block = true;
+                    return BT_STATUS.SUCCESS;
+                }
+            }
+        }
 
         const interval = this.profile.attackInterval || 14;
         if (this.actionTimer % interval === 0) {
             const r = this.rand(sim);
+
+            // Archetype-specific combat specials
+            if (bot.archetype === 'TANKER') {
+                if (r < 0.45) {
+                    input.punch = true; // Heavy straight slam
+                } else if (r < 0.75) {
+                    input.down = true;
+                    input.kick = true; // Ground Stomp shockwave
+                } else {
+                    input.block = true;
+                }
+                return BT_STATUS.SUCCESS;
+            } else if (bot.archetype === 'FURY') {
+                if (r < 0.35) {
+                    input.kick = true; // Willow kick or rapid kick combo
+                } else if (r < 0.65) {
+                    input.down = true;
+                    input.dirX = nx;
+                    input.kick = true; // Slide kick
+                } else if (r < 0.85) {
+                    input.throwBtn = true; // Shoulder throw
+                } else {
+                    input.punch = true;
+                }
+                return BT_STATUS.SUCCESS;
+            } else if (bot.archetype === 'SNIPER') {
+                // Sniper disengages close range
+                input.dirX = -nx;
+                input.dirZ = Math.sign(dz || 1);
+                if (bot.weapon && bot.weapon.ammo > 0) input.fire = true;
+                return BT_STATUS.SUCCESS;
+            }
+
             if (this.profile.level === 'hard') {
                 if (r < 0.34) {
                     input.punch = true;

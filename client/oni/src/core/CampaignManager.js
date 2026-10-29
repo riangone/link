@@ -169,41 +169,117 @@ export const CAMPAIGN_CHAPTERS = [
         index: 1,
         code: 'CH.1',
         name: '辛迪加货运仓库',
-        subtitle: 'Syndicate Freight Depot · 骇入终端 & 守备队长巴拉巴斯',
+        subtitle: 'Syndicate Freight Depot · 哨兵警报 & 守备队长巴拉巴斯',
         isTutorial: false,
         themeColor: 0x38bdf8,
         recommendedLv: 1,
         zones: [
             {
-                title: '区域 1/3：外围货场巡逻队',
+                title: '区域 1/3：外围货场集装箱迷宫 & 巡逻哨兵',
                 speaker: 'SHINATAMA',
-                dialogue: 'Konoko，你已潜入辛迪加 14 号货运仓库。先解决外围巡逻兵，夺取他的配枪！',
-                enemy: { name: 'SYNDICATE SENTRY (哨兵)', level: 'easy', maxHp: 85, weapon: 'TCTF_PISTOL', hypo: 0, expReward: 65 },
+                dialogue: 'Konoko，前方是辛迪加 14 号露天货场！利用集装箱卡视线潜行。小心哨兵发现你后会狂奔拍响 🚨警报控制台 呼叫增援！消灭守卫并黑入终端开启安全大门！',
+                playerStartX: -22.0,
+                gateX: -6.0,
+                enemy: {
+                    name: 'SYNDICATE SENTRY (巡逻哨兵)',
+                    archetype: 'STRIKER',
+                    x: -14.0,
+                    z: -1.0,
+                    level: 'easy',
+                    maxHp: 80,
+                    weapon: 'TCTF_PISTOL',
+                    hypo: 0,
+                    expReward: 65,
+                    isAlerted: false,
+                    canTriggerAlarm: true,
+                    patrolMinX: -17.0,
+                    patrolMaxX: -12.0
+                },
+                extraEnemies: [
+                    { id: 'grunt_1a', name: 'CARGO BRAWLER (近战打手)', archetype: 'STRIKER', x: -9.5, z: 2.2, maxHp: 75, weapon: null, hypo: 0, level: 'easy', expReward: 45, patrolMinX: -11.5, patrolMaxX: -7.5, isAlerted: false }
+                ],
+                alarmConsolePos: { x: -12.5, z: -4.0, label: '🚨 货场警报控制台' },
+                reinforcements: [
+                    { id: 'reinf_fury_1', name: 'SYNDICATE FURY (突击女刺客)', archetype: 'FURY', x: -6.5, z: 0.5, maxHp: 80, weapon: null, hypo: 0, expReward: 70 },
+                    { id: 'reinf_striker_1', name: 'DEPOT ENFORCER (增援突击手)', archetype: 'STRIKER', x: -6.5, z: -2.0, maxHp: 85, weapon: 'TCTF_PISTOL', hypo: 0, expReward: 55 }
+                ],
+                obstacles: [
+                    { id: 'crate_1a', minX: -21.0, maxX: -18.8, minZ: -4.2, maxZ: -2.0, height: 2.8, blocksProjectiles: true, label: '📦 集装箱 A' },
+                    { id: 'crate_1b', minX: -17.5, maxX: -15.2, minZ: 1.8, maxZ: 4.2, height: 2.8, blocksProjectiles: true, label: '📦 集装箱 B' },
+                    { id: 'crate_1c', minX: -12.5, maxX: -10.2, minZ: -3.5, maxZ: -1.5, height: 2.6, blocksProjectiles: true, label: '📦 集装箱 C' }
+                ],
                 props: [
-                    { type: 'MEDKIT_CRATE', x: -3.8, z: -2.2, label: '💉 医疗补给箱' }
+                    { type: 'MEDKIT_CRATE', x: -18.0, z: -3.2, label: '💉 医疗补给箱' },
+                    { type: 'WEAPON_CRATE', weaponType: 'SCRAM_CANNON', x: -8.5, z: -3.2, label: '🔫 蜂群炮补给箱' }
                 ],
                 requireConsoleHack: true,
-                consolePos: { x: 4.2, z: -2.6, label: '💻 仓库门禁终端' }
+                consolePos: { x: -7.0, z: -3.2, label: '💻 货场安全门禁终端' }
             },
             {
-                title: '区域 2/3：重装武器库守卫',
+                title: '区域 2/3：激光警戒长廊 & 重装防暴机房',
                 speaker: 'SHINATAMA',
-                dialogue: '大门已解锁！当心，重装突击兵正守在蜂群追踪炮补给箱旁！',
-                enemy: { name: 'STRIKER TROOPER (重装兵)', level: 'normal', maxHp: 110, weapon: 'SCRAM_CANNON', hypo: 1, expReward: 85 },
-                props: [
-                    { type: 'WEAPON_CRATE', weaponType: 'SCRAM_CANNON', x: 0.0, z: -2.0, label: '🔫 蜂群炮武器箱' },
-                    { type: 'SHIELD_CELL', x: -3.2, z: 2.2, label: '🛡️ 纳米护盾充能' }
+                dialogue: '第一道门已突破！长廊内有霸体重装巨汉（Tanker）与后排高台水银狙击手架枪！警惕走廊警报器，速战速决！',
+                gateX: 14.0,
+                enemy: {
+                    name: 'TANKER TROOPER (重装防暴巨汉)',
+                    archetype: 'TANKER',
+                    x: 3.5,
+                    z: 0.0,
+                    level: 'normal',
+                    maxHp: 160,
+                    weapon: 'SCRAM_CANNON',
+                    hypo: 1,
+                    expReward: 110,
+                    isAlerted: false,
+                    patrolMinX: 1.5,
+                    patrolMaxX: 5.5
+                },
+                extraEnemies: [
+                    { id: 'sniper_2a', name: 'CORRIDOR SNIPER (走廊狙击手)', archetype: 'SNIPER', x: 8.5, z: -2.8, maxHp: 85, weapon: 'MERCURY_BOW', hypo: 0, level: 'normal', expReward: 75, isAlerted: false, canTriggerAlarm: true, patrolMinX: 6.5, patrolMaxX: 10.5 }
                 ],
-                requireConsoleHack: false
+                alarmConsolePos: { x: 4.0, z: -4.0, label: '🚨 长廊警报控制台' },
+                reinforcements: [
+                    { id: 'reinf_grunt_2a', name: 'STRIKER GRUNT (增援小兵)', archetype: 'STRIKER', x: 13.0, z: 2.0, maxHp: 75, weapon: 'TCTF_PISTOL', hypo: 0, expReward: 50 },
+                    { id: 'reinf_grunt_2b', name: 'STRIKER BRAWLER (增援打手)', archetype: 'STRIKER', x: 13.0, z: -2.0, maxHp: 80, weapon: null, hypo: 0, expReward: 50 }
+                ],
+                obstacles: [
+                    { id: 'crate_2a', minX: 0.2, maxX: 2.4, minZ: -3.4, maxZ: -1.2, height: 2.8, blocksProjectiles: true, label: '📦 战术掩体箱' },
+                    { id: 'gantry_2b', minX: 4.5, maxX: 6.5, minZ: 1.2, maxZ: 3.5, height: 3.2, blocksProjectiles: true, label: '🏗️ 龙门吊支架' }
+                ],
+                props: [
+                    { type: 'MEDKIT_CRATE', x: 0.5, z: 2.8, label: '💉 再生剂补给' },
+                    { type: 'SHIELD_CELL', x: 6.0, z: 2.8, label: '🛡️ 纳米护盾充能' }
+                ],
+                requireConsoleHack: true,
+                consolePos: { x: 12.5, z: -3.2, label: '💻 升降台主控终端' }
             },
             {
-                title: '区域 3/3：BOSS 战 · 巴拉巴斯 (BARABAS)',
+                title: '区域 3/3：BOSS 战 · 守备统领巴拉巴斯 (BARABAS) & 亲卫小队',
                 speaker: 'BARABAS (巴拉巴斯)',
-                dialogue: '「TCTF 的小丫头？让你尝尝重型粒子束的厉害！」—— 击败仓库守备队长巴拉巴斯！',
+                dialogue: '「TCTF 居然派一个女人孤身闯进来？小姑娘，我会用重型水银穿甲箭把你钉在大门上！」—— 击败巴拉巴斯与亲卫小队！',
                 isBoss: true,
-                enemy: { name: 'BOSS: BARABAS (巴拉巴斯)', level: 'normal', maxHp: 145, weapon: 'MERCURY_BOW', hypo: 1, expReward: 150 },
+                enemy: {
+                    name: 'BOSS: BARABAS (巴拉巴斯)',
+                    archetype: 'TANKER',
+                    x: 24.0,
+                    z: 0.0,
+                    level: 'normal',
+                    maxHp: 180,
+                    weapon: 'MERCURY_BOW',
+                    hypo: 1,
+                    expReward: 200
+                },
+                extraEnemies: [
+                    { id: 'guard_fury_3', name: 'ROYAL FURY (巴拉巴斯亲卫女刺客)', archetype: 'FURY', x: 21.0, z: 2.8, maxHp: 90, weapon: null, hypo: 1, level: 'normal', expReward: 75 },
+                    { id: 'guard_blackops_3', name: 'BLACK OPS STALKER (潜影暗部特工)', archetype: 'BLACK_OPS', x: 27.0, z: -2.6, maxHp: 100, weapon: 'SCRAM_CANNON', hypo: 0, level: 'normal', expReward: 85 }
+                ],
+                obstacles: [
+                    { id: 'crate_3a', minX: 17.5, maxX: 19.8, minZ: -3.8, maxZ: -1.5, height: 2.8, blocksProjectiles: true, label: '📦 重型升降机货架' },
+                    { id: 'lift_3b', minX: 23.0, maxX: 25.2, minZ: 1.8, maxZ: 4.0, height: 3.2, blocksProjectiles: true, label: '⚙️ 升降液压柱' }
+                ],
                 props: [
-                    { type: 'MEDKIT_CRATE', x: 3.5, z: 2.4, label: '💉 紧急再生剂' }
+                    { type: 'MEDKIT_CRATE', x: 28.5, z: -2.8, label: '💉 紧急医疗箱' },
+                    { type: 'WEAPON_CRATE', weaponType: 'SCRAM_CANNON', x: 18.0, z: 2.8, label: '🔫 追踪蜂群炮' }
                 ],
                 requireConsoleHack: false
             }
@@ -214,41 +290,109 @@ export const CAMPAIGN_CHAPTERS = [
         index: 2,
         code: 'CH.2',
         name: '武藏丸生物实验室',
-        subtitle: 'Musashi Biotech Lab · 道弹蛹真相 & 暗影忍者百足',
+        subtitle: 'Musashi Biotech Lab · 道弹基因机密 & 暗影忍者百足',
         isTutorial: false,
         themeColor: 0xa855f7,
         recommendedLv: 2,
         zones: [
             {
-                title: '区域 1/3：实验室激光走廊',
+                title: '区域 1/3：生化离心长廊 & 暗影特工',
                 speaker: 'SHINATAMA',
-                dialogue: '这里存放着“道弹蛹（Daodan Chrysalis）”的实验档案……小心辛迪加特工伏击！',
-                enemy: { name: 'BIO-LAB GUARD (实验室卫兵)', level: 'normal', maxHp: 115, weapon: 'TCTF_PISTOL', hypo: 1, expReward: 95 },
+                dialogue: '这里存放着“道弹蛹（Daodan Chrysalis）”绝密档案……小心潜影暗部特工（Black-Ops）的光学迷彩伏击！',
+                playerStartX: -22.0,
+                gateX: -6.0,
+                enemy: {
+                    name: 'BLACK OPS SCOUT (光学迷彩侦察兵)',
+                    archetype: 'BLACK_OPS',
+                    x: -14.0,
+                    z: -1.0,
+                    level: 'normal',
+                    maxHp: 105,
+                    weapon: 'TCTF_PISTOL',
+                    hypo: 1,
+                    expReward: 100,
+                    isAlerted: false,
+                    canTriggerAlarm: true,
+                    patrolMinX: -17.0,
+                    patrolMaxX: -12.0
+                },
+                extraEnemies: [
+                    { id: 'lab_ninja_1', name: 'SYNDICATE FURY (暗影女刺客)', archetype: 'FURY', x: -9.5, z: 2.5, maxHp: 85, weapon: null, hypo: 0, level: 'normal', expReward: 70, patrolMinX: -11.5, patrolMaxX: -7.5, isAlerted: false }
+                ],
+                alarmConsolePos: { x: -12.5, z: -4.0, label: '🚨 实验室警报控制台' },
+                reinforcements: [
+                    { id: 'reinf_shadow_1', name: 'SHADOW REINFORCEMENT (增援暗影兵)', archetype: 'BLACK_OPS', x: -6.5, z: 0.0, maxHp: 95, weapon: 'SCRAM_CANNON', hypo: 0, expReward: 75 }
+                ],
+                obstacles: [
+                    { id: 'bio_tube_1', minX: -18.5, maxX: -16.2, minZ: -3.8, maxZ: -1.5, height: 3.2, blocksProjectiles: true, label: '🧪 培养槽机柜 A' }
+                ],
                 props: [
-                    { type: 'WEAPON_CRATE', weaponType: 'MERCURY_BOW', x: -1.5, z: -2.4, label: '🔫 水银狙击弩箱' }
+                    { type: 'WEAPON_CRATE', weaponType: 'MERCURY_BOW', x: -19.5, z: -3.2, label: '🔫 水银狙击弩箱' }
                 ],
                 requireConsoleHack: true,
-                consolePos: { x: -4.2, z: -2.5, label: '💻 主机数据终端' }
+                consolePos: { x: -7.0, z: -3.2, label: '💻 培养室门禁终端 A' }
             },
             {
-                title: '区域 2/3：黑曜石精锐双刃卫',
+                title: '区域 2/3：双刃精锐守卫 & 反应堆中控',
                 speaker: 'KONOKO (麦玉)',
-                dialogue: '终端数据显示我体内的道弹蛹正在共鸣……不管是谁挡路，统统打倒！',
-                enemy: { name: 'BLACK OPS CAPTAIN (黑曜石队长)', level: 'normal', maxHp: 135, weapon: 'SCRAM_CANNON', hypo: 1, expReward: 120 },
-                props: [
-                    { type: 'MEDKIT_CRATE', x: 3.6, z: -2.0, label: '💉 医疗补给箱' },
-                    { type: 'SHIELD_CELL', x: 0.0, z: 2.5, label: '🛡️ 道弹共鸣晶簇' }
+                dialogue: '终端数据显示我体内的道弹蛹正在共鸣……不管是多少人挡路，统统打倒！',
+                gateX: 14.0,
+                enemy: {
+                    name: 'TANKER WARDEN (反应堆典狱长)',
+                    archetype: 'TANKER',
+                    x: 3.5,
+                    z: 0.0,
+                    level: 'normal',
+                    maxHp: 170,
+                    weapon: 'SCRAM_CANNON',
+                    hypo: 1,
+                    expReward: 130,
+                    isAlerted: false,
+                    patrolMinX: 1.5,
+                    patrolMaxX: 5.5
+                },
+                extraEnemies: [
+                    { id: 'black_ops_trooper', name: 'ELITE SHADOW TROOPER (精锐暗影兵)', archetype: 'BLACK_OPS', x: 8.5, z: 2.2, maxHp: 105, weapon: 'TCTF_PISTOL', hypo: 0, level: 'normal', expReward: 80, isAlerted: false, patrolMinX: 6.5, patrolMaxX: 10.5 }
                 ],
-                requireConsoleHack: false
+                alarmConsolePos: { x: 4.0, z: -4.0, label: '🚨 反应堆警报控制台' },
+                reinforcements: [
+                    { id: 'reinf_lab_2', name: 'LAB SHADOW GUARD (增援卫兵)', archetype: 'FURY', x: 13.0, z: 1.0, maxHp: 85, weapon: null, hypo: 0, expReward: 65 }
+                ],
+                obstacles: [
+                    { id: 'bio_tube_2', minX: 3.5, maxX: 5.5, minZ: -1.2, maxZ: 1.0, height: 3.2, blocksProjectiles: true, label: '🧪 反应堆立柱' }
+                ],
+                props: [
+                    { type: 'MEDKIT_CRATE', x: 1.5, z: -2.8, label: '💉 医疗补给箱' },
+                    { type: 'SHIELD_CELL', x: 6.0, z: 3.0, label: '🛡️ 道弹共鸣晶簇' }
+                ],
+                requireConsoleHack: true,
+                consolePos: { x: 12.5, z: -3.2, label: '💻 主机数据终端 B' }
             },
             {
                 title: '区域 3/3：BOSS 战 · 暗影忍者百足 (MUKADE)',
                 speaker: 'MUKADE (百足)',
-                dialogue: '「在阴影中化为尘埃吧，Konoko！」—— 击败擅长空翻闪避与背摔的辛迪加忍者百足！',
+                dialogue: '「在阴影中化为尘埃吧，Konoko！你的道弹力量属于辛迪加！」—— 击败擅长空翻闪避、背摔分身与水银弩的百足！',
                 isBoss: true,
-                enemy: { name: 'BOSS: MUKADE (暗影百足)', level: 'hard', maxHp: 165, weapon: 'MERCURY_BOW', hypo: 2, expReward: 220 },
+                enemy: {
+                    name: 'BOSS: MUKADE (暗影百足)',
+                    archetype: 'FURY',
+                    x: 24.0,
+                    z: 0.0,
+                    level: 'hard',
+                    maxHp: 190,
+                    weapon: 'MERCURY_BOW',
+                    hypo: 2,
+                    expReward: 260
+                },
+                extraEnemies: [
+                    { id: 'mukade_clone', name: 'SHADOW CLONE (百足分身)', archetype: 'FURY', x: 21.0, z: 2.5, maxHp: 85, weapon: null, hypo: 0, level: 'normal', expReward: 70 },
+                    { id: 'mukade_stalker', name: 'SHADOW ASSASSIN (暗影刺客)', archetype: 'BLACK_OPS', x: 27.0, z: -2.5, maxHp: 95, weapon: 'TCTF_PISTOL', hypo: 0, level: 'normal', expReward: 75 }
+                ],
+                obstacles: [
+                    { id: 'bio_tube_3', minX: 18.0, maxX: 20.0, minZ: 1.5, maxZ: 3.5, height: 3.2, blocksProjectiles: true, label: '🧪 离心核心柱' }
+                ],
                 props: [
-                    { type: 'MEDKIT_CRATE', x: -3.6, z: 2.2, label: '💉 医疗补给箱' }
+                    { type: 'MEDKIT_CRATE', x: 28.5, z: 2.5, label: '💉 医疗补给箱' }
                 ],
                 requireConsoleHack: false
             }
@@ -267,36 +411,86 @@ export const CAMPAIGN_CHAPTERS = [
             {
                 title: '区域 1/3：天台防线突破',
                 speaker: 'GRIFFIN (格里芬)',
-                dialogue: 'Muro 已经占领了顶层大气处理器天台！注意天台边缘的高低差，可以把敌人击落深渊！',
-                enemy: { name: 'SYNDICATE ENFORCER (天台督军)', level: 'normal', maxHp: 130, weapon: 'SCRAM_CANNON', hypo: 1, expReward: 120 },
+                dialogue: 'Muro 已经占领了顶层大气处理器天台！消灭守备部队并夺取控制台权限！',
+                playerStartX: -22.0,
+                gateX: -6.0,
+                enemy: {
+                    name: 'SYNDICATE ENFORCER (天台督军)',
+                    archetype: 'TANKER',
+                    x: -14.0,
+                    z: -0.5,
+                    level: 'normal',
+                    maxHp: 150,
+                    weapon: 'SCRAM_CANNON',
+                    hypo: 1,
+                    expReward: 130,
+                    isAlerted: false,
+                    patrolMinX: -17.0,
+                    patrolMaxX: -12.0
+                },
+                extraEnemies: [
+                    { id: 'rooftop_sentry', name: 'ROOFTOP SNIPER (天台枪手)', archetype: 'SNIPER', x: -9.5, z: 2.2, maxHp: 95, weapon: 'MERCURY_BOW', hypo: 0, level: 'normal', expReward: 70, isAlerted: false, patrolMinX: -11.5, patrolMaxX: -7.5 }
+                ],
                 props: [
-                    { type: 'WEAPON_CRATE', weaponType: 'TCTF_PISTOL', x: -2.5, z: -2.0, label: '🔫 战术手枪箱' },
-                    { type: 'MEDKIT_CRATE', x: 2.8, z: -2.2, label: '💉 再生剂补给' }
+                    { type: 'WEAPON_CRATE', weaponType: 'TCTF_PISTOL', x: -19.5, z: -2.5, label: '🔫 战术手枪箱' },
+                    { type: 'MEDKIT_CRATE', x: -12.0, z: -3.0, label: '💉 再生剂补给' }
                 ],
                 requireConsoleHack: true,
-                consolePos: { x: 0.0, z: -3.4, label: '💻 大气处理器主控台' }
+                consolePos: { x: -7.0, z: -3.0, label: '💻 大气处理器主控台 A' }
             },
             {
                 title: '区域 2/3：穆罗亲卫队 (Elite Guard)',
                 speaker: 'SHINATAMA',
-                dialogue: '主控台已锁定！那是 Muro 的贴身暗影亲卫，善用过肩摔和道弹超载！',
-                enemy: { name: 'MURO ROYAL GUARD (亲卫统领)', level: 'hard', maxHp: 155, weapon: 'MERCURY_BOW', hypo: 1, expReward: 160 },
-                props: [
-                    { type: 'SHIELD_CELL', x: -3.5, z: 2.0, label: '🛡️ 超载能量核心' },
-                    { type: 'MEDKIT_CRATE', x: 3.5, z: 2.0, label: '💉 再生剂补给' }
+                dialogue: '主控台已锁定！那是 Muro 的贴身暗影亲卫统领，善用过肩摔和道弹超载！',
+                gateX: 14.0,
+                enemy: {
+                    name: 'MURO ROYAL GUARD (亲卫统领)',
+                    archetype: 'TANKER',
+                    x: 3.5,
+                    z: 0.0,
+                    level: 'hard',
+                    maxHp: 175,
+                    weapon: 'MERCURY_BOW',
+                    hypo: 1,
+                    expReward: 170,
+                    isAlerted: false,
+                    patrolMinX: 1.5,
+                    patrolMaxX: 5.5
+                },
+                extraEnemies: [
+                    { id: 'royal_fury', name: 'ROYAL FURY (亲卫先锋刺客)', archetype: 'FURY', x: 8.5, z: -2.5, maxHp: 115, weapon: null, hypo: 1, level: 'hard', expReward: 90, isAlerted: false, patrolMinX: 6.5, patrolMaxX: 10.5 }
                 ],
-                requireConsoleHack: false
+                props: [
+                    { type: 'SHIELD_CELL', x: 2.5, z: 2.5, label: '🛡️ 超载能量核心' },
+                    { type: 'MEDKIT_CRATE', x: 7.5, z: 2.5, label: '💉 再生剂补给' }
+                ],
+                requireConsoleHack: true,
+                consolePos: { x: 12.5, z: -3.0, label: '💻 能源矩阵终端 B' }
             },
             {
                 title: '最终区域：FINAL BOSS · 穆罗 (MURO)',
                 speaker: 'MURO (穆罗)',
                 titleBanner: 'FINAL SHOWDOWN: MURO',
-                dialogue: '「整个世界都将在道弹的进化中重塑，妹妹！」—— 击败完全觉醒的辛迪加首领 Muro！',
+                dialogue: '「整个世界都将在道弹的进化中重塑，我的妹妹！顺从命运吧！」—— 击败完全觉醒的辛迪加首领 Muro！',
                 isBoss: true,
-                enemy: { name: 'FINAL BOSS: MURO (鬼神穆罗)', level: 'hard', maxHp: 200, weapon: 'SCRAM_CANNON', hypo: 2, daodanStage: 3, expReward: 350 },
+                enemy: {
+                    name: 'FINAL BOSS: MURO (鬼神穆罗)',
+                    archetype: 'TANKER',
+                    x: 24.0,
+                    z: 0.0,
+                    level: 'hard',
+                    maxHp: 220,
+                    weapon: 'SCRAM_CANNON',
+                    hypo: 2,
+                    daodanStage: 3,
+                    expReward: 400
+                },
+                extraEnemies: [
+                    { id: 'muro_shadow_elite', name: 'MURO SHADOW ELITE (宿卫暗忍)', archetype: 'BLACK_OPS', x: 21.0, z: 2.8, maxHp: 110, weapon: 'MERCURY_BOW', hypo: 1, level: 'hard', expReward: 100 }
+                ],
                 props: [
-                    { type: 'WEAPON_CRATE', weaponType: 'MERCURY_BOW', x: 0.0, z: -2.6, label: '🔫 水银狙击弩' },
-                    { type: 'MEDKIT_CRATE', x: -4.0, z: 0.0, label: '💉 战术医疗箱' }
+                    { type: 'WEAPON_CRATE', weaponType: 'MERCURY_BOW', x: 18.0, z: -3.0, label: '🔫 水银狙击弩' },
+                    { type: 'MEDKIT_CRATE', x: 28.5, z: 0.0, label: '💉 战术医疗箱' }
                 ],
                 requireConsoleHack: false
             }
@@ -324,6 +518,10 @@ export class CampaignManager {
 
         // Interactive 3D Props in current zone (Consoles, Medkits, Weapon Crates, Shield Cells, Security Gate)
         this.interactables = [];
+
+        // 🚨 Dynamic Alarm & Reinforcements Engine State
+        this.alarmActive = false;
+        this.alarmAverted = false;
 
         // HUD Banner State
         this.commsState = {
@@ -484,6 +682,9 @@ export class CampaignManager {
 
     startTutorial() {
         CollisionSystem.setStageType('INDOOR_FLAT');
+        CollisionSystem.setCustomBounds(null);
+        CollisionSystem.clearObstacles();
+        this.sim.clearExtraEnemies();
         this.mode = 'TUTORIAL';
         this.activeChapterId = 'ch0';
         this.tutorialStageIdx = 0;
@@ -576,26 +777,127 @@ export class CampaignManager {
         } else {
             CollisionSystem.setStageType('INDOOR_FLAT');
         }
+        // Continuous large-world boundaries across all 3 grand sectors (x from -28 to +38, z from -9 to +9)
+        CollisionSystem.setCustomBounds({ minX: -28.0, maxX: 38.0, minZ: -9.0, maxZ: 9.0 });
         this.mode = 'CAMPAIGN';
         this.activeChapterId = chapter.id;
         this.zoneIndex = 0;
+        this.alarmActive = false;
+        this.alarmAverted = false;
         this.sim.survivalMode = false;
         this.sim.reset();
         this.applyRpgStatsToPlayer(this.sim.f1, true);
         this.sim.f1.name = `KONOKO (Lv.${this.rpg.level})`;
-        this.setupCampaignZone(chapter, 0);
+        this.setupCampaignZone(chapter, 0, true);
     }
 
-    setupCampaignZone(chapter, zoneIdx) {
+    triggerAlarm(sourceBot) {
+        if (this.alarmActive) return;
+        this.alarmActive = true;
+        this.alarmAverted = false;
+
+        const chapter = CAMPAIGN_CHAPTERS.find((c) => c.id === this.activeChapterId);
+        const zone = chapter ? chapter.zones[this.zoneIndex] : null;
+
+        for (let i = 0; i < this.interactables.length; i++) {
+            if (this.interactables[i].type === 'ALARM_CONSOLE') {
+                this.interactables[i].alarmTriggered = true;
+            }
+        }
+
+        if (this.sim && Array.isArray(this.sim.events)) {
+            this.sim.events.push({
+                type: 'ALARM_TRIGGERED',
+                source: sourceBot ? sourceBot.name : 'SENTRY',
+                x: sourceBot ? sourceBot.x : 0,
+                z: sourceBot ? sourceBot.z : 0
+            });
+        }
+
+        if (zone && Array.isArray(zone.reinforcements) && this.sim) {
+            this.sim.spawnReinforcements(zone.reinforcements);
+        }
+
+        if (this.commsState) {
+            this.commsState.title = '🚨 警报大作！辛迪加武装增援正在赶来！';
+            this.commsState.text = '警报控制台被拍响了！哨兵呼叫了战术突击增援，注意防范侧翼围攻并黑入控制台关闭警报！';
+            this.commsState.objectiveHint = '消灭增援敌人并黑入控制台关闭警报！';
+        }
+    }
+
+    disableAlarm(tickEvents) {
+        if (!this.alarmActive) return;
+        this.alarmActive = false;
+        for (let i = 0; i < this.interactables.length; i++) {
+            if (this.interactables[i].type === 'ALARM_CONSOLE') {
+                this.interactables[i].alarmTriggered = false;
+            }
+        }
+        this.addExp(40, tickEvents);
+        if (tickEvents) {
+            tickEvents.push({
+                type: 'ALARM_DISABLED',
+                text: 'ALARM OVERRIDDEN! 警报已切断 (+40 EXP)'
+            });
+        }
+        if (this.commsState) {
+            this.commsState.title = '✅ 警报已成功切断！';
+            this.commsState.text = '控制台警报已被手动切断，后续武装增援停止入场！';
+        }
+    }
+
+    isAlarmTriggered() {
+        return this.alarmActive;
+    }
+
+    startBossCinematic(zone) {
+        this.cinematic = {
+            active: true,
+            bossName: zone.speaker || zone.enemy.name,
+            bossTitle: zone.title || 'BOSS SHOWDOWN',
+            dialogue: zone.dialogue,
+            typedText: '',
+            typeIndex: 0,
+            frame: 0,
+            totalFrames: 160,
+            canSkip: true
+        };
+        if (this.sim && Array.isArray(this.sim.events)) {
+            this.sim.events.push({
+                type: 'BOSS_CINEMATIC_START',
+                bossName: this.cinematic.bossName,
+                dialogue: zone.dialogue
+            });
+        }
+    }
+
+    skipBossCinematic() {
+        if (!this.cinematic || !this.cinematic.active) return;
+        this.cinematic.active = false;
+        if (this.sim && Array.isArray(this.sim.events)) {
+            this.sim.events.push({
+                type: 'BOSS_ENGAGE',
+                bossName: this.cinematic.bossName
+            });
+        }
+        if (this.commsState) {
+            this.commsState.text = this.cinematic.dialogue;
+            this.commsState.objectiveHint = `消灭 ${this.cinematic.bossName}！`;
+        }
+    }
+
+    setupCampaignZone(chapter, zoneIdx, isInitial = false) {
         this.zoneIndex = zoneIdx;
         this.zoneCleared = false;
         this.zoneTransitionTimer = 0;
         this.interactables = [];
+        this.alarmActive = false;
+        this.alarmAverted = false;
 
         const zone = chapter.zones[zoneIdx];
         if (!zone) return;
 
-        // Clear leftover weapons/projectiles
+        // Clear leftover dropped weapons & projectiles
         for (const w of this.sim.getWeapons()) {
             this.sim.removeEntity(w.id);
         }
@@ -603,19 +905,68 @@ export class CampaignManager {
             this.sim.removeEntity(p.id);
         }
 
-        // Reposition fighters for the new zone
+        // Setup unified chapter obstacles across all sectors (including security laser gates)
+        CollisionSystem.clearObstacles();
+        const sectorObstacles = [];
+        if (Array.isArray(chapter.zones)) {
+            for (let z = 0; z < chapter.zones.length; z++) {
+                const zData = chapter.zones[z];
+                if (Array.isArray(zData.obstacles)) {
+                    for (const obs of zData.obstacles) {
+                        sectorObstacles.push({ ...obs, active: true });
+                    }
+                }
+                if (zData.requireConsoleHack && zData.gateX !== undefined) {
+                    const gx = zData.gateX;
+                    const isPassed = z < zoneIdx;
+                    sectorObstacles.push({
+                        id: `gate_obs_${chapter.id}_${z}`,
+                        minX: gx - 0.25,
+                        maxX: gx + 0.25,
+                        minZ: -3.5,
+                        maxZ: 3.5,
+                        height: 3.5,
+                        blocksProjectiles: true,
+                        isGate: true,
+                        gateZoneIndex: z,
+                        active: !isPassed
+                    });
+                }
+            }
+        }
+        CollisionSystem.setObstacles(sectorObstacles);
+
+        // Clear and spawn squad enemies for this sector
+        this.sim.clearExtraEnemies();
+        if (Array.isArray(zone.extraEnemies)) {
+            for (const cfg of zone.extraEnemies) {
+                this.sim.spawnExtraEnemy(cfg);
+            }
+        }
+
+        // Fighter placement: Only reset player position on INITIAL chapter start!
+        // On zone transitions, player physically walks through the gate into the sector!
         const f1 = this.sim.f1;
         const f2 = this.sim.f2;
-        f1.x = -2.8;
-        f1.y = 0;
-        f1.z = 0;
-        f1.vx = 0;
-        f1.vy = 0;
-        f1.vz = 0;
-        f1.facing = 1;
-        f1.transitionTo(FIGHTER_STATE.IDLE);
+        if (isInitial) {
+            f1.x = zone.playerStartX !== undefined ? zone.playerStartX : -12.0;
+            f1.y = 0;
+            f1.z = 0;
+            f1.vx = 0;
+            f1.vy = 0;
+            f1.vz = 0;
+            f1.facing = 1;
+            f1.transitionTo(FIGHTER_STATE.IDLE);
+        } else {
+            f1.facing = 1;
+            f1.transitionTo(FIGHTER_STATE.IDLE);
+        }
 
-        f2.reset(2.8, -1);
+        // Setup primary sector enemy (f2)
+        const enemyX = zone.enemy.x !== undefined ? zone.enemy.x : (f1.x + 6.0);
+        const enemyZ = zone.enemy.z !== undefined ? zone.enemy.z : 0;
+        f2.reset(enemyX, -1);
+        f2.z = enemyZ;
         f2.name = zone.enemy.name;
         f2.maxHp = zone.enemy.maxHp;
         f2.hp = zone.enemy.maxHp;
@@ -624,6 +975,12 @@ export class CampaignManager {
         f2.maxHypo = zone.enemy.hypo || 0;
         f2.hypoCount = zone.enemy.hypo || 0;
         f2.aiProfileLevel = zone.enemy.level || 'normal';
+        f2.isAlerted = zone.enemy.isAlerted !== undefined ? zone.enemy.isAlerted : false;
+        f2.patrolMinX = zone.enemy.patrolMinX;
+        f2.patrolMaxX = zone.enemy.patrolMaxX;
+        f2.canTriggerAlarm = zone.enemy.canTriggerAlarm !== undefined ? zone.enemy.canTriggerAlarm : false;
+        f2.hasTriggeredAlarm = false;
+        f2.isRunningToAlarm = false;
         if (zone.enemy.daodanStage) {
             f2.daodanStage = zone.enemy.daodanStage;
             f2.daodanMeter = 80;
@@ -638,7 +995,7 @@ export class CampaignManager {
         this.sim.isMatchOver = false;
         this.sim.winner = null;
 
-        // Spawn interactive props (Medkit Crates, Weapon Crates, Shield Cells, Security Console)
+        // Spawn interactive props (Medkits, Weapon Crates, Shield Cells, Terminal Console, Gate)
         let propSeq = 1;
         if (Array.isArray(zone.props)) {
             for (const p of zone.props) {
@@ -657,10 +1014,24 @@ export class CampaignManager {
         }
 
         this.consoleHacked = !zone.requireConsoleHack;
+        if (zone.alarmConsolePos) {
+            this.interactables.push({
+                id: `alarm_console_${chapter.id}_${zoneIdx}`,
+                type: 'ALARM_CONSOLE',
+                zoneIndex: zoneIdx,
+                x: zone.alarmConsolePos.x,
+                y: 0,
+                z: zone.alarmConsolePos.z,
+                label: zone.alarmConsolePos.label || '🚨 警报控制台',
+                active: true,
+                alarmTriggered: false
+            });
+        }
         if (zone.requireConsoleHack && zone.consolePos) {
             this.interactables.push({
                 id: `console_${chapter.id}_${zoneIdx}`,
                 type: 'CONSOLE',
+                zoneIndex: zoneIdx,
                 x: zone.consolePos.x,
                 y: 0,
                 z: zone.consolePos.z,
@@ -668,11 +1039,12 @@ export class CampaignManager {
                 active: true,
                 hacked: false
             });
-            // Security laser gate on the right edge until console is hacked & enemy defeated
+            const gx = zone.gateX !== undefined ? zone.gateX : (zone.consolePos.x + 0.8);
             this.interactables.push({
                 id: `gate_${chapter.id}_${zoneIdx}`,
                 type: 'SECURITY_GATE',
-                x: 5.8,
+                zoneIndex: zoneIdx,
+                x: gx,
                 y: 0,
                 z: 0,
                 label: '🔒 安全激光门',
@@ -690,13 +1062,22 @@ export class CampaignManager {
             highlightBtn: null,
             objectiveHint: zone.requireConsoleHack ? '目标：击败守卫并靠近 💻终端 解锁通道' : '目标：击败区域守卫'
         };
+
+        // P3 Boss Cinematic Cutscene trigger on boss encounters
+        if (zone.isBoss) {
+            this.startBossCinematic(zone);
+        }
     }
 
     disableCampaign() {
         CollisionSystem.setStageType('ROOFTOP');
+        CollisionSystem.setCustomBounds(null);
+        CollisionSystem.clearObstacles();
+        this.sim.clearExtraEnemies();
         this.mode = 'VERSUS';
         this.interactables = [];
         this.commsState.visible = false;
+        if (this.cinematic) this.cinematic.active = false;
         this.applyRpgStatsToPlayer(this.sim.f1, false);
     }
 
@@ -869,6 +1250,19 @@ export class CampaignManager {
         const zone = chapter.zones[this.zoneIndex];
         if (!zone) return;
 
+        // P3 Boss Cinematic Playback (freezes combat ticks while typewriter dialogue runs)
+        if (this.cinematic && this.cinematic.active) {
+            this.cinematic.frame++;
+            if (this.cinematic.frame % 2 === 0 && this.cinematic.typeIndex < this.cinematic.dialogue.length) {
+                this.cinematic.typeIndex++;
+                this.cinematic.typedText = this.cinematic.dialogue.substring(0, this.cinematic.typeIndex);
+            }
+            if (this.cinematic.frame >= this.cinematic.totalFrames) {
+                this.skipBossCinematic();
+            }
+            return;
+        }
+
         const f1 = this.sim.f1;
         const f2 = this.sim.f2;
 
@@ -913,14 +1307,28 @@ export class CampaignManager {
                     y: 0.5,
                     z: item.z
                 });
+            } else if (item.type === 'ALARM_CONSOLE' && this.alarmActive) {
+                // Konoko approaches tripped alarm console to disable subsequent reinforcements
+                if (dist <= 1.6 && (p1Input.punch || p1Input.fire || dist <= 1.25)) {
+                    this.disableAlarm(tickEvents);
+                }
             } else if (item.type === 'CONSOLE' && !item.hacked) {
                 // Auto-hack console when Konoko walks near it or presses punch/fire near it
-                if (dist <= 1.45 && (this.zoneCleared || p1Input.punch || p1Input.fire || dist <= 1.15)) {
+                if (dist <= 1.6 && (this.zoneCleared || p1Input.punch || p1Input.fire || dist <= 1.25)) {
                     item.hacked = true;
                     this.consoleHacked = true;
                     this.addExp(30, tickEvents);
                     for (const g of this.interactables) {
-                        if (g.type === 'SECURITY_GATE') g.unlocked = true;
+                        if (g.type === 'SECURITY_GATE' && (g.zoneIndex === undefined || g.zoneIndex === this.zoneIndex)) {
+                            g.unlocked = true;
+                        }
+                    }
+                    if (CollisionSystem.obstacles) {
+                        for (const obs of CollisionSystem.obstacles) {
+                            if (obs.isGate && (obs.gateZoneIndex === undefined || obs.gateZoneIndex === this.zoneIndex)) {
+                                obs.active = false;
+                            }
+                        }
                     }
                     tickEvents.push({
                         type: 'CONSOLE_HACKED',
@@ -940,10 +1348,29 @@ export class CampaignManager {
             }
         }
 
-        // 3. Intercept enemy defeat in multi-zone chapters so match doesn't end before the final zone!
-        if (f2.hp <= 0 && !this.zoneCleared) {
+        // 3. Intercept enemy defeat in multi-zone chapters (must defeat all enemies in the sector!)
+        const enemies = this.sim.getEnemies();
+        const hasKoEvent = Array.isArray(tickEvents) && tickEvents.some((ev) => ev.type === 'KO');
+        const allEnemiesDefeated = (enemies.length > 0 && enemies.every((e) => e.hp <= 0)) || (f2.hp <= 0 && (hasKoEvent || this.sim.extraEnemies.length === 0));
+
+        if (allEnemiesDefeated && !this.zoneCleared) {
             this.zoneCleared = true;
-            this.addExp(zone.enemy.expReward || 80, tickEvents);
+
+            // Stealth reward: If zone had an alarm console and player neutralized sentry before alarm tripped
+            if (zone.alarmConsolePos && !this.alarmActive && !this.alarmAverted) {
+                this.alarmAverted = true;
+                this.addExp(60, tickEvents);
+                tickEvents.push({
+                    type: 'ALARM_AVERTED',
+                    text: '🚨 STEALTH SUCCESS: 警报已成功遏制！(+60 EXP)'
+                });
+            }
+
+            let totalExp = zone.enemy.expReward || 80;
+            if (Array.isArray(zone.extraEnemies)) {
+                for (const ee of zone.extraEnemies) totalExp += (ee.expReward || 45);
+            }
+            this.addExp(totalExp, tickEvents);
 
             const isLastZone = this.zoneIndex >= chapter.zones.length - 1;
             if (!isLastZone) {
@@ -951,7 +1378,10 @@ export class CampaignManager {
                 this.sim.isMatchOver = false;
                 this.sim.winner = null;
                 f1.transitionTo(FIGHTER_STATE.IDLE);
-                f2.transitionTo(FIGHTER_STATE.DEFEAT);
+                for (let k = 0; k < enemies.length; k++) {
+                    enemies[k].hp = 0;
+                    enemies[k].transitionTo(FIGHTER_STATE.DEFEAT);
+                }
 
                 // Remove KO event if Simulation just pushed it
                 for (let i = tickEvents.length - 1; i >= 0; i--) {
@@ -967,10 +1397,10 @@ export class CampaignManager {
 
                 if (this.consoleHacked) {
                     this.zoneTransitionTimer = 85;
-                    this.commsState.text = '区域肃清！正在进入下一扇安全门……';
+                    this.commsState.text = '区域守军肃清！安全门已开启，正在推进至下一区域……';
                     this.commsState.objectiveHint = '区域完成！准备推进';
                 } else {
-                    this.commsState.text = '守卫已击倒！请前往发光的 💻战术终端 解锁安全门！';
+                    this.commsState.text = '区域守军已肃清！请前往发光的 💻战术终端 骇入门禁解除激光网！';
                     this.commsState.objectiveHint = '目标：靠近 💻终端 骇入门禁';
                 }
                 this.commsState.progressText = `Lv.${this.rpg.level} (${this.rpg.exp} EXP)`;
@@ -998,23 +1428,33 @@ export class CampaignManager {
             }
         }
 
-        // If zone was already cleared and player just hacked the console, start transition timer!
+        // If zone was already cleared and player just hacked the console, set transition message
         if (this.zoneCleared && this.consoleHacked && this.zoneTransitionTimer === 0 && this.zoneIndex < chapter.zones.length - 1) {
-            this.zoneTransitionTimer = 65;
-            this.commsState.text = '终端门禁已骇入！正在推进至下一区域……';
+            this.zoneTransitionTimer = 90;
+            this.commsState.text = '终端门禁已骇入！安全门已开启，穿过大门推进至下一区域！';
+            this.commsState.objectiveHint = '目标：穿过安全大门';
         }
 
-        if (this.zoneTransitionTimer > 0) {
-            this.zoneTransitionTimer--;
-            if (this.zoneTransitionTimer === 0 && this.zoneIndex + 1 < chapter.zones.length) {
-                this.setupCampaignZone(chapter, this.zoneIndex + 1);
+        // P1 Sector Transition: player physically runs through the open security gate OR fallback timer expires
+        const currentGateX = (zone && zone.gateX !== undefined) ? zone.gateX : (this.zoneIndex === 0 ? -2.0 : 10.0);
+        const playerCrossedGate = f1.x >= (currentGateX - 0.2);
+
+        if (this.zoneCleared && this.consoleHacked && this.zoneIndex + 1 < chapter.zones.length) {
+            if (playerCrossedGate || this.zoneTransitionTimer === 1) {
+                this.zoneTransitionTimer = 0;
+                this.setupCampaignZone(chapter, this.zoneIndex + 1, false);
                 tickEvents.push({
                     type: 'ZONE_ADVANCE',
                     zoneIndex: this.zoneIndex + 1,
                     title: chapter.zones[this.zoneIndex].title,
                     enemyLevel: chapter.zones[this.zoneIndex].enemy.level
                 });
+                return;
             }
+        }
+
+        if (this.zoneTransitionTimer > 1) {
+            this.zoneTransitionTimer--;
         }
     }
 }

@@ -71,6 +71,7 @@ export class ProceduralFighterMesh {
         this.buildGroundDecal();
         this.buildTrail();
         this.buildHeldWeaponMesh();
+        this.buildAlertBadge();
 
         this.pose = makePose();
         this.vel = makePose();         // spring velocities
@@ -243,6 +244,65 @@ export class ProceduralFighterMesh {
         this.arms.r.fist.add(this.heldGunGroup);
     }
 
+    buildAlertBadge() {
+        if (this.isP1) return; // Player does not have an alert badge
+        const S = 128;
+        const makeBadgeTex = (char, color, bg) => {
+            const cvs = document.createElement('canvas');
+            cvs.width = cvs.height = S;
+            const ctx = cvs.getContext('2d');
+            ctx.fillStyle = bg;
+            ctx.beginPath();
+            ctx.arc(64, 64, 52, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 10;
+            ctx.stroke();
+            ctx.fillStyle = color;
+            ctx.font = '900 76px "Courier New", monospace, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(char, 64, 66);
+            const tex = new THREE.CanvasTexture(cvs);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        };
+
+        const texQuestion = makeBadgeTex('?', '#94a3b8', 'rgba(15, 23, 42, 0.92)');
+        const texExclamation = makeBadgeTex('!', '#ff1744', 'rgba(60, 10, 20, 0.95)');
+
+        const mat = new THREE.SpriteMaterial({
+            map: texQuestion,
+            transparent: true,
+            depthTest: false
+        });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(0.65, 0.65, 1.0);
+        sprite.position.set(0, 2.2, 0);
+        this.root.add(sprite);
+        this.alertBadge = { sprite, mat, texQuestion, texExclamation };
+    }
+
+    updateAlertBadge(fighter, timeSeconds) {
+        if (!this.alertBadge) return;
+        if (fighter.hp <= 0) {
+            this.alertBadge.sprite.visible = false;
+            return;
+        }
+        const isAlerted = fighter.isAlerted !== false;
+        this.alertBadge.sprite.visible = true;
+        if (!isAlerted) {
+            this.alertBadge.mat.map = this.alertBadge.texQuestion;
+            this.alertBadge.sprite.scale.set(0.55, 0.55, 1.0);
+            this.alertBadge.sprite.position.y = 2.15 + Math.sin(timeSeconds * 3.5) * 0.05;
+        } else {
+            this.alertBadge.mat.map = this.alertBadge.texExclamation;
+            const pulse = 1.0 + Math.sin(timeSeconds * 12.0) * 0.16;
+            this.alertBadge.sprite.scale.set(0.72 * pulse, 0.72 * pulse, 1.0);
+            this.alertBadge.sprite.position.y = 2.25 + Math.sin(timeSeconds * 6.0) * 0.04;
+        }
+    }
+
     // ------------------------------------------------------------------ per-frame
     update(fighter, timeSeconds, dtIn) {
         const dt = dtIn !== undefined ? dtIn
@@ -262,6 +322,23 @@ export class ProceduralFighterMesh {
             this.loco.phase += dir * moved * GAIT.WALK.perMeter;
         }
 
+        // Archetype visual scaling & optical camouflage
+        const targetScale = fighter.scale || (this.isP1 ? 1.0 : 1.06);
+        if (Math.abs(this.body.scale.x - targetScale) > 0.01) {
+            this.body.scale.setScalar(targetScale);
+        }
+        if (fighter.isCamouflage && this.meshes) {
+            const isVisible = fighter.state === FIGHTER_STATE.ATTACK || fighter.hitStunDuration > 0 || fighter.hp <= 0;
+            const targetOpacity = isVisible ? 0.95 : 0.32;
+            for (let i = 0; i < this.meshes.length; i++) {
+                const m = this.meshes[i];
+                if (m.material) {
+                    m.material.transparent = true;
+                    m.material.opacity = targetOpacity;
+                }
+            }
+        }
+
         resolvePose(this.target, fighter, this.loco, timeSeconds);
         this.detectHit(fighter);
         this.integrateSprings(fighter.state, dt);
@@ -269,6 +346,7 @@ export class ProceduralFighterMesh {
         this.applyRoot(fighter);
         this.applyPose(this.pose, !this.target.gait);
         this.updateHeldWeapon(fighter);
+        this.updateAlertBadge(fighter, timeSeconds);
         this.updateHair(dt);
         this.updateDecals(fighter);
         this.updateTrail(fighter, dt);

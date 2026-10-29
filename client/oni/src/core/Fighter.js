@@ -428,6 +428,9 @@ export class Fighter {
         this.x = Math.max(bounds.minX, Math.min(bounds.maxX, this.x));
         this.z = Math.max(bounds.minZ, Math.min(bounds.maxZ, this.z));
 
+        // P7 Sector Environment Obstacles (Sliding collision against cargo crates, consoles, gates)
+        CollisionSystem.resolveObstacles(this);
+
         // Soft wall impact damping in indoor flat mode
         if (CollisionSystem.isIndoor()) {
             if (this.x <= bounds.minX + 0.02 || this.x >= bounds.maxX - 0.02) {
@@ -1130,6 +1133,18 @@ export class Fighter {
                     knockdown: true,
                     isThrow: true
                 });
+
+                // Oni Collateral Body Splash: slamming an opponent sends a shockwave that bowls over adjacent enemies
+                simEvents.push({
+                    type: 'COLLATERAL_SPLASH',
+                    attacker: this.id,
+                    thrownFighter: target.id,
+                    x: target.x,
+                    y: target.y,
+                    z: target.z,
+                    radius: 2.2,
+                    damage: Math.max(8, Math.round(move.damage * 0.45))
+                });
             }
         }
 
@@ -1289,7 +1304,7 @@ export class Fighter {
         } else {
             fx = attackerFacingOrFighter >= 0 ? 1 : -1;
         }
-        const effectiveDmg = Math.round(move.damage * dmgMult);
+        const effectiveDmg = Math.max(1, Math.round(move.damage * dmgMult * (this.damageTakenMult || 1.0)));
 
         if (hitInfo.isBlock) {
             const chipDamage = Math.max(1, Math.floor(effectiveDmg * 0.15));
@@ -1304,7 +1319,7 @@ export class Fighter {
 
         // Clean Hit!
         this.hp = Math.max(0, this.hp - effectiveDmg);
-        const poiseDmg = move.poiseDamage || move.damage * 2;
+        const poiseDmg = Math.round((move.poiseDamage || move.damage * 2) * (this.poiseTakenMult || 1.0));
         this.poise = Math.max(0, this.poise - poiseDmg);
         this.poiseRegenCooldown = POISE_CONFIG.REGEN_DELAY;
 
@@ -1349,11 +1364,43 @@ export class Fighter {
         }
 
         this.transitionTo(FIGHTER_STATE.HIT_STUN);
-        this.hitStunDuration = move.hitStun;
-        const kbX = move.knockback.x || 2.0;
+        this.hitStunDuration = move.hitStun || 14;
+        const kbX = (move.knockback && move.knockback.x) || 2.0;
         this.vx = fx * kbX;
         this.vz = fz * kbX;
 
         return { blocked: false, damage: effectiveDmg, poiseBroken: false };
+    }
+
+    /**
+     * Find best target among active enemy fighters for soft lock, camera tracking, and magnetic lunges
+     * @param {Array<Fighter>} candidates
+     */
+    findBestTarget(candidates) {
+        if (!Array.isArray(candidates) || candidates.length === 0) return null;
+        let best = null;
+        let bestScore = -Infinity;
+        const { fx, fz } = this.getForwardVector();
+
+        for (let i = 0; i < candidates.length; i++) {
+            const c = candidates[i];
+            if (!c || c.hp <= 0 || c.id === this.id) continue;
+            const dx = c.x - this.x;
+            const dz = c.z - this.z;
+            const dist = Math.hypot(dx, dz);
+            if (dist < 0.001) return c;
+
+            const nx = dx / dist;
+            const nz = dz / dist;
+            const dot = nx * fx + nz * fz; // 1 = right in front
+
+            // Score prioritizes forward vision cone, then proximity
+            const score = dot * 2.2 - dist * 0.75;
+            if (score > bestScore) {
+                bestScore = score;
+                best = c;
+            }
+        }
+        return best;
     }
 }

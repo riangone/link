@@ -47,8 +47,9 @@ export class ThreeScene {
         this._perf = { last: 0, frames: 0, sum: 0, n: 0 };
 
         this.scene = new THREE.Scene();
-        this.fogColor = new THREE.Color(0x0b0f18);
-        this.scene.fog = new THREE.FogExp2(this.fogColor, 0.024);
+        this.fogColor = new THREE.Color(0xdbe6f2);
+        this.scene.fog = new THREE.FogExp2(this.fogColor, 0.006);
+        this.renderer.setClearColor(0xdce6f2, 1.0);
 
         this.camera = new THREE.PerspectiveCamera(36, w / h, 0.1, 200);
         this.camera.position.set(0, 1.8, 7);
@@ -57,7 +58,7 @@ export class ThreeScene {
         this.cameraTarget = new THREE.Vector3(0, 1.1, 0);
 
         // camera rig: preset view + user orbit offsets (all render-only)
-        this.camModes = ['side', 'diagonal', 'shoulder', 'top'];
+        this.camModes = ['side', 'diagonal', 'shoulder', 'top', 'adventure'];
         this.camMode = 'side';
         this.orbit = { yaw: 0, pitch: 0, zoom: 1 };
         this.camYaw = 0;      // smoothed yaw actually used (0 = classic side view from +Z)
@@ -71,14 +72,17 @@ export class ThreeScene {
         this.rooftopGroup = new THREE.Group();
         this.skylineGroup = new THREE.Group();
         this.indoorGroup = new THREE.Group();
+        this.warehouseGroup = new THREE.Group();
         this.scene.add(this.rooftopGroup);
         this.scene.add(this.skylineGroup);
         this.scene.add(this.indoorGroup);
+        this.scene.add(this.warehouseGroup);
 
         this.setupSky();
         this.setupLights();
         this.setupStage();
         this.setupIndoorStage();
+        this.setupWarehouseStage();
         this.setupSkyline();
         this.setupRain();
 
@@ -93,17 +97,17 @@ export class ThreeScene {
         const mat = new THREE.ShaderMaterial({
             side: THREE.BackSide, depthWrite: false, fog: false,
             uniforms: {
-                top: { value: new THREE.Color(0x070a10) },
-                mid: { value: new THREE.Color(0x131b28) },
-                glow: { value: new THREE.Color(0x2a5678) }
+                top: { value: new THREE.Color(0x72aee6) },
+                mid: { value: new THREE.Color(0xcde2f8) },
+                glow: { value: new THREE.Color(0xffffff) }
             },
             vertexShader: `varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
             fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 glow; varying vec3 vP;
               void main(){
                 float h = vP.y;
                 vec3 c = mix(mid, top, smoothstep(0.0, 0.48, h));
-                c += glow * 0.35 * exp(-abs(h - 0.02) * 14.0);
-                c += vec3(0.42, 0.32, 0.18) * 0.14 * exp(-abs(h - 0.06) * 10.0);
+                c += glow * 0.45 * exp(-abs(h - 0.02) * 12.0);
+                c += vec3(0.95, 0.92, 0.88) * 0.25 * exp(-abs(h - 0.06) * 8.0);
                 gl_FragColor = vec4(c, 1.0);
               }`
         });
@@ -112,9 +116,9 @@ export class ThreeScene {
     }
 
     setupLights() {
-        this.scene.add(new THREE.HemisphereLight(0x889ab5, 0x1a1e26, 1.25));
+        this.scene.add(new THREE.HemisphereLight(0xffffff, 0xd0dce8, 1.85));
 
-        const key = new THREE.DirectionalLight(0xf6ede0, 2.1);
+        const key = new THREE.DirectionalLight(0xfffef8, 2.7);
         key.position.set(3, 9, 6);
         key.castShadow = true;
         key.shadow.mapSize.setScalar(this.lowPower ? 1024 : 2048);
@@ -131,13 +135,13 @@ export class ThreeScene {
         this.scene.add(key);
         this.scene.add(key.target);
 
-        const rimC = new THREE.DirectionalLight(0x5890b8, 1.35);
+        const rimC = new THREE.DirectionalLight(0x78b8e8, 1.6);
         rimC.position.set(-8, 4, -6);
         this.scene.add(rimC);
-        const rimM = new THREE.DirectionalLight(0xc88a55, 1.15);
+        const rimM = new THREE.DirectionalLight(0xfce8cc, 1.4);
         rimM.position.set(8, 4, -6);
         this.scene.add(rimM);
-        const fill = new THREE.DirectionalLight(0x7c8ea6, 0.55);
+        const fill = new THREE.DirectionalLight(0xe8f0f8, 0.95);
         fill.position.set(0, 2, 10);
         this.scene.add(fill);
     }
@@ -147,20 +151,20 @@ export class ThreeScene {
         const c = document.createElement('canvas');
         c.width = c.height = S;
         const g = c.getContext('2d');
-        // Oni 2001 architectural brutalist concrete & matte tactical steel deck
-        g.fillStyle = '#252932';
+        // Oni light-themed high-tech architectural concrete deck
+        g.fillStyle = '#b8c4d0';
         g.fillRect(0, 0, S, S);
         for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
-            const v = 38 + Math.floor(this.rand() * 12);
-            g.fillStyle = `rgb(${v},${v + 3},${v + 8})`;
+            const v = 205 + Math.floor(this.rand() * 18);
+            g.fillStyle = `rgb(${v - 2},${v},${v + 4})`;
             g.fillRect(i * 128 + 4, j * 128 + 4, 120, 120);
-            // Concrete weathering & industrial stencil marks
-            g.fillStyle = `rgba(18,20,26,0.35)`;
-            g.fillRect(i * 128 + 10, j * 128 + 10, 108, 4);
+            // Crisp clean panel accent lines
+            g.fillStyle = `rgba(160, 178, 196, 0.45)`;
+            g.fillRect(i * 128 + 8, j * 128 + 8, 112, 3);
         }
-        // Dark expansion joints (matte asphalt/rubber seams, no mirror glare)
-        g.strokeStyle = 'rgba(14,16,20,1)';
-        g.lineWidth = 6;
+        // Clean expansion seams (slate blue-gray)
+        g.strokeStyle = '#8ca0b4';
+        g.lineWidth = 4;
         for (let i = 0; i <= 4; i++) {
             g.beginPath(); g.moveTo(i * 128, 0); g.lineTo(i * 128, S); g.stroke();
             g.beginPath(); g.moveTo(0, i * 128); g.lineTo(S, i * 128); g.stroke();
@@ -168,19 +172,19 @@ export class ThreeScene {
         const map = new THREE.CanvasTexture(c);
         map.colorSpace = THREE.SRGBColorSpace;
 
-        // Subtle recessed floor marker lights (subdued industrial amber/cyan)
+        // Clean luminous runway indicators
         const e = document.createElement('canvas');
         e.width = e.height = S;
         const ge = e.getContext('2d');
         ge.fillStyle = '#000';
         ge.fillRect(0, 0, S, S);
-        ge.strokeStyle = '#1e3f52';
+        ge.strokeStyle = '#00f0ff';
         ge.lineWidth = 1.5;
         for (let i = 0; i <= 4; i++) {
             ge.beginPath(); ge.moveTo(i * 128, 0); ge.lineTo(i * 128, S); ge.stroke();
-            ge.beginPath(); ge.moveTo(0, i * 128); ge.lineTo(S, i * 128); g.stroke();
+            ge.beginPath(); ge.moveTo(0, i * 128); ge.lineTo(S, i * 128); ge.stroke();
         }
-        ge.fillStyle = '#b87328';
+        ge.fillStyle = '#f59e0b';
         for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) ge.fillRect(i * 128 - 3, j * 128 - 3, 6, 6);
         const emissive = new THREE.CanvasTexture(e);
         emissive.colorSpace = THREE.SRGBColorSpace;
@@ -412,18 +416,19 @@ export class ThreeScene {
         const c = document.createElement('canvas');
         c.width = c.height = S;
         const g = c.getContext('2d');
-        g.fillStyle = '#1c2230';
+        // Clean high-tech white & pale cyan composite tatami dojo matting
+        g.fillStyle = '#d4e0ec';
         g.fillRect(0, 0, S, S);
         for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
-            const v = 30 + Math.floor(this.rand() * 8);
-            g.fillStyle = `rgb(${v},${v + 4},${v + 10})`;
+            const v = 222 + Math.floor(this.rand() * 12);
+            g.fillStyle = `rgb(${v - 4},${v},${v + 4})`;
             g.fillRect(i * 128 + 3, j * 128 + 3, 122, 122);
-            // Fine non-slip diamond grid pattern
-            g.fillStyle = 'rgba(0,0,0,0.2)';
+            // Crisp tactical grip geometric pattern
+            g.fillStyle = 'rgba(176, 196, 216, 0.4)';
             g.fillRect(i * 128 + 6, j * 128 + 6, 56, 56);
             g.fillRect(i * 128 + 66, j * 128 + 66, 56, 56);
         }
-        g.strokeStyle = '#10141d';
+        g.strokeStyle = '#a6b8cc';
         g.lineWidth = 4;
         for (let i = 0; i <= 4; i++) {
             g.beginPath(); g.moveTo(i * 128, 0); g.lineTo(i * 128, S); g.stroke();
@@ -539,10 +544,10 @@ export class ThreeScene {
         ringInner.position.y = 0.02;
         this.indoorGroup.add(ringInner);
 
-        // 2. North Enclosure Wall (Heavy composite concrete + glowing cyan status strip)
+        // 2. North Enclosure Wall (Clean high-tech architectural panels + cyan status strip)
         const northWallMat = new THREE.MeshStandardMaterial({
-            color: 0x141a24,
-            roughness: 0.9,
+            color: 0xdbe4ed,
+            roughness: 0.82,
             metalness: 0.12
         });
         const northWall = new THREE.Mesh(new THREE.BoxGeometry(18.6, 5.5, 0.8), northWallMat);
@@ -550,7 +555,7 @@ export class ThreeScene {
         this.indoorGroup.add(northWall);
 
         // Lower kickplate along north wall
-        const kickplateMat = new THREE.MeshStandardMaterial({ color: 0x1e2533, roughness: 0.85, metalness: 0.15 });
+        const kickplateMat = new THREE.MeshStandardMaterial({ color: 0xb8c6d4, roughness: 0.75, metalness: 0.15 });
         const kickplate = new THREE.Mesh(new THREE.BoxGeometry(18.6, 0.45, 0.12), kickplateMat);
         kickplate.position.set(0, 0.22, -5.04);
         this.indoorGroup.add(kickplate);
@@ -572,7 +577,7 @@ export class ThreeScene {
         this.indoorGroup.add(banner);
 
         // 3. West & East Safety Containment Pillars & Holographic Forcefields (x = ±8.8)
-        const pillarMat = new THREE.MeshStandardMaterial({ color: 0x1e2430, roughness: 0.8, metalness: 0.2 });
+        const pillarMat = new THREE.MeshStandardMaterial({ color: 0xc2d0dc, roughness: 0.75, metalness: 0.2 });
         const warnLampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xd88418) });
         const cyanLampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x00f0ff) });
         const zPillars = [-4.2, -1.4, 1.4, 4.2];
@@ -634,22 +639,131 @@ export class ThreeScene {
         }
     }
 
+    setupWarehouseStage() {
+        // 1. Industrial High-Tech Clean Freight Warehouse Floor (70m x 24m, centered at x = 5.0)
+        // Spans the full grand campaign continuous sectors (x ∈ [-28, +38])
+        const warehouseFloorMat = new THREE.MeshStandardMaterial({
+            color: 0xc8d3df,
+            roughness: 0.78,
+            metalness: 0.15
+        });
+        const warehouseFloor = new THREE.Mesh(new THREE.BoxGeometry(70.0, 1.0, 24.0), warehouseFloorMat);
+        warehouseFloor.position.set(5.0, -0.5, 0);
+        warehouseFloor.receiveShadow = true;
+        this.warehouseGroup.add(warehouseFloor);
+
+        // Industrial Hazard Caution Stripes along north and south perimeter lines
+        const stripeMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.85 });
+        for (const z of [-8.5, 8.5]) {
+            const stripe = new THREE.Mesh(new THREE.BoxGeometry(68.0, 0.02, 0.45), stripeMat);
+            stripe.position.set(5.0, 0.015, z);
+            this.warehouseGroup.add(stripe);
+        }
+
+        // 2. High-Contrast Shipping Containers & Tactile Props (Anime Tech High-Key Industrial Palette)
+        const containerMats = [
+            new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.65, metalness: 0.25 }), // Vibrant Sky Blue
+            new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.70, metalness: 0.2 }),  // Industrial Safety Amber
+            new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.60, metalness: 0.1 }),  // Clean Off-White
+            new THREE.MeshStandardMaterial({ color: 0xe11d48, roughness: 0.65, metalness: 0.2 })   // Crimson Accent
+        ];
+
+        // Helper to place container
+        const addContainer = (x, z, w, h, d, matIdx) => {
+            const box = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), containerMats[matIdx % containerMats.length]);
+            box.position.set(x, h / 2, z);
+            box.castShadow = true;
+            box.receiveShadow = true;
+            this.warehouseGroup.add(box);
+            return box;
+        };
+
+        // Sector 1: West Cargo Maze (x in [-26, -6])
+        addContainer(-20.0, -3.2, 2.2, 2.8, 2.4, 0);
+        addContainer(-16.5, 3.0, 2.4, 2.8, 2.2, 1);
+        addContainer(-11.5, -2.5, 2.2, 2.6, 2.0, 2);
+        addContainer(-7.9, 1.8, 2.0, 2.6, 2.2, 0);
+
+        // Sector 2: Transit Corridor (x in [-6, +14])
+        addContainer(1.35, -2.4, 2.2, 2.8, 2.0, 1);
+        addContainer(5.5, 2.5, 2.0, 3.2, 2.2, 2);
+        addContainer(9.5, -2.6, 2.4, 2.8, 2.2, 3);
+
+        // Sector 3: Freight Elevator Vault (x in [+14, +36])
+        addContainer(18.5, 3.2, 2.5, 3.0, 2.4, 0);
+        addContainer(24.0, -3.0, 2.4, 3.2, 2.5, 1);
+        addContainer(30.0, 2.8, 2.6, 3.4, 2.6, 2);
+
+        // 3. Structural Sector Portals & Security Archways at x = -6.0 and x = 14.0
+        const archSteel = new THREE.MeshStandardMaterial({ color: 0x718096, roughness: 0.5, metalness: 0.5 });
+        const cyanGlow = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+        const amberGlow = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+
+        const makeArchway = (xPos, signMat, signLabel) => {
+            const arch = new THREE.Group();
+            for (const z of [-5.5, 5.5]) {
+                const post = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4.4, 0.6), archSteel);
+                post.position.set(xPos, 2.2, z);
+                post.castShadow = true;
+                arch.add(post);
+            }
+            const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.55, 11.5), archSteel);
+            lintel.position.set(xPos, 4.4, 0);
+            arch.add(lintel);
+
+            const neon = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.12, 6.5), signMat);
+            neon.position.set(xPos, 4.4, 0);
+            arch.add(neon);
+            return arch;
+        };
+
+        this.warehouseGroup.add(makeArchway(-6.0, cyanGlow, 'SECTOR 02 // LOGISTICS TRANSIT CORRIDOR'));
+        this.warehouseGroup.add(makeArchway(14.0, amberGlow, 'SECTOR 03 // FREIGHT ELEVATOR & SECURE VAULT'));
+
+        // 4. Overhead Gantry Cranes & Warehouse Beams (Light Gray/Blue Steel)
+        const steelMat = new THREE.MeshStandardMaterial({ color: 0x8293a6, roughness: 0.5, metalness: 0.5 });
+        for (const x of [-22.0, -8.0, 6.0, 20.0, 32.0]) {
+            const craneBeam = new THREE.Mesh(new THREE.BoxGeometry(0.6, 7.5, 0.6), steelMat);
+            craneBeam.position.set(x, 3.75, -8.5);
+            this.warehouseGroup.add(craneBeam);
+        }
+        const crossBeam = new THREE.Mesh(new THREE.BoxGeometry(68.0, 0.5, 0.5), steelMat);
+        crossBeam.position.set(5.0, 7.2, -8.5);
+        this.warehouseGroup.add(crossBeam);
+
+        // 5. North Clean Architectural Wall & Billboard
+        const northWallMat = new THREE.MeshStandardMaterial({ color: 0xd8e3ee, roughness: 0.85, metalness: 0.1 });
+        const northWall = new THREE.Mesh(new THREE.BoxGeometry(70.0, 8.0, 0.8), northWallMat);
+        northWall.position.set(5.0, 4.0, -9.5);
+        this.warehouseGroup.add(northWall);
+
+        const neonSignMat = new THREE.MeshBasicMaterial({ color: 0x0284c7 });
+        const neonSign = new THREE.Mesh(new THREE.BoxGeometry(32.0, 0.16, 0.05), neonSignMat);
+        neonSign.position.set(5.0, 6.0, -9.05);
+        this.warehouseGroup.add(neonSign);
+    }
+
     setStageMode(mode = 'ROOFTOP') {
+        const isWarehouse = mode === 'WAREHOUSE';
         const isIndoor = mode === 'INDOOR_DOJO';
-        this.stageMode = isIndoor ? 'INDOOR_DOJO' : 'ROOFTOP';
+        const isRooftop = !isWarehouse && !isIndoor;
+        this.stageMode = mode;
 
-        if (this.rooftopGroup) this.rooftopGroup.visible = !isIndoor;
-        if (this.skylineGroup) this.skylineGroup.visible = !isIndoor;
-        if (this.rain) this.rain.visible = !isIndoor;
-        if (this.sky) this.sky.visible = !isIndoor;
+        if (this.rooftopGroup) this.rooftopGroup.visible = isRooftop;
+        if (this.skylineGroup) this.skylineGroup.visible = isRooftop;
+        if (this.rain) this.rain.visible = isRooftop;
+        if (this.sky) this.sky.visible = true; // Sky remains visible for airy, bright daylight in all scenes
         if (this.indoorGroup) this.indoorGroup.visible = isIndoor;
+        if (this.warehouseGroup) this.warehouseGroup.visible = isWarehouse;
 
+        // Bright high-key clean atmosphere across all modes
+        this.scene.fog.color.setHex(0xdbe6f2);
         if (isIndoor) {
-            this.scene.fog.density = 0.010;
-            this.scene.fog.color.setHex(0x101520);
+            this.scene.fog.density = 0.005;
+        } else if (isWarehouse) {
+            this.scene.fog.density = 0.006;
         } else {
-            this.scene.fog.density = 0.024;
-            this.scene.fog.color.setHex(0x0b0f18);
+            this.scene.fog.density = 0.008;
         }
     }
 
@@ -731,11 +845,37 @@ export class ThreeScene {
         el.addEventListener('contextmenu', (e) => e.preventDefault());
     }
 
-    updateCamera(f1, f2, isPreview = false, timeSeconds = 0) {
+    updateCamera(f1, f2, isPreview = false, timeSeconds = 0, cinematicState = null) {
         const dt = this._lastCamT === undefined ? 1 / 60 : Math.min(0.1, Math.max(0, timeSeconds - this._lastCamT));
         this._lastCamT = timeSeconds;
         this.updateRain(dt);
         this.postfx.flash *= Math.exp(-dt * 18);
+
+        // P3 Boss Cinematic Dramatic Push-In Dolly
+        if (cinematicState && cinematicState.active && f2) {
+            const progress = Math.min(1.0, cinematicState.frame / 70.0);
+            const ease = 1 - Math.pow(1 - progress, 3);
+            const dist = 8.2 - ease * 4.8; // dolly in from 8.2m to 3.4m!
+            const pitch = 0.14; // low-angle hero shot looking up at Boss
+            const yaw = (f2.facingAngle !== undefined ? f2.facingAngle : (f2.facing === 1 ? 0 : Math.PI)) - 0.35;
+
+            const bossX = f2.x;
+            const bossZ = f2.z;
+            const lookY = 1.15;
+
+            const targetCamPos = new THREE.Vector3(
+                bossX + dist * Math.sin(yaw) * Math.cos(pitch),
+                lookY + dist * Math.sin(pitch),
+                bossZ + dist * Math.cos(yaw) * Math.cos(pitch)
+            );
+            this.camera.position.lerp(targetCamPos, 0.12);
+            this.cameraTarget.set(bossX, lookY, bossZ);
+            this.camera.lookAt(this.cameraTarget);
+
+            this.keyLight.position.set(bossX + 3, 9, bossZ + 6);
+            this.keyLight.target.position.set(bossX, 0, bossZ);
+            return;
+        }
 
         let midX = (f1.x + f2.x) * 0.5;
         let midZ = (f1.z + f2.z) * 0.5;
@@ -758,6 +898,14 @@ export class ThreeScene {
             lookY = 1.05 + midY * 0.3;
         } else if (this.camMode === 'top') {         // high tactical view
             pitch = 0.95; camDist *= 1.15; lookY = 0.5;
+        } else if (this.camMode === 'adventure') {   // Oni 2001 Adventure 3rd-person follow
+            const { fx, fz } = typeof f1.getForwardVector === 'function' ? f1.getForwardVector() : { fx: 1, fz: 0 };
+            yaw = Math.atan2(-fx, fz) * 0.45;
+            pitch = 0.22;
+            camDist = Math.max(5.2, 4.0 + dist * 0.45);
+            midX = f1.x * 0.72 + (f2 ? f2.x : f1.x) * 0.28;
+            midZ = f1.z * 0.72 + (f2 ? f2.z : f1.z) * 0.28;
+            lookY = 1.12 + midY * 0.25;
         }
         if (isPreview) {
             yaw += Math.sin(timeSeconds * 0.45) * 0.14;

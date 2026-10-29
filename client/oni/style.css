@@ -814,6 +814,131 @@ html:-webkit-full-screen body,
     line-height: 1.35;
 }
 
+/* P3 Cinematic Letterbox & Radio Broadcast */
+.cinematic-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: auto;
+    z-index: 25;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    transition: opacity 0.3s ease;
+}
+
+.cinematic-overlay.hidden {
+    display: none;
+    pointer-events: none;
+}
+
+.cinematic-bar {
+    width: 100%;
+    height: 11vh;
+    background: #060910;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.9);
+    position: relative;
+    z-index: 2;
+}
+
+.cinematic-bar.top {
+    border-bottom: 2px solid rgba(0, 240, 255, 0.4);
+}
+
+.cinematic-bar.bottom {
+    border-top: 2px solid rgba(255, 34, 85, 0.4);
+}
+
+.cinematic-radio-hud {
+    align-self: center;
+    width: 90%;
+    max-width: 680px;
+    margin-bottom: 14vh;
+    background: rgba(10, 16, 28, 0.92);
+    border: 1.5px solid rgba(255, 34, 85, 0.7);
+    border-left: 6px solid #ff2255;
+    border-radius: 12px;
+    padding: 14px 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 24px rgba(255, 34, 85, 0.3);
+    backdrop-filter: blur(12px);
+    position: relative;
+    z-index: 3;
+    animation: cinematicHudPop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes cinematicHudPop {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.radio-freq-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: #ff4d6d;
+    margin-bottom: 8px;
+    border-bottom: 1px dashed rgba(255, 77, 109, 0.35);
+    padding-bottom: 4px;
+}
+
+.radio-speaker-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.radio-speaker-badge strong {
+    font-size: 15px;
+    color: #fff;
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 10px rgba(255, 34, 85, 0.6);
+}
+
+.boss-sub-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.15);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.radio-typewriter-text {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #f1f5f9;
+    min-height: 42px;
+    font-family: 'Courier New', monospace, sans-serif;
+    letter-spacing: 0.02em;
+}
+
+.cinematic-skip-hint {
+    text-align: right;
+    font-size: 11px;
+    font-weight: 800;
+    color: #94a3b8;
+    margin-top: 8px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    animation: skipHintBlink 1.2s infinite ease-in-out;
+}
+
+@keyframes skipHintBlink {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1.0; }
+}
+
 /* Tutorial Target Button Pulse Highlight */
 @keyframes tutorialPulse {
     0%, 100% {

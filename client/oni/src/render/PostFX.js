@@ -47,8 +47,8 @@ void main() {
   col += (texture2D(tBloomA, vUv).rgb * 0.9 + texture2D(tBloomB, vUv).rgb * 0.7) * strength;
   col = aces(col * exposure);
   col = toSRGB(col);
-  float vig = smoothstep(0.95, 0.25, length(d * vec2(1.1, 1.25)));
-  col *= mix(0.55, 1.0, vig);
+  float vig = smoothstep(0.98, 0.35, length(d * vec2(1.1, 1.25)));
+  col *= mix(0.88, 1.0, vig);
   col += flash;
   gl_FragColor = vec4(col, 1.0);
 }`;
@@ -86,8 +86,14 @@ export class PostFX {
         this.matBlur = mk(BLUR, { tDiffuse: { value: null }, dir: { value: new THREE.Vector2() } });
         this.matComposite = mk(COMPOSITE, {
             tScene: { value: null }, tBloomA: { value: null }, tBloomB: { value: null },
-            strength: { value: 0.28 }, exposure: { value: 1.02 }, flash: { value: 0 }
+            strength: { value: 0.28 }, exposure: { value: 1.30 }, flash: { value: 0 }
         });
+    }
+
+    setExposure(val) {
+        if (this.matComposite && this.matComposite.uniforms && this.matComposite.uniforms.exposure) {
+            this.matComposite.uniforms.exposure.value = val;
+        }
     }
 
     setSize(w, h, pixelRatio) {
