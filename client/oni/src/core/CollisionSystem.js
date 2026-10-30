@@ -14,6 +14,11 @@ export class CollisionSystem {
     static stageType = 'ROOFTOP';
     static obstacles = [];
     static customBounds = null;
+    static activeWorld = null;
+
+    static setWorld(world = null) {
+        this.activeWorld = world;
+    }
 
     static setStageType(type = 'ROOFTOP') {
         this.stageType = type === 'INDOOR_FLAT' ? 'INDOOR_FLAT' : 'ROOFTOP';
@@ -48,6 +53,9 @@ export class CollisionSystem {
      * Pushes the character out along the penetration vector (AABB sliding).
      */
     static resolveObstacles(fighter, radius = 0.45) {
+        if (this.activeWorld && typeof this.activeWorld.resolveCapsuleCollision === 'function') {
+            this.activeWorld.resolveCapsuleCollision(fighter, radius, 1.8);
+        }
         if (!this.obstacles || this.obstacles.length === 0) return;
         const fy = fighter.y || 0;
 
@@ -162,7 +170,10 @@ export class CollisionSystem {
      *       * Lower Perimeter Catwalk: |x| <= 9.8, |z| <= 5.8 -> y = -1.8
      *       * Outer Cyberpunk Abyss: beyond catwalk -> -Infinity (Ring-Out!)
      */
-    static getFloorHeightAt(x, z) {
+    static getFloorHeightAt(x, z, yHint = 0) {
+        if (this.activeWorld && typeof this.activeWorld.floorAt === 'function') {
+            return this.activeWorld.floorAt(x, z, yHint);
+        }
         if (this.stageType === 'INDOOR_FLAT') {
             return STAGE_CONFIG.UPPER_DECK_Y;
         }

@@ -70,6 +70,7 @@ export class Simulation {
         this.isMatchOver = false;
         this.winner = null;
         this.rules = new ArenaRules();
+        this.world = null;
 
         // Event queue for render/audio listeners (drained each frame)
         this.events = [];
@@ -111,6 +112,11 @@ export class Simulation {
         } else {
             this.setRules(new ArenaRules());
         }
+    }
+
+    setWorld(world) {
+        this.world = world;
+        CollisionSystem.setWorld(world);
     }
 
     setStageType(type = 'ROOFTOP') {
@@ -503,6 +509,20 @@ export class Simulation {
 
         const enemies = this.getEnemies();
         const activeTarget = (typeof this.f1.findBestTarget === 'function' ? this.f1.findBestTarget(enemies) : null) || this.f2;
+
+        // 0. Update active World & process Action (E) interactions with Consoles/Doors/Pickups
+        if (this.world) {
+            this.world.update(FIXED_DT, [this.f1, this.f2, ...this.extraEnemies]);
+            if (input1 && (input1.action || input1.pickup)) {
+                const res = this.world.interact(this.f1);
+                if (res && res.success) {
+                    this.events.push({
+                        fighterId: this.f1.id,
+                        ...res
+                    });
+                }
+            }
+        }
 
         // 1. Check weapon pickup before fighter update (if Punch or Fire pressed near a weapon while unarmed)
         const p1In = { ...input1 };
@@ -899,7 +919,7 @@ export class Simulation {
                 }
 
                 // Floor bounce / settle at current platform elevation (Upper Deck y=0 or Lower Catwalk y=-1.8)
-                const floorY = CollisionSystem.getFloorHeightAt(wpn.x, wpn.z);
+                const floorY = CollisionSystem.getFloorHeightAt(wpn.x, wpn.z, wpn.y);
                 if (Number.isFinite(floorY) && wpn.y <= floorY + 0.14) {
                     wpn.y = floorY + 0.14;
                     if (Math.abs(wpn.vy) > 2.2) {
@@ -922,7 +942,7 @@ export class Simulation {
                     continue;
                 }
             } else {
-                const floorY = CollisionSystem.getFloorHeightAt(wpn.x, wpn.z);
+                const floorY = CollisionSystem.getFloorHeightAt(wpn.x, wpn.z, wpn.y);
                 if (!Number.isFinite(floorY) || wpn.y > floorY + 0.22) {
                     wpn.isGrounded = false;
                 } else {
@@ -1011,7 +1031,7 @@ export class Simulation {
             }
 
             // Remove if hits floor or out of stage bounds
-            const projFloorY = CollisionSystem.getFloorHeightAt(p.x, p.z);
+            const projFloorY = CollisionSystem.getFloorHeightAt(p.x, p.z, p.y);
             const bounds = CollisionSystem.getActiveBounds();
             if (
                 (Number.isFinite(projFloorY) && p.y <= projFloorY + 0.05) ||

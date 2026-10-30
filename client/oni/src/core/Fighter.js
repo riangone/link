@@ -462,13 +462,13 @@ export class Fighter {
         // Horizontal integration + P5 Step-Up / Ledge-Drop / Ring-Out Elevation Physics
         const nextX = this.x + this.vx * FIXED_DT;
         const nextZ = this.z + this.vz * FIXED_DT;
-        const nextFloorY = CollisionSystem.getFloorHeightAt(nextX, nextZ);
+        const nextFloorY = CollisionSystem.getFloorHeightAt(nextX, nextZ, this.y);
 
         // If moving horizontally into a higher wall (e.g. on lower catwalk y = -1.8 trying to walk into upper deck wall y = 0 without jumping high enough)
         if (Number.isFinite(nextFloorY) && nextFloorY > this.y + 0.35) {
             // Block horizontal penetration into the higher deck wall
-            const onlyXFloor = CollisionSystem.getFloorHeightAt(nextX, this.z);
-            const onlyZFloor = CollisionSystem.getFloorHeightAt(this.x, nextZ);
+            const onlyXFloor = CollisionSystem.getFloorHeightAt(nextX, this.z, this.y);
+            const onlyZFloor = CollisionSystem.getFloorHeightAt(this.x, nextZ, this.y);
             if (!Number.isFinite(onlyXFloor) || onlyXFloor <= this.y + 0.35) {
                 this.x = nextX;
             } else {
@@ -502,7 +502,7 @@ export class Fighter {
             }
         }
 
-        const targetFloorY = CollisionSystem.getFloorHeightAt(this.x, this.z);
+        const targetFloorY = CollisionSystem.getFloorHeightAt(this.x, this.z, this.y);
         this.floorY = targetFloorY;
 
         // If fighter was grounded on a higher ledge and stepped/slid off into a lower tier or the abyss:
