@@ -16,7 +16,10 @@
  *    └── 7. Range-Based Offensive Pressure: Close (3-hit chains, command specials) / Mid-Long (Firearms, Throw empty gun, Dash)
  */
 
-import { FIGHTER_STATE, AI_ARCHETYPES, STAGE_CONFIG } from './Constants.js';
+import { FIGHTER_STATE, AI_ARCHETYPES, STAGE_CONFIG, DIFFICULTY_PRESETS } from './Constants.js';
+
+// Neutral tuning used when no Simulation (and thus no difficulty) is attached, e.g. unit tests
+const NEUTRAL_AI_TUNING = { aiAttackIntervalMult: 1.0, aiBlockMult: 1.0, squadTokenGap: 0, squadTokenHold: 50, shootersWaitForMelee: false };
 import { createDeterministicRNG } from './Simulation.js';
 import { CollisionSystem } from './CollisionSystem.js';
 
@@ -31,19 +34,108 @@ export class BotBrain {
     static activeAttackerId = null;
     static tokenExpireFrame = 0;
 
-    static requestAttackToken(botId, currentFrame = 0, duration = 45) {
-        if (!this.activeAttackerId || this.activeAttackerId === botId || currentFrame >= this.tokenExpireFrame) {
-            this.activeAttackerId = botId;
-            this.tokenExpireFrame = currentFrame + duration;
+    // Ranged Firearm Token Bucket to prevent multiple enemies firing simultaneously
+    static activeShooterId = null;
+    static shooterExpireFrame = 0;
+
+    static tokenAcquiredFrame = 0;
+    static nextTokenFreeFrame = 0;
+    static lastAttackerId = null;
+
+    /**
+     * Squad melee token. Only one enemy may press attacks on the player at a time.
+     * The holder keeps it for `duration` frames from acquisition (no endless renewal),
+     * then the squad waits `gap` frames before anyone else may engage.
+     */
+    static requestAttackToken(botId, currentFrame = 0, duration = 60, gap = 0) {
+        // Frame counter went backwards (new match / restart): clear stale token state
+        if (currentFrame < this.tokenAcquiredFrame) {
+            this.activeAttackerId = null;
+            this.tokenExpireFrame = 0;
+            this.nextTokenFreeFrame = 0;
+            this.tokenAcquiredFrame = 0;
+        }
+        if (this.activeAttackerId === botId && currentFrame < this.tokenExpireFrame) {
             return true;
         }
-        return false;
+        if (this.activeAttackerId && currentFrame < this.tokenExpireFrame) {
+            return false;
+        }
+        if (this.activeAttackerId) {
+            // Holder's turn just ended: open the breathing gap
+            this.lastAttackerId = this.activeAttackerId;
+            this.nextTokenFreeFrame = this.tokenExpireFrame + gap;
+            this.activeAttackerId = null;
+        }
+        if (currentFrame < this.nextTokenFreeFrame) return false;
+        // Give someone else a turn first if the previous attacker asks again right away
+        if (gap > 0 && botId === this.lastAttackerId && currentFrame < this.nextTokenFreeFrame + 20) return false;
+        this.activeAttackerId = botId;
+        this.tokenAcquiredFrame = currentFrame;
+        this.tokenExpireFrame = currentFrame + duration;
+        return true;
+    }
+
+    static isMeleeEngagedByOther(botId, currentFrame = 0) {
+        return !!this.activeAttackerId && this.activeAttackerId !== botId && currentFrame < this.tokenExpireFrame;
     }
 
     static releaseAttackToken(botId) {
         if (this.activeAttackerId === botId) {
             this.activeAttackerId = null;
             this.tokenExpireFrame = 0;
+        }
+    }
+
+    static resetSquadTokens() {
+        this.activeAttackerId = null;
+        this.tokenExpireFrame = 0;
+        this.tokenAcquiredFrame = 0;
+        this.nextTokenFreeFrame = 0;
+        this.lastAttackerId = null;
+        this.activeShooterId = null;
+        this.shooterExpireFrame = 0;
+    }
+
+    /**
+     * Map an enemy's authored tier onto the player's chosen difficulty.
+     * Recruit (easy) caps minions at grunt AI and bosses at elite; Master (hard) floors everyone at elite.
+     */
+    static resolveTier(cfgLevel = 'normal', difficulty = 'easy', isBoss = false) {
+        const order = ['easy', 'normal', 'hard'];
+        let idx = order.indexOf(cfgLevel);
+        if (idx < 0) idx = 1;
+        let cap = 2;
+        let floor = 0;
+        if (difficulty === 'easy') cap = isBoss ? 1 : 0;
+        else if (difficulty === 'normal') cap = isBoss ? 2 : 1;
+        else floor = 1;
+        return order[Math.min(cap, Math.max(floor, idx))];
+    }
+
+    static tuningFor(sim) {
+        if (!sim || !sim.difficulty) return NEUTRAL_AI_TUNING;
+        return DIFFICULTY_PRESETS[sim.difficulty] || NEUTRAL_AI_TUNING;
+    }
+
+    squadTokenRequest(bot, sim) {
+        const t = BotBrain.tuningFor(sim);
+        return BotBrain.requestAttackToken(bot.id, (sim && sim.currentFrame) || 0, t.squadTokenHold || 50, t.squadTokenGap || 0);
+    }
+
+    static requestRangedToken(botId, currentFrame = 0, duration = 80) {
+        if (!this.activeShooterId || this.activeShooterId === botId || currentFrame >= this.shooterExpireFrame) {
+            this.activeShooterId = botId;
+            this.shooterExpireFrame = currentFrame + duration;
+            return true;
+        }
+        return false;
+    }
+
+    static releaseRangedToken(botId) {
+        if (this.activeShooterId === botId) {
+            this.activeShooterId = null;
+            this.shooterExpireFrame = 0;
         }
     }
 
@@ -222,7 +314,20 @@ export class BotBrain {
             bot.isRunningToAlarm = false;
             return BT_STATUS.FAILURE;
         }
+
         const camp = sim && sim.campaignManager;
+        // Check if sentry was intercepted by attack, throw, or knockdown while sprinting to alarm
+        if (bot.state === FIGHTER_STATE.HIT_STUN || bot.state === FIGHTER_STATE.BEING_THROWN || bot.state === FIGHTER_STATE.KNOCKED_DOWN || bot.hp <= 0) {
+            if (bot.isRunningToAlarm) {
+                bot.isRunningToAlarm = false;
+                bot.canTriggerAlarm = false;
+                if (camp && !camp.alarmActive && !camp.alarmAverted && typeof camp.interceptAlarm === 'function') {
+                    camp.interceptAlarm(bot);
+                }
+            }
+            return BT_STATUS.FAILURE;
+        }
+
         if (!camp || camp.alarmActive) {
             bot.isRunningToAlarm = false;
             return BT_STATUS.FAILURE;
@@ -418,13 +523,23 @@ export class BotBrain {
      */
     branchDefensiveGuard(bb) {
         const { opp, dist, nx, nz, input, sim } = bb;
-        if (opp.state === FIGHTER_STATE.ATTACK && dist < 2.6) {
-            if (this.rand(sim) < this.profile.blockChance) {
-                input.block = true;
-                input.dirX = -nx;
-                input.dirZ = -nz;
-                return BT_STATUS.SUCCESS;
-            }
+        if (opp.state !== FIGHTER_STATE.ATTACK) {
+            this.guardRollMove = null;
+            this.guardHold = false;
+            return BT_STATUS.FAILURE;
+        }
+        if (dist >= 2.6) return BT_STATUS.FAILURE;
+        // Roll ONCE per opponent attack (not every frame — per-frame rolls made ~100% block rates)
+        if (this.guardRollMove !== opp.currentMove) {
+            this.guardRollMove = opp.currentMove;
+            const t = BotBrain.tuningFor(sim);
+            this.guardHold = this.rand(sim) < this.profile.blockChance * (t.aiBlockMult || 1.0);
+        }
+        if (this.guardHold) {
+            input.block = true;
+            input.dirX = -nx;
+            input.dirZ = -nz;
+            return BT_STATUS.SUCCESS;
         }
         return BT_STATUS.FAILURE;
     }
@@ -433,14 +548,19 @@ export class BotBrain {
      * Branch 7: Context-sensitive punish against Dizzy or Knocked-Down opponent
      */
     branchPunishOpponent(bb) {
-        const { opp, dist, input, sim } = bb;
+        const { bot, opp, dist, input, sim } = bb;
+        if (sim && typeof sim.getEnemies === 'function' && sim.getEnemies().length > 1) {
+            if (!this.squadTokenRequest(bot, sim)) {
+                return BT_STATUS.FAILURE; // Secondary flankers don't dogpile onto knocked down opponent
+            }
+        }
         if (opp.state === FIGHTER_STATE.DIZZY && dist < 1.38) {
             input.throwBtn = true;
             input.punch = true;
             return BT_STATUS.SUCCESS;
         }
         if (opp.state === FIGHTER_STATE.KNOCKED_DOWN && dist < 1.55 && this.profile.level !== 'easy') {
-            if (this.rand(sim) < 0.4) {
+            if (this.rand(sim) < 0.3) {
                 input.kick = true; // Ground stomp
                 return BT_STATUS.SUCCESS;
             }
@@ -455,7 +575,9 @@ export class BotBrain {
         const { bot, opp, dist, nx, nz, input, sim } = bb;
 
         // 8a. If opponent has a loaded gun at mid-range on Hard/Normal, rush in with Slide or Acrobatic Disarm!
-        if (!bot.weapon && opp.weapon && opp.weapon.ammo > 0 && dist > 1.8 && dist < 4.2 && this.profile.level !== 'easy') {
+        const squadSize = sim && typeof sim.getEnemies === 'function' ? sim.getEnemies().length : 1;
+        if (!bot.weapon && opp.weapon && opp.weapon.ammo > 0 && dist > 1.8 && dist < 4.2 && this.profile.level !== 'easy' &&
+            (squadSize <= 1 || this.squadTokenRequest(bot, sim))) {
             const r = this.rand(sim);
             if (r < 0.14) {
                 input.slide = true;
@@ -469,15 +591,22 @@ export class BotBrain {
         }
 
         // 8b. If bot holds a weapon at mid/long range
-        if (dist >= 1.55 && bot.weapon && this.actionTimer % 12 === 0) {
-            if (bot.weapon.ammo > 0 && dist < 9.5) {
-                const fireChance = this.profile.level === 'hard' ? 0.32 : (this.profile.level === 'normal' ? 0.18 : 0.08);
+        if (dist >= 1.55 && bot.weapon && this.actionTimer % 20 === 0) {
+            // Coordinate ranged shooters so multiple squad members don't fire simultaneously
+            const currentFrame = (sim && sim.currentFrame) || 0;
+            // Recruit/Elite: gunmen hold fire while a squadmate is already brawling with the player
+            const holdFire = BotBrain.tuningFor(sim).shootersWaitForMelee && BotBrain.isMeleeEngagedByOther(bot.id, currentFrame);
+            const canFire = !holdFire && BotBrain.requestRangedToken(bot.id, currentFrame, 80);
+            const oppVulnerable = opp.state === FIGHTER_STATE.KNOCKED_DOWN || opp.state === FIGHTER_STATE.WAKEUP || opp.state === FIGHTER_STATE.HIT_STUN;
+
+            if (canFire && !oppVulnerable && bot.weapon.ammo > 0 && dist < 9.5) {
+                const fireChance = this.profile.level === 'hard' ? 0.28 : (this.profile.level === 'normal' ? 0.14 : 0.05);
                 if (this.rand(sim) < fireChance) {
                     input.fire = true;
                     return BT_STATUS.SUCCESS;
                 }
-            } else if (bot.weapon.ammo <= 0 && dist < 5.5) {
-                if (this.rand(sim) < 0.35) {
+            } else if (canFire && bot.weapon.ammo <= 0 && dist < 5.5) {
+                if (this.rand(sim) < 0.30) {
                     input.fire = true; // Throw empty weapon at opponent
                     return BT_STATUS.SUCCESS;
                 }
@@ -517,18 +646,17 @@ export class BotBrain {
         if (sim && typeof sim.getEnemies === 'function') {
             const squad = sim.getEnemies();
             if (squad.length > 1) {
-                const currentFrame = sim.currentFrame || 0;
-                if (!BotBrain.requestAttackToken(bot.id, currentFrame, 50)) {
-                    // Secondary flanker: circles laterally or guards
+                if (!this.squadTokenRequest(bot, sim)) {
+                    // Secondary flanker: circles laterally with an open guard (Oni mooks wait their turn
+                    // instead of turtling, so Konoko can pick them off)
                     input.dirX = -nx * 0.4;
                     input.dirZ = Math.sign(dz || 1) * 0.7;
-                    input.block = true;
                     return BT_STATUS.SUCCESS;
                 }
             }
         }
 
-        const interval = this.profile.attackInterval || 14;
+        const interval = Math.max(6, Math.round((this.profile.attackInterval || 14) * (BotBrain.tuningFor(sim).aiAttackIntervalMult || 1.0)));
         if (this.actionTimer % interval === 0) {
             const r = this.rand(sim);
 
@@ -605,6 +733,24 @@ export class BotBrain {
     branchApproachPressure(bb) {
         const { bot, dist, dz, nx, nz, input, sim } = bb;
 
+        // Squad flanking etiquette: secondary bots maintain a martial perimeter (2.2m .. 3.2m) instead of dogpiling
+        if (sim && typeof sim.getEnemies === 'function') {
+            const squad = sim.getEnemies();
+            if (squad.length > 1 && BotBrain.activeAttackerId && BotBrain.activeAttackerId !== bot.id) {
+                if (dist < 2.3) {
+                    // Step back slightly (open guard)
+                    input.dirX = -nx * 0.45;
+                    input.dirZ = Math.sign(dz || 1) * 0.65;
+                    return BT_STATUS.SUCCESS;
+                } else if (dist <= 3.3) {
+                    // Circle laterally in perimeter
+                    input.dirX = 0;
+                    input.dirZ = Math.sign(dz || 1) * 0.6;
+                    return BT_STATUS.SUCCESS;
+                }
+            }
+        }
+
         // Easy bot occasionally pauses at mid-range ( martial-arts sizing up ) so player isn't overwhelmed
         if (this.profile.level === 'easy' && dist > 1.5 && dist < 2.8 && (this.actionTimer % 50) > 34) {
             input.dirX = 0;
@@ -651,7 +797,8 @@ export class BotBrain {
     think(botFighter, opponent, sim = null) {
         this.actionTimer++;
         if (botFighter && this.profile && this.profile.speedScale) {
-            botFighter.speedScale = this.profile.speedScale;
+            // Multiplies archetype × difficulty speedScale instead of overwriting it
+            botFighter.aiSpeedMult = this.profile.speedScale;
         }
         const input = this.createBlankInput();
 

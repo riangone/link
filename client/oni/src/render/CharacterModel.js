@@ -166,7 +166,7 @@ function faceTexture(p) {
  * Stylized 3-tone anime/retro cel-shading ramp for Oni (2001) aesthetic.
  * Eliminates glossy plastic/mirror specular highlights and produces crisp anime shading planes.
  */
-function makeCelGradientMap() {
+export function makeCelGradientMap() {
     const data = new Uint8Array([
         95, 95, 95, 255,
         175, 175, 175, 255,
@@ -179,16 +179,51 @@ function makeCelGradientMap() {
     return tex;
 }
 
-const PALETTES = {
+export const PALETTES = {
     konoko: {
-        // Oni 2001 Konoko TCTF Assault Suit: deep indigo-violet bodysuit + matte purple-slate tactical vest
-        suit: 0x262344, suit2: 0x1b1932, armor: 0x4b437a, trim: 0x2d3142, accent: 0x38bdf8,
-        skin: 0xf4cfb8, skinCss: '#f4cfb8', hair: 0x7c3aed, hairEmissive: 0x190833,
-        glove: 0x1e1d30, sole: 0x14151c, outline: 0x090812,
-        irisTop: '#4b1d8f', irisBot: '#a855f7', browCss: '#4c1d95'
+        // Oni 2001 Konoko TCTF Assault Suit: deep indigo bodysuit + ivory-white TCTF tactical vest + amber Daodan cuff
+        suit: 0x221e3b, suit2: 0x161326, armor: 0xf1f5f9, trim: 0x334155, accent: 0xf97316,
+        skin: 0xfde2d0, skinCss: '#fde2d0', hair: 0x6d28d9, hairEmissive: 0x1e0e45,
+        glove: 0x1e1d30, sole: 0x0f172a, outline: 0x090812,
+        irisTop: '#4c1d95', irisBot: '#8b5cf6', browCss: '#4c1d95'
+    },
+    striker: {
+        // Oni 2001 Syndicate Striker: deep navy/slate jacket + denim trousers + amber combat visor
+        suit: 0x1e293b, suit2: 0x0f172a, armor: 0x334155, trim: 0x475569, accent: 0xf59e0b,
+        skin: 0xf4cfb8, skinCss: '#f4cfb8', hair: 0xd97706, hairEmissive: 0x291400,
+        glove: 0x181920, sole: 0x0e0f14, outline: 0x06060a,
+        irisTop: '#000', irisBot: '#000', browCss: '#000'
+    },
+    fury: {
+        // Oni 2001 Syndicate Fury: sleek magenta/purple assassin catsuit + glowing neon pink slit mask
+        suit: 0x3b0764, suit2: 0x2e0854, armor: 0x581c87, trim: 0x1e1b4b, accent: 0xf43f5e,
+        skin: 0xfce7f3, skinCss: '#fce7f3', hair: 0x1e1b4b, hairEmissive: 0x120824,
+        glove: 0x3b0764, sole: 0x0f172a, outline: 0x0c0414,
+        irisTop: '#f43f5e', irisBot: '#fb7185', browCss: '#4c0519'
+    },
+    tanker: {
+        // Oni 2001 Syndicate Tanker: massive industrial gunmetal armor + dual back gas tanks + yellow hazard accents
+        suit: 0x18181b, suit2: 0x09090b, armor: 0x3f3f46, trim: 0x52525b, accent: 0xeab308,
+        skin: 0x71717a, skinCss: '#71717a', hair: 0x18181b, hairEmissive: 0x000000,
+        glove: 0x27272a, sole: 0x09090b, outline: 0x050505,
+        irisTop: '#000', irisBot: '#000', browCss: '#000'
+    },
+    black_ops: {
+        // Oni 2001 Black-Ops / Ninja: matte stealth cowl + carbon armor + crimson mono-eye targeting optic
+        suit: 0x0b0f19, suit2: 0x04060a, armor: 0x1e293b, trim: 0x0f172a, accent: 0xef4444,
+        skin: 0x1e293b, skinCss: '#1e293b', hair: 0x090d16, hairEmissive: 0x000000,
+        glove: 0x0f172a, sole: 0x020617, outline: 0x030508,
+        irisTop: '#ef4444', irisBot: '#dc2626', browCss: '#000'
+    },
+    barabas: {
+        // Oni 2001 Boss Barabas: cybernetic exoskeleton spine + chrome cranial implants + crimson optic + weathered muscle
+        suit: 0x292524, suit2: 0x1c1917, armor: 0x78716c, trim: 0x44403c, accent: 0xdc2626,
+        skin: 0xd49b78, skinCss: '#d49b78', hair: 0x57534e, hairEmissive: 0x000000,
+        glove: 0x44403c, sole: 0x1c1917, outline: 0x080706,
+        irisTop: '#dc2626', irisBot: '#ef4444', browCss: '#292524'
     },
     trooper: {
-        // Oni 2001 Syndicate Striker: matte charcoal polymer armor + crimson tactical visor
+        // Fallback generic trooper
         suit: 0x1e2028, suit2: 0x2a2d38, armor: 0x4a5060, trim: 0x2d303b, accent: 0xef4444,
         skin: 0x2e2a36, skinCss: '#2e2a36', hair: 0x15151b, hairEmissive: 0x000000,
         glove: 0x181920, sole: 0x0e0f14, outline: 0x06060a,
@@ -199,12 +234,38 @@ const PALETTES = {
 export class CharacterModel {
     /**
      * @param {boolean} isP1  true = Konoko (TCTF), false = Syndicate trooper
-     * @param {{outline?: boolean}} opts
+     * @param {{outline?: boolean, archetype?: string}} opts
      */
     constructor(isP1, opts = {}) {
         this.isP1 = isP1;
-        this.p = PALETTES[isP1 ? 'konoko' : 'trooper'];
-        this.k = isP1 ? 1 : 1.18; // limb girth multiplier
+        const arch = String(opts.archetype || (isP1 ? 'KONOKO' : 'STRIKER')).toUpperCase();
+        this.archetype = arch;
+        let palKey = 'trooper';
+        if (isP1) {
+            palKey = 'konoko';
+        } else if (arch === 'FURY') {
+            palKey = 'fury';
+        } else if (arch === 'TANKER') {
+            palKey = 'tanker';
+        } else if (arch === 'BLACK_OPS' || arch === 'SNIPER' || arch === 'NINJA') {
+            palKey = 'black_ops';
+        } else if (arch === 'BARABAS') {
+            palKey = 'barabas';
+        } else {
+            palKey = 'striker';
+        }
+        this.p = PALETTES[palKey] || PALETTES.trooper;
+
+        if (isP1) {
+            this.k = 1.0;
+        } else if (arch === 'TANKER' || arch === 'BARABAS') {
+            this.k = 1.25;
+        } else if (arch === 'FURY') {
+            this.k = 0.94;
+        } else {
+            this.k = 1.12;
+        }
+
         this.useOutline = opts.outline !== false;
         this.meshes = [];         // flashable meshes (outline excluded)
         this.pending = new Map(); // joint -> Map(material -> parts[])
@@ -212,16 +273,31 @@ export class CharacterModel {
 
         // skeleton dimensions (body-local units, before the body's uniform scale)
         this.dims = {
-            pelvisY: 0.97, hipX: 0.088, hipY: -0.05,
+            pelvisY: 0.97,
+            hipX: isP1 ? 0.088 : (arch === 'FURY' ? 0.082 : 0.096),
+            hipY: -0.05,
             thigh: 0.43, shin: 0.42, ankleH: 0.07, toeZ: 0.13,
-            shoulderX: isP1 ? 0.172 : 0.19, upperArm: 0.27, foreArm: 0.245
+            shoulderX: isP1 ? 0.172 : (arch === 'TANKER' || arch === 'BARABAS' ? 0.22 : (arch === 'FURY' ? 0.16 : 0.188)),
+            upperArm: 0.27, foreArm: 0.245
         };
 
         this.makeMaterials();
         this.root = new THREE.Group();
         this.buildSkeleton();
         this.buildBody();
-        if (isP1) this.buildKonoko(); else this.buildTrooper();
+        if (isP1) {
+            this.buildKonoko();
+        } else if (arch === 'FURY') {
+            this.buildFury();
+        } else if (arch === 'TANKER') {
+            this.buildTanker();
+        } else if (arch === 'BLACK_OPS' || arch === 'SNIPER' || arch === 'NINJA') {
+            this.buildNinja();
+        } else if (arch === 'BARABAS') {
+            this.buildBarabas();
+        } else {
+            this.buildStriker();
+        }
         this.bake();
     }
 
@@ -440,35 +516,179 @@ export class CharacterModel {
         }
     }
 
-    buildTrooper() {
+    buildStriker() {
         const m = this.mat;
         const H = this.head;
-        // helmet + glowing visor + respirator
-        this.part(H, new THREE.SphereGeometry(0.118, 20, 14), m.armor, 0, 0.11, -0.008, { scale: [1, 1.03, 1.1] });
-        this.part(H, latheY([[0.09, 0.121], [0.135, 0.121]], 24, -Math.PI * 0.4, Math.PI * 0.8, false), m.accent, 0, 0, -0.005, { scale: [1, 1, 1.08], outline: false });
-        this.part(H, roundedBox(0.1, 0.06, 0.07, 0.022), m.trim, 0, 0.04, 0.08);
-        for (const s of [-1, 1]) this.part(H, new THREE.CylinderGeometry(0.022, 0.026, 0.03, 14), m.suit2, s * 0.05, 0.035, 0.11, { rot: [Math.PI / 2, 0, 0] });
-        this.part(H, roundedBox(0.03, 0.05, 0.16, 0.012), m.trim, 0, 0.22, -0.02);
-        for (const s of [-1, 1]) this.part(H, roundedBox(0.03, 0.08, 0.08, 0.012), m.trim, s * 0.115, 0.1, -0.01);
+        const k = this.k;
+        const d = this.dims;
+        // Spiky punk hair crown
+        this.part(H, new THREE.SphereGeometry(0.112, 18, 12), m.hair, 0, 0.11, -0.005, { scale: [1, 1.02, 1.05] });
+        for (let i = 0; i < 5; i++) {
+            const pTuft = tuftGeo(0.035, 0.09, 0.45);
+            this.part(H, pTuft, m.hair, (i - 2) * 0.026, 0.22, 0.01 - Math.abs(i - 2) * 0.015, { rot: [-0.3, 0, (i - 2) * -0.25] });
+        }
+        // Amber combat visor across upper face
+        this.part(H, roundedBox(0.13, 0.032, 0.08, 0.01), m.accent, 0, 0.11, 0.06, { outline: false });
+        // Ear communicator
+        this.part(H, new THREE.CylinderGeometry(0.02, 0.02, 0.02, 10), m.trim, 0.09, 0.09, 0, { rot: [0, 0, Math.PI / 2] });
 
-        // heavy chest rig
-        this.part(this.chest, roundedBox(0.34, 0.22, 0.2, 0.05), m.armor, 0, 0.13, 0.01);
-        this.part(this.chest, roundedBox(0.22, 0.08, 0.04, 0.015), m.trim, 0, 0.06, 0.11);
-        this.part(this.chest, roundedBox(0.04, 0.02, 0.01, 0.005), m.accent, 0.07, 0.19, 0.115);
-        this.part(this.chest, roundedBox(0.24, 0.26, 0.1, 0.03), m.trim, 0, 0.12, -0.13);
-        this.part(this.spine, roundedBox(0.24, 0.12, 0.16, 0.03), m.suit2, 0, 0.1, 0);
-        this.part(this.pelvis, new THREE.TorusGeometry(0.16, 0.022, 8, 28), m.trim, 0, 0.055, 0, { rot: [Math.PI / 2, 0, 0], scale: [1, 0.72, 1] });
-        for (const s of [-1, 1]) this.part(this.pelvis, roundedBox(0.06, 0.08, 0.04, 0.012), m.trim, s * 0.08, 0.02, 0.1);
+        // Open-collar combat vest
+        this.part(this.chest, roundedBox(0.31 * k, 0.22, 0.19 * k, 0.04), m.armor, 0, 0.13, 0.01);
+        this.part(this.chest, roundedBox(0.14, 0.18, 0.03, 0.01), m.suit2, 0, 0.13, 0.095); // inner shirt
+        this.part(this.chest, roundedBox(0.04, 0.02, 0.01, 0.004), m.accent, 0.07, 0.18, 0.105); // badge
+        // Ammo belt
+        this.part(this.pelvis, new THREE.TorusGeometry(0.155 * k, 0.02, 8, 24), m.trim, 0, 0.055, 0, { rot: [Math.PI / 2, 0, 0], scale: [1, 0.72, 1] });
+        for (const s of [-1, 1]) this.part(this.pelvis, roundedBox(0.05, 0.06, 0.035, 0.01), m.trim, s * 0.08, 0.03, 0.095);
+
+        // Shoulders: light combat pauldrons
+        for (const side of [SIDE_L, SIDE_R]) {
+            const A = this.arms[side === SIDE_L ? 'l' : 'r'];
+            this.part(A.sh, new THREE.SphereGeometry(0.075 * k, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), m.armor, side * 0.012, 0.012, 0, { scale: [1.1, 0.85, 1.1], rot: [0, 0, side * 0.35] });
+            this.part(A.el, limbGeo(0.14, [[0, 0.045 * k], [1, 0.036 * k]], 12), m.trim, 0, -0.06, 0);
+            const L = this.legs[side === SIDE_L ? 'l' : 'r'];
+            this.part(L.knee, roundedBox(0.075 * k, 0.09, 0.06, 0.02), m.armor, 0, -0.01, 0.025);
+        }
+    }
+
+    buildFury() {
+        const m = this.mat;
+        const H = this.head;
+        const k = this.k;
+        const d = this.dims;
+        // Aerodynamic assassin cowl
+        this.part(H, new THREE.SphereGeometry(0.105, 20, 14), m.suit, 0, 0.1, -0.005, { scale: [0.96, 1.05, 1.02] });
+        // Twin cat-ear combat sensor horns on head
+        for (const s of [-1, 1]) {
+            const ear = tuftGeo(0.024, 0.065, 0.5);
+            this.part(H, ear, m.armor, s * 0.065, 0.21, 0.01, { rot: [0.1, 0, s * -0.35] });
+            this.part(H, tuftGeo(0.012, 0.04, 0.4), m.accent, s * 0.065, 0.21, 0.02, { rot: [0.1, 0, s * -0.35], outline: false });
+        }
+        // Sleek glowing horizontal slit visor (pink/magenta)
+        this.part(H, latheY([[0.08, 0.108], [0.12, 0.108]], 20, -Math.PI * 0.35, Math.PI * 0.7, false), m.accent, 0, 0, -0.003, { scale: [1, 1, 1.05], outline: false });
+
+        // Agile curved chest armor
+        this.part(this.chest, latheY([[0.02, 0.14], [0.12, 0.155], [0.22, 0.145], [0.27, 0.12]], 20, -Math.PI * 0.4, Math.PI * 0.8, false), m.armor, 0, 0, 0.005, { scale: [1, 1, 0.7] });
+        this.part(this.chest, roundedBox(0.01, 0.12, 0.01, 0.004), m.accent, 0, 0.14, 0.105);
+        // Sleek waist harness
+        this.part(this.pelvis, new THREE.TorusGeometry(0.14, 0.015, 8, 24), m.trim, 0, 0.055, 0, { rot: [Math.PI / 2, 0, 0], scale: [1, 0.68, 1] });
 
         for (const side of [SIDE_L, SIDE_R]) {
             const A = this.arms[side === SIDE_L ? 'l' : 'r'];
-            this.part(A.sh, new THREE.SphereGeometry(0.095, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), m.armor, side * 0.015, 0.015, 0, { scale: [1.1, 0.9, 1.1], rot: [0, 0, side * 0.3] });
-            this.part(A.sh, roundedBox(0.03, 0.006, 0.08, 0.003), m.accent, side * 0.07, 0.04, 0, { rot: [0, 0, side * 0.55], outline: false });
-            this.part(A.el, limbGeo(0.17, [[0, 0.054], [0.6, 0.05], [1, 0.042]], 12), m.armor, 0, -0.06, 0);
+            this.part(A.sh, new THREE.SphereGeometry(0.062, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), m.armor, side * 0.01, 0.01, 0, { scale: [1.05, 0.8, 1.1], rot: [0, 0, side * 0.35] });
+            this.part(A.el, limbGeo(0.15, [[0, 0.038], [1, 0.03]], 12), m.armor, 0, -0.07, 0);
+            this.part(A.el, roundedBox(0.006, 0.1, 0.006, 0.002), m.accent, side * 0.035, -0.13, 0);
+
             const L = this.legs[side === SIDE_L ? 'l' : 'r'];
-            this.part(L.knee, roundedBox(0.1, 0.12, 0.08, 0.03), m.armor, 0, -0.02, 0.03);
-            this.part(L.hip, roundedBox(0.12, 0.18, 0.14, 0.035), m.armor, side * 0.01, -0.16, 0.02);
-            this.part(L.knee, roundedBox(0.006, 0.1, 0.006, 0.002), m.accent, 0, -0.2, 0.065, { outline: false });
+            this.part(L.knee, new THREE.SphereGeometry(0.048, 12, 8, -Math.PI / 2, Math.PI, 0, Math.PI), m.armor, 0, 0.005, 0.01, { scale: [1, 1.2, 1] });
+            this.part(L.knee, roundedBox(0.006, 0.14, 0.006, 0.002), m.accent, 0, -0.16, 0.055);
         }
+    }
+
+    buildTanker() {
+        const m = this.mat;
+        const H = this.head;
+        const k = this.k;
+        const d = this.dims;
+        // Heavy blast helmet + glowing horizontal slit + respirator filters
+        this.part(H, new THREE.SphereGeometry(0.128, 22, 14), m.armor, 0, 0.11, -0.008, { scale: [1.02, 1.05, 1.12] });
+        this.part(H, latheY([[0.09, 0.132], [0.14, 0.132]], 24, -Math.PI * 0.38, Math.PI * 0.76, false), m.accent, 0, 0, -0.005, { scale: [1, 1, 1.08], outline: false });
+        this.part(H, roundedBox(0.11, 0.07, 0.08, 0.025), m.trim, 0, 0.04, 0.09);
+        for (const s of [-1, 1]) this.part(H, new THREE.CylinderGeometry(0.026, 0.03, 0.035, 14), m.suit2, s * 0.055, 0.035, 0.12, { rot: [Math.PI / 2, 0, 0] });
+
+        // Heavy reinforced blast chest plate
+        this.part(this.chest, roundedBox(0.38, 0.25, 0.24, 0.06), m.armor, 0, 0.13, 0.01);
+        this.part(this.chest, roundedBox(0.26, 0.1, 0.04, 0.015), m.trim, 0, 0.06, 0.13);
+        this.part(this.chest, roundedBox(0.05, 0.025, 0.01, 0.005), m.accent, 0.08, 0.20, 0.135);
+        this.part(this.spine, roundedBox(0.28, 0.14, 0.18, 0.035), m.suit2, 0, 0.1, 0);
+
+        // Iconic Tanker Back Dual Hydraulic / Gas Cylinders
+        this.part(this.chest, roundedBox(0.28, 0.28, 0.12, 0.03), m.trim, 0, 0.12, -0.14);
+        for (const s of [-1, 1]) {
+            const cyl = new THREE.CylinderGeometry(0.048, 0.048, 0.34, 14);
+            this.part(this.chest, cyl, m.armor, s * 0.085, 0.14, -0.19);
+            const capTop = new THREE.SphereGeometry(0.048, 12, 8);
+            this.part(this.chest, capTop, m.accent, s * 0.085, 0.31, -0.19);
+            const capBot = new THREE.SphereGeometry(0.048, 12, 8);
+            this.part(this.chest, capBot, m.trim, s * 0.085, -0.03, -0.19);
+        }
+
+        this.part(this.pelvis, new THREE.TorusGeometry(0.18, 0.025, 8, 28), m.trim, 0, 0.055, 0, { rot: [Math.PI / 2, 0, 0], scale: [1, 0.74, 1] });
+        for (const s of [-1, 1]) this.part(this.pelvis, roundedBox(0.07, 0.09, 0.05, 0.015), m.trim, s * 0.09, 0.02, 0.11);
+
+        for (const side of [SIDE_L, SIDE_R]) {
+            const A = this.arms[side === SIDE_L ? 'l' : 'r'];
+            this.part(A.sh, new THREE.SphereGeometry(0.11, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), m.armor, side * 0.018, 0.018, 0, { scale: [1.15, 0.95, 1.15], rot: [0, 0, side * 0.3] });
+            this.part(A.sh, roundedBox(0.04, 0.008, 0.09, 0.003), m.accent, side * 0.08, 0.05, 0, { rot: [0, 0, side * 0.55], outline: false });
+            this.part(A.el, limbGeo(0.18, [[0, 0.06], [0.6, 0.055], [1, 0.046]], 12), m.armor, 0, -0.06, 0);
+            const L = this.legs[side === SIDE_L ? 'l' : 'r'];
+            this.part(L.knee, roundedBox(0.12, 0.14, 0.09, 0.035), m.armor, 0, -0.02, 0.035);
+            this.part(L.hip, roundedBox(0.14, 0.20, 0.16, 0.04), m.armor, side * 0.012, -0.16, 0.025);
+        }
+    }
+
+    buildNinja() {
+        const m = this.mat;
+        const H = this.head;
+        const k = this.k;
+        const d = this.dims;
+        // Shinobi fabric cowl
+        this.part(H, new THREE.SphereGeometry(0.108, 20, 14), m.suit, 0, 0.105, -0.005, { scale: [0.98, 1.04, 1.05] });
+        // Lower face wrap cowl
+        this.part(H, latheY([[0.02, 0.105], [0.08, 0.112]], 20, -Math.PI * 0.45, Math.PI * 0.9, false), m.armor, 0, 0, 0.002, { scale: [1, 1, 1.02] });
+        // Single glowing red optic lens in center of forehead/eye
+        this.part(H, new THREE.CylinderGeometry(0.02, 0.02, 0.025, 14), m.trim, 0, 0.11, 0.095, { rot: [Math.PI / 2, 0, 0] });
+        this.part(H, new THREE.CircleGeometry(0.016, 12), m.accent, 0, 0.11, 0.109);
+
+        // Crossed chest harness
+        this.part(this.chest, roundedBox(0.30 * k, 0.20, 0.18 * k, 0.035), m.armor, 0, 0.13, 0.01);
+        this.part(this.chest, roundedBox(0.02, 0.24, 0.02, 0.005), m.trim, 0, 0.13, 0.095, { rot: [0, 0, 0.55] });
+        this.part(this.chest, roundedBox(0.02, 0.24, 0.02, 0.005), m.trim, 0, 0.13, 0.095, { rot: [0, 0, -0.55] });
+
+        for (const side of [SIDE_L, SIDE_R]) {
+            const A = this.arms[side === SIDE_L ? 'l' : 'r'];
+            this.part(A.el, limbGeo(0.16, [[0, 0.042], [1, 0.032]], 12), m.trim, 0, -0.06, 0);
+            this.part(A.fist, roundedBox(0.07, 0.04, 0.03, 0.01), m.armor, 0, -0.04, 0.02);
+            const L = this.legs[side === SIDE_L ? 'l' : 'r'];
+            this.part(L.knee, limbGeo(0.20, [[0, 0.052], [1, 0.038]], 12), m.trim, 0, -d.shin + 0.20, 0);
+        }
+    }
+
+    buildBarabas() {
+        const m = this.mat;
+        const H = this.head;
+        const k = this.k;
+        const d = this.dims;
+        // Bald cranial dome + right temple metal plate + left bionic eye
+        this.part(H, new THREE.SphereGeometry(0.122, 22, 16), m.skin, 0, 0.11, -0.005, { scale: [1.02, 1.05, 1.08] });
+        // Cranial metal reinforcement
+        this.part(H, roundedBox(0.07, 0.04, 0.06, 0.012), m.armor, 0.05, 0.16, 0.03, { rot: [0.1, 0, -0.2] });
+        // Left bionic red optic
+        this.part(H, new THREE.CircleGeometry(0.016, 12), m.accent, -0.038, 0.11, 0.115);
+
+        // Massive muscular torso with cybernetic exoskeleton spine
+        this.part(this.chest, roundedBox(0.38, 0.26, 0.22, 0.05), m.skin, 0, 0.13, 0.01);
+        this.part(this.chest, roundedBox(0.32, 0.16, 0.04, 0.02), m.armor, 0, 0.14, 0.115); // front pectoral armor
+        // Spine exoskeleton on back
+        this.part(this.chest, roundedBox(0.10, 0.32, 0.08, 0.02), m.armor, 0, 0.13, -0.13);
+        for (let i = 0; i < 4; i++) {
+            this.part(this.chest, roundedBox(0.18, 0.03, 0.04, 0.01), m.trim, 0, 0.02 + i * 0.07, -0.14);
+            this.part(this.chest, new THREE.CircleGeometry(0.012, 10), m.accent, 0, 0.02 + i * 0.07, -0.165, { rot: [0, Math.PI, 0] });
+        }
+
+        // Heavy crushing hydraulic gauntlets
+        for (const side of [SIDE_L, SIDE_R]) {
+            const A = this.arms[side === SIDE_L ? 'l' : 'r'];
+            this.part(A.sh, new THREE.SphereGeometry(0.105, 16, 12), m.armor, side * 0.02, 0.015, 0, { scale: [1.15, 0.95, 1.15], rot: [0, 0, side * 0.3] });
+            this.part(A.el, limbGeo(0.18, [[0, 0.062], [1, 0.048]], 12), m.armor, 0, -0.06, 0);
+            this.part(A.fist, roundedBox(0.09, 0.10, 0.09, 0.03), m.trim, 0, -0.04, 0.01);
+            this.part(A.fist, roundedBox(0.02, 0.08, 0.02, 0.005), m.accent, side * 0.045, -0.04, 0.02);
+
+            const L = this.legs[side === SIDE_L ? 'l' : 'r'];
+            this.part(L.knee, roundedBox(0.11, 0.13, 0.08, 0.03), m.armor, 0, -0.02, 0.03);
+        }
+    }
+
+    buildTrooper() {
+        this.buildStriker();
     }
 }

@@ -5,6 +5,8 @@
 
 import { Fighter } from './Fighter.js';
 import { CollisionSystem } from './CollisionSystem.js';
+import { BotBrain } from './BotBrain.js';
+import { OniRules, ArenaRules } from './Rules.js';
 import {
     FIGHTER_STATE,
     FIXED_DT,
@@ -43,6 +45,9 @@ export class Simulation {
     constructor(seed = 0x0412001) {
         this.initialSeed = seed;
         this.rng = createDeterministicRNG(seed);
+        if (typeof BotBrain !== 'undefined') {
+            BotBrain.resetSquadTokens();
+        }
 
         this.f1 = new Fighter('p1', 'Konoko', -2.6, 1, false);
         this.f2 = new Fighter('p2', 'Syndi-Bot', 2.6, -1, true);
@@ -64,6 +69,7 @@ export class Simulation {
         this.hitstopFrames = 0;
         this.isMatchOver = false;
         this.winner = null;
+        this.rules = new ArenaRules();
 
         // Event queue for render/audio listeners (drained each frame)
         this.events = [];
@@ -74,6 +80,7 @@ export class Simulation {
 
         // P3 Survival Wave Mode (optional continuous enemy reinforcements)
         this.survivalMode = false;
+        this.campaignMode = false;
         this.waveNumber = 1;
         this.respawnTimer = 0;
         this.WAVE_ROSTER = [
@@ -88,6 +95,22 @@ export class Simulation {
         this.waveNumber = 1;
         this.respawnTimer = 0;
         this.applyWaveEnemyConfig(1);
+    }
+
+    setRules(rules) {
+        this.rules = rules;
+        if (this.rules && typeof this.rules.onInit === 'function') {
+            this.rules.onInit(this);
+        }
+    }
+
+    setCampaignMode(on) {
+        this.campaignMode = !!on;
+        if (this.campaignMode) {
+            this.setRules(new OniRules());
+        } else {
+            this.setRules(new ArenaRules());
+        }
     }
 
     setStageType(type = 'ROOFTOP') {
@@ -168,40 +191,40 @@ export class Simulation {
         enemy.z = z;
         enemy.archetype = cfg.archetype || 'STRIKER';
 
-        // Apply archetype baseline stats
-        let baseHp = cfg.maxHp || 90;
-        let basePoise = cfg.maxPoise || 100;
+        // Apply archetype baseline stats (Tuned for fluid Oni Beat 'em up crowd balance)
+        let baseHp = cfg.maxHp || 42;
+        let basePoise = cfg.maxPoise || 20;
         let baseSpeed = cfg.speedScale || 1.0;
 
         if (enemy.archetype === 'TANKER') {
-            baseHp = cfg.maxHp || 155;
-            basePoise = 180;
+            baseHp = cfg.maxHp || 105;
+            basePoise = cfg.maxPoise || 180;
             baseSpeed = 0.76;
             enemy.scale = 1.25;
             enemy.unlockMove('GROUND_STOMP');
         } else if (enemy.archetype === 'FURY') {
-            baseHp = cfg.maxHp || 80;
-            basePoise = 90;
+            baseHp = cfg.maxHp || 48;
+            basePoise = 24;
             baseSpeed = 1.06;
             enemy.scale = 0.94;
             enemy.unlockMove('SLIDE_KICK');
             enemy.unlockMove('WILLOW_KICK');
             enemy.unlockMove('THROW_FRONT');
         } else if (enemy.archetype === 'BLACK_OPS') {
-            baseHp = cfg.maxHp || 110;
-            basePoise = 110;
+            baseHp = cfg.maxHp || 60;
+            basePoise = 45;
             baseSpeed = 1.02;
             enemy.isCamouflage = true;
             enemy.unlockMove('BACK_SPIN_FIST');
         } else if (enemy.archetype === 'SNIPER') {
-            baseHp = cfg.maxHp || 85;
-            basePoise = 95;
+            baseHp = cfg.maxHp || 38;
+            basePoise = 18;
             baseSpeed = 0.88;
             enemy.isSniper = true;
         }
 
         // Apply global difficulty scaling
-        enemy.maxHp = Math.max(30, Math.round(baseHp * preset.enemyHpMult));
+        enemy.maxHp = Math.max(22, Math.round(baseHp * preset.enemyHpMult));
         enemy.hp = enemy.maxHp;
         enemy.maxPoise = basePoise;
         enemy.poise = enemy.maxPoise;
@@ -211,6 +234,7 @@ export class Simulation {
         enemy.aiProfileLevel = cfg.level || (this.difficulty === 'easy' ? 'easy' : 'normal');
         enemy.expReward = cfg.expReward || 65;
         enemy.isBoss = !!cfg.isBoss;
+        enemy.isMinion = !enemy.isBoss;
         enemy.patrolMinX = cfg.patrolMinX !== undefined ? cfg.patrolMinX : (x - 2.5);
         enemy.patrolMaxX = cfg.patrolMaxX !== undefined ? cfg.patrolMaxX : (x + 2.5);
         enemy.isAlerted = cfg.isAlerted !== undefined ? cfg.isAlerted : true;
@@ -410,6 +434,7 @@ export class Simulation {
         this.hitstopFrames = 0;
         this.isMatchOver = false;
         this.winner = null;
+        this.campaignMode = false;
         this.waveNumber = 1;
         this.respawnTimer = 0;
         if (this.survivalMode) {
@@ -503,14 +528,21 @@ export class Simulation {
         this.processFighterRequests();
 
         // Check if player or all enemies are defeated
-        const allEnemiesDown = enemies.every((e) => e.hp <= 0);
-        if (allEnemiesDown && !this.isMatchOver) {
-            this.declareWinner('p1');
-            return;
-        }
-        if (this.f1.hp <= 0 && !this.isMatchOver) {
-            this.declareWinner('p2');
-            return;
+        if (this.rules && typeof this.rules.onTick === 'function') {
+            this.rules.onTick(this);
+            if (this.isMatchOver) return;
+        } else {
+            if (this.f1.hp <= 0 && !this.isMatchOver) {
+                this.declareWinner('p2');
+                return;
+            }
+            if (!this.campaignMode && !this.isMatchOver) {
+                const allEnemiesDown = enemies.length > 0 && enemies.every((e) => e.hp <= 0);
+                if (allEnemiesDown) {
+                    this.declareWinner('p1');
+                    return;
+                }
+            }
         }
 
         // 3. Update Weapons & Projectiles in deterministic order
@@ -590,7 +622,7 @@ export class Simulation {
             (fighter.state === FIGHTER_STATE.IDLE ||
                 fighter.state === FIGHTER_STATE.WALK ||
                 fighter.state === FIGHTER_STATE.CROUCH) &&
-            (rawInput.punch || rawInput.fire);
+            (rawInput.action || rawInput.pickup || rawInput.fire || (rawInput.punch && (rawInput.crouch || rawInput.down || fighter.state === FIGHTER_STATE.CROUCH)));
 
         if (!isSlidingOrRunning && !canManualPickup) return false;
 
@@ -605,7 +637,9 @@ export class Simulation {
             if (dist <= WEAPON_PICKUP_RANGE && dy <= 1.45) {
                 fighter.equipWeapon(wpn);
                 this.removeEntity(wpn.id);
-                // Consume punch/fire edge so fighter doesn't immediately punch on the same frame
+                // Consume pickup input edge so fighter doesn't perform immediate extra action
+                rawInput.action = false;
+                rawInput.pickup = false;
                 rawInput.punch = false;
                 rawInput.fire = false;
 
@@ -633,16 +667,18 @@ export class Simulation {
             const ev = this.events[i];
             if (ev.type === 'WEAPON_FIRE_REQUEST') {
                 this.events.splice(i, 1);
-                const attacker = ev.attacker === 'p1' ? this.f1 : this.f2;
-                const defender = ev.attacker === 'p1' ? this.f2 : this.f1;
+                const attacker = this.entities.get(ev.attacker) || (ev.attacker === 'p1' ? this.f1 : this.f2);
+                const defender = ev.attacker === 'p1'
+                    ? ((typeof this.f1.findBestTarget === 'function' ? this.f1.findBestTarget(this.getEnemies()) : null) || this.f2)
+                    : this.f1;
                 this.executeWeaponFire(attacker, defender, ev.weaponType);
             } else if (ev.type === 'WEAPON_THROW_REQUEST') {
                 this.events.splice(i, 1);
-                const attacker = ev.attacker === 'p1' ? this.f1 : this.f2;
+                const attacker = this.entities.get(ev.attacker) || (ev.attacker === 'p1' ? this.f1 : this.f2);
                 this.executeWeaponThrow(attacker, ev.weapon, ev.move);
             } else if (ev.type === 'HIT' && ev.isThrow) {
-                const attacker = ev.attacker === 'p1' ? this.f1 : this.f2;
-                const defender = ev.defender === 'p1' ? this.f1 : this.f2;
+                const attacker = this.entities.get(ev.attacker) || (ev.attacker === 'p1' ? this.f1 : this.f2);
+                const defender = this.entities.get(ev.defender) || (ev.defender === 'p1' ? this.f1 : this.f2);
                 if (attacker.gainDaodan) attacker.gainDaodan(ev.damage * DAODAN_CONFIG.GAIN_ON_DEAL_DAMAGE, this.events);
                 if (defender.gainDaodan) defender.gainDaodan(ev.damage * DAODAN_CONFIG.GAIN_ON_TAKE_DAMAGE, this.events);
                 if (ev.move && ev.move.disarms) {
@@ -838,7 +874,7 @@ export class Simulation {
 
                 // Check if thrown weapon hits opponent in flight
                 if (wpn.isThrownAttack && wpn.throwAttackerId) {
-                    const attacker = wpn.throwAttackerId === 'p1' ? this.f1 : this.f2;
+                    const attacker = this.entities.get(wpn.throwAttackerId) || (wpn.throwAttackerId === 'p1' ? this.f1 : this.f2);
                     const defenders = wpn.throwAttackerId === 'p1' ? this.getEnemies() : [this.f1];
                     for (let dIdx = 0; dIdx < defenders.length; dIdx++) {
                         const defender = defenders[dIdx];
@@ -995,6 +1031,8 @@ export class Simulation {
         if (!hitResult) return;
 
         attacker.hasHitThisMove = true;
+        if (!attacker.hitTargets) attacker.hitTargets = new Set();
+        attacker.hitTargets.add(defender.id);
         this.applyDamageResult(attacker, defender, hitResult);
     }
 
@@ -1065,8 +1103,34 @@ export class Simulation {
             knockdown: hitResult.move.knockdown || hitResult.move.isLauncher || defender.hp <= 0
         });
 
+        // Intercept sentry sprinting towards alarm console upon hit
+        if (defender.isRunningToAlarm && this.campaignManager && !this.campaignManager.alarmActive && !this.campaignManager.alarmAverted) {
+            defender.isRunningToAlarm = false;
+            defender.canTriggerAlarm = false;
+            if (typeof this.campaignManager.interceptAlarm === 'function') {
+                this.campaignManager.interceptAlarm(defender);
+            }
+        }
+
         if (defender.hp <= 0) {
-            this.declareWinner(attacker.id);
+            defender.hp = 0;
+            defender.transitionTo(FIGHTER_STATE.DEFEAT);
+
+            if (defender.id === 'p1') {
+                this.declareWinner('p2');
+            } else if (!this.campaignMode) {
+                const enemies = this.getEnemies();
+                const allDown = enemies.length > 0 && enemies.every((e) => e.hp <= 0);
+                if (allDown) {
+                    this.declareWinner(attacker.id);
+                }
+            } else {
+                this.events.push({
+                    type: 'ENEMY_DOWN',
+                    enemyId: defender.id,
+                    enemyName: defender.name
+                });
+            }
         }
     }
 
@@ -1098,7 +1162,15 @@ export class Simulation {
     }
 
     handleTimeout() {
+        if (this.rules && typeof this.rules.onTimeout === 'function') {
+            this.rules.onTimeout(this);
+            return;
+        }
         this.isMatchOver = true;
+        if (this.campaignMode) {
+            this.declareWinner('p2');
+            return;
+        }
         if (this.f1.hp > this.f2.hp) {
             this.declareWinner('p1');
         } else if (this.f2.hp > this.f1.hp) {

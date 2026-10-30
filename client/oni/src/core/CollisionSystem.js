@@ -54,6 +54,14 @@ export class CollisionSystem {
         for (let i = 0; i < this.obstacles.length; i++) {
             const obs = this.obstacles[i];
             if (obs.active === false) continue;
+
+            // Tactical low slide / crouch slips under security laser tripwires
+            if (obs.type === 'SECURITY_GATE' || obs.canSlideUnder || obs.isLaserGate) {
+                const isSliding = fighter.state === FIGHTER_STATE.CROUCH ||
+                    (fighter.state === FIGHTER_STATE.ATTACK && fighter.currentMove && fighter.currentMove.id === 'SLIDE_KICK');
+                if (isSliding) continue;
+            }
+
             // Height check
             const obsHeight = obs.height || 3.0;
             if (fy < (obs.minY || 0) - 0.2 || fy > (obs.minY || 0) + obsHeight) continue;
@@ -231,12 +239,16 @@ export class CollisionSystem {
      * @param {number} radius Character collision radius
      */
     static resolvePushbox(f1, f2, radius = 0.65) {
-        // Do not push apart during synchronized throw animation
+        // Do not push apart during synchronized throw animation or against defeated fighters
         if (
             f1.state === FIGHTER_STATE.THROW ||
             f2.state === FIGHTER_STATE.THROW ||
             f1.state === FIGHTER_STATE.BEING_THROWN ||
-            f2.state === FIGHTER_STATE.BEING_THROWN
+            f2.state === FIGHTER_STATE.BEING_THROWN ||
+            f1.state === FIGHTER_STATE.DEFEAT ||
+            f2.state === FIGHTER_STATE.DEFEAT ||
+            f1.hp <= 0 ||
+            f2.hp <= 0
         ) {
             return;
         }
@@ -349,15 +361,21 @@ export class CollisionSystem {
             defender.hp <= 0 ||
             defender.state === FIGHTER_STATE.WAKEUP ||
             defender.state === FIGHTER_STATE.TECH_RECOVERY ||
-            defender.state === FIGHTER_STATE.BEING_THROWN
+            defender.state === FIGHTER_STATE.BEING_THROWN ||
+            defender.state === FIGHTER_STATE.THROW
         ) {
+            return null;
+        }
+
+        if (!attacker.hitTargets) attacker.hitTargets = new Set();
+        if (attacker.hitTargets.has(defender.id)) {
             return null;
         }
 
         const hitbox = this.getActiveHitboxWorld(attacker);
         if (!hitbox) return null;
 
-        if (attacker.hasHitThisMove) return null;
+        if (attacker.hasHitThisMove && !hitbox.move.isMultiTarget) return null;
 
         // Grounded opponents can only be hit by moves with `hitsGrounded` (e.g. Ground Stomp)
         // UNLESS they are still airborne (juggle physics!)
@@ -475,7 +493,8 @@ export class CollisionSystem {
             defender.hp <= 0 ||
             defender.state === FIGHTER_STATE.WAKEUP ||
             defender.state === FIGHTER_STATE.TECH_RECOVERY ||
-            defender.state === FIGHTER_STATE.BEING_THROWN
+            defender.state === FIGHTER_STATE.BEING_THROWN ||
+            defender.state === FIGHTER_STATE.THROW
         ) {
             return null;
         }

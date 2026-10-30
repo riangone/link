@@ -4,7 +4,7 @@
 
 export const I18N = {
     zh: {
-        title: '鬼神对决 · Oni Combat',
+        title: '奥尼 · Oni Combat',
         tagline: '3D 赛博近空格斗 · 搓招、滑铲、格挡与硬直判定',
         p1_name: 'KONOKO (长谷川舞)',
         p2_name: 'SYNDI-BOT (特遣队镜像)',
@@ -23,7 +23,7 @@ export const I18N = {
         back_to_lobby: '返回大厅',
         round_time: '时间',
         moves_btn: '招式表',
-        cam_modes: { side: '侧视', diagonal: '斜角', shoulder: '肩后', top: '俯视' },
+        cam_modes: { adventure: '越肩跟随', side: '侧视', diagonal: '斜角', shoulder: '肩后', top: '俯视' },
         touch_tip: '🕹️ 摇杆移动/双击前冲 · P刺拳 · K踢腿 · ⚡滑铲 · B格挡',
         ko: 'K.O.',
         winner_p1: 'KONOKO 获胜！',
@@ -31,7 +31,7 @@ export const I18N = {
         draw: '平局！'
     },
     ja: {
-        cam_modes: { side: 'サイド', diagonal: '斜め', shoulder: '肩越し', top: '俯瞰' },
+        cam_modes: { adventure: '三人称追従', side: 'サイド', diagonal: '斜め', shoulder: '肩越し', top: '俯瞰' },
         title: 'オニ・コンバット · Oni Combat',
         tagline: '3Dサイバー近接格闘 · コマンド技、スライディング、ガード＆ヒットストップ',
         p1_name: 'コノコ (長谷川舞)',
@@ -56,7 +56,7 @@ export const I18N = {
         draw: '引き分け！'
     },
     en: {
-        cam_modes: { side: 'Side', diagonal: '3/4', shoulder: 'Shoulder', top: 'Top' },
+        cam_modes: { adventure: 'Adventure', side: 'Side', diagonal: '3/4', shoulder: 'Shoulder', top: 'Top' },
         title: 'Oni Combat - 3D Cyber Strike',
         tagline: '3D Cyberpunk Melee · Combos, Slide Sweeps, Blocking & Hitstop',
         p1_name: 'KONOKO (TCTF Agent)',

@@ -62,13 +62,23 @@ function init() {
     const rpgStripMoves = document.getElementById('rpg-strip-moves');
     const commsBanner = document.getElementById('comms-banner');
     const commsSpeaker = document.getElementById('comms-speaker');
+    const commsFreqText = document.getElementById('comms-freq-text');
     const commsTitle = document.getElementById('comms-title');
     const commsProgress = document.getElementById('comms-progress');
     const commsText = document.getElementById('comms-text');
+    const commsDiaryBox = document.getElementById('comms-diary-box');
+    const commsDiaryTitle = document.getElementById('comms-diary-title');
+    const commsDiaryText = document.getElementById('comms-diary-text');
+    const btnToggleDossier = document.getElementById('btn-toggle-dossier');
+    const campaignDossierDrawer = document.getElementById('campaign-dossier-drawer');
+    const dossierItemsList = document.getElementById('dossier-items-list');
+    const dossierCaret = document.getElementById('dossier-caret');
     const btnRematch = document.getElementById('btn-rematch');
     const winnerText = document.getElementById('winner-text');
     const fpsCounter = document.getElementById('fps-counter');
     const btnToggleMoves = document.getElementById('btn-toggle-moves');
+    const moveListOverlay = document.getElementById('move-list-overlay');
+    const btnCloseMoves = document.getElementById('btn-close-moves');
     const movesPanel = document.getElementById('moves-panel');
     const btnDifficulty = document.getElementById('btn-difficulty');
     const btnDifficultyText = document.getElementById('btn-difficulty-text');
@@ -115,17 +125,64 @@ function init() {
         } catch (_) {}
     }
 
-    // Toggle Moves Panel on mobile / compact screens
-    if (btnToggleMoves && movesPanel) {
-        btnToggleMoves.addEventListener('click', (e) => {
-            e.stopPropagation();
-            movesPanel.classList.toggle('open');
-        });
-        document.addEventListener('click', (e) => {
-            if (!movesPanel.contains(e.target) && e.target !== btnToggleMoves) {
-                movesPanel.classList.remove('open');
+    function playAlarmSiren() {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            for (let i = 0; i < 3; i++) {
+                osc.frequency.setValueAtTime(620, now + i * 0.3);
+                osc.frequency.setValueAtTime(860, now + i * 0.3 + 0.15);
             }
-        });
+            gain.gain.setValueAtTime(0.14, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.96);
+        } catch (_) {}
+    }
+
+    function playOverrideChime() {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(523.25, now);
+            osc.frequency.setValueAtTime(659.25, now + 0.08);
+            osc.frequency.setValueAtTime(783.99, now + 0.16);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.36);
+        } catch (_) {}
+    }
+
+    function playCommsChirp() {
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1480, now);
+            osc.frequency.setValueAtTime(1760, now + 0.04);
+            gain.gain.setValueAtTime(0.06, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.13);
+        } catch (_) {}
     }
 
     // Systems
@@ -134,7 +191,7 @@ function init() {
     const campaign = new CampaignManager(sim);
     sim.campaignManager = campaign;
     const meshP1 = new ProceduralFighterMesh(threeScene.scene, true);
-    const meshP2 = new ProceduralFighterMesh(threeScene.scene, false);
+    const meshP2 = new ProceduralFighterMesh(threeScene.scene, false, { archetype: (sim.f2 && sim.f2.archetype) || 'STRIKER' });
     const vfx = new VFXSystem(threeScene.scene);
     const botBrain = new BotBrain(botMode);
     const extraMeshes = new Map();
@@ -161,6 +218,9 @@ function init() {
     }
     updateRpgModalStrip();
 
+    const chapterCountBadge = document.getElementById('chapter-count-badge');
+    const actTabs = document.getElementById('act-tabs');
+
     function selectChapterCard(chId) {
         selectedChapterId = chId;
         if (chapterSelector) {
@@ -169,11 +229,26 @@ function init() {
             });
         }
         const ch = CAMPAIGN_CHAPTERS.find((c) => c.id === chId);
+        if (chapterCountBadge && ch) {
+            chapterCountBadge.textContent = `${ch.code} ${ch.name}`;
+        }
         if (btnStartCampaign && ch) {
             btnStartCampaign.textContent = ch.isTutorial
                 ? `🎓 开始 ${ch.code} ${ch.name}`
                 : `📖 开始战役闯关 (${ch.code} ${ch.name})`;
         }
+    }
+    // Chapter cards always show the data-driven chapter list (original Oni chapter order)
+    if (chapterSelector) {
+        chapterSelector.querySelectorAll('.chapter-card').forEach((card) => {
+            const ch = CAMPAIGN_CHAPTERS.find((c) => c.id === card.getAttribute('data-chapter'));
+            if (!ch || ch.isTutorial) return;
+            const nameEl = card.querySelector('.ch-name');
+            const subEl = card.querySelector('.ch-sub');
+            const parts = String(ch.name).split('·').map((t) => t.trim());
+            if (nameEl) nameEl.textContent = parts[1] || parts[0];
+            if (subEl) subEl.textContent = parts[1] ? `「${parts[0]}」` : ch.subtitle;
+        });
     }
     if (chapterSelector) {
         chapterSelector.addEventListener('click', (e) => {
@@ -184,6 +259,91 @@ function init() {
             selectChapterCard(chId);
         });
     }
+
+    if (actTabs && chapterSelector) {
+        actTabs.addEventListener('click', (e) => {
+            const tab = e.target.closest('.act-tab');
+            if (!tab) return;
+            actTabs.querySelectorAll('.act-tab').forEach((t) => t.classList.remove('active'));
+            tab.classList.add('active');
+            const targetAct = tab.getAttribute('data-act');
+            const cards = chapterSelector.querySelectorAll('.chapter-card');
+            cards.forEach((card) => {
+                const cardAct = card.getAttribute('data-act');
+                if (targetAct === 'all' || cardAct === targetAct) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    }
+
+    function initDossierDrawer() {
+        if (!btnToggleDossier || !campaignDossierDrawer || !dossierItemsList) return;
+        btnToggleDossier.addEventListener('click', (e) => {
+            e.stopPropagation();
+            campaignDossierDrawer.classList.toggle('hidden');
+            if (dossierCaret) {
+                dossierCaret.textContent = campaignDossierDrawer.classList.contains('hidden') ? '▼' : '▲';
+            }
+        });
+
+        dossierItemsList.innerHTML = '';
+        CAMPAIGN_CHAPTERS.forEach((ch) => {
+            const card = document.createElement('div');
+            card.className = 'dossier-card';
+            card.innerHTML = `
+                <div class="dossier-card-head">
+                    <strong>${ch.code} · ${ch.name}</strong>
+                    <span>推荐 Lv.${ch.recommendedLv || 1}</span>
+                </div>
+                <p>${ch.briefing || ch.subtitle}</p>
+            `;
+            card.addEventListener('click', () => {
+                selectChapterCard(ch.id);
+                campaignDossierDrawer.classList.add('hidden');
+                if (dossierCaret) dossierCaret.textContent = '▼';
+            });
+            dossierItemsList.appendChild(card);
+        });
+    }
+    initDossierDrawer();
+
+    // Move List Panel & Modal Overlay Event Handlers
+    if (btnToggleMoves) {
+        btnToggleMoves.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (movesPanel) movesPanel.classList.toggle('open');
+        });
+        document.addEventListener('click', (e) => {
+            if (movesPanel && movesPanel.classList.contains('open')) {
+                if (!movesPanel.contains(e.target) && e.target !== btnToggleMoves && !btnToggleMoves.contains(e.target)) {
+                    movesPanel.classList.remove('open');
+                }
+            }
+        });
+    }
+    if (btnCloseMoves && moveListOverlay) {
+        btnCloseMoves.addEventListener('click', () => {
+            moveListOverlay.classList.add('hidden');
+            if (movesPanel) movesPanel.classList.remove('open');
+        });
+        moveListOverlay.addEventListener('click', (e) => {
+            if (e.target === moveListOverlay) {
+                moveListOverlay.classList.add('hidden');
+                if (movesPanel) movesPanel.classList.remove('open');
+            }
+        });
+    }
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (moveListOverlay && !moveListOverlay.classList.contains('hidden')) {
+                moveListOverlay.classList.add('hidden');
+            }
+            if (movesPanel) movesPanel.classList.remove('open');
+        }
+    });
 
     // Difficulty Selection & Live Switcher ('easy' -> 'normal' -> 'hard')
     const DIFF_LABELS = {
@@ -198,11 +358,9 @@ function init() {
         botMode = level;
         try { localStorage.setItem('oni_difficulty', botMode); } catch (_) {}
         botBrain.setLevel(botMode);
+        extraBrains.clear();
         if (sim) {
             sim.setDifficulty(botMode);
-            if (sim.f2 && botBrain.profile) {
-                sim.f2.speedScale = botBrain.profile.speedScale || 1.0;
-            }
         }
         if (btnDifficultyText) {
             btnDifficultyText.textContent = DIFF_LABELS[botMode];
@@ -215,6 +373,12 @@ function init() {
         }
     }
     setBotDifficulty(botMode);
+
+    // Enemy AI tier = the enemy's authored level clamped by the PLAYER-chosen difficulty.
+    // Never writes back to botMode / the saved difficulty.
+    function applyEnemyTier(cfgLevel, isBoss = false) {
+        botBrain.setLevel(BotBrain.resolveTier(cfgLevel || 'normal', botMode, !!isBoss));
+    }
 
     if (difficultySelector) {
         difficultySelector.addEventListener('click', (e) => {
@@ -343,7 +507,15 @@ function init() {
         keysDown[e.code] = true;
         const camKeys = { Digit1: 'side', Digit2: 'diagonal', Digit3: 'shoulder', Digit4: 'top' };
         if (camKeys[e.code]) setCam(threeScene.setCameraMode(camKeys[e.code]));
-        if (e.code === 'Digit0') threeScene.resetOrbit();
+        if (e.code === 'Equal' || e.code === 'NumpadAdd' || e.key === '+' || e.key === '=') {
+            e.preventDefault();
+            threeScene.adjustZoom(0.92);
+        } else if (e.code === 'Minus' || e.code === 'NumpadSubtract' || e.key === '-' || e.key === '_') {
+            e.preventDefault();
+            threeScene.adjustZoom(1.08);
+        } else if (e.code === 'Digit0' || e.code === 'Numpad0') {
+            threeScene.resetOrbit();
+        }
         if (e.code === 'F11') {
             e.preventDefault();
             toggleFullscreen();
@@ -355,6 +527,73 @@ function init() {
     window.addEventListener('keyup', (e) => {
         keysDown[e.code] = false;
     });
+
+    // ---- Oni 2001 PC controls: mouse turns Konoko (camera locked behind her), LMB punch, RMB kick.
+    // Click the game view to capture the mouse; Esc releases it. Toggle with the M key.
+    const oniCtrl = {
+        enabled: localStorage.getItem('oni_ctrl') !== '0' &&
+            !!(window.matchMedia && window.matchMedia('(pointer: fine)').matches),
+        locked: false,
+        pendingDX: 0,
+        sens: Number(localStorage.getItem('oni_mouse_sens')) || 0.0026
+    };
+    const lockTarget = threeScene.renderer.domElement;
+    function oniAimAllowed() {
+        return oniCtrl.enabled && isPlaying && !(isMultiplayer && myRole === 'client');
+    }
+    lockTarget.addEventListener('click', () => {
+        if (oniAimAllowed() && !oniCtrl.locked && lockTarget.requestPointerLock) {
+            try { lockTarget.requestPointerLock(); } catch (_) { /* unsupported */ }
+        }
+    });
+    document.addEventListener('pointerlockchange', () => {
+        oniCtrl.locked = document.pointerLockElement === lockTarget;
+        oniCtrl.pendingDX = 0;
+        threeScene.setAimFollow(oniCtrl.locked);
+        keysDown.Mouse0 = false;
+        keysDown.Mouse2 = false;
+        if (oniCtrl.locked) showActionNotice('原作操控：鼠标转向 · 左键拳 · 右键踢 · Esc 释放鼠标');
+    });
+    document.addEventListener('mousemove', (e) => {
+        if (!oniCtrl.locked) return;
+        oniCtrl.pendingDX += e.movementX || 0;
+        threeScene.adjustAimPitch((e.movementY || 0) * 0.0022);
+    });
+    document.addEventListener('mousedown', (e) => {
+        if (!oniCtrl.locked) return;
+        if (e.button === 0) keysDown.Mouse0 = true;
+        if (e.button === 2) keysDown.Mouse2 = true;
+    });
+    document.addEventListener('mouseup', (e) => {
+        if (e.button === 0) keysDown.Mouse0 = false;
+        if (e.button === 2) keysDown.Mouse2 = false;
+    });
+    window.addEventListener('keydown', (e) => {
+        if (e.code !== 'KeyM' || e.repeat) return;
+        oniCtrl.enabled = !oniCtrl.enabled;
+        localStorage.setItem('oni_ctrl', oniCtrl.enabled ? '1' : '0');
+        if (!oniCtrl.enabled && oniCtrl.locked && document.exitPointerLock) document.exitPointerLock();
+        showActionNotice(oniCtrl.enabled ? '原作操控：开（点击画面锁定鼠标）' : '原作操控：关（自动朝向敌人）');
+    });
+
+    // Zoom Toast HUD
+    let zoomToastTimer = null;
+    let zoomToastEl = document.getElementById('zoom-toast');
+    if (!zoomToastEl) {
+        zoomToastEl = document.createElement('div');
+        zoomToastEl.id = 'zoom-toast';
+        zoomToastEl.className = 'zoom-toast';
+        document.body.appendChild(zoomToastEl);
+    }
+    threeScene.onZoomChange = (pct) => {
+        if (!zoomToastEl) return;
+        zoomToastEl.textContent = `🔍 视距: ${pct}%`;
+        zoomToastEl.classList.add('visible');
+        clearTimeout(zoomToastTimer);
+        zoomToastTimer = setTimeout(() => {
+            zoomToastEl.classList.remove('visible');
+        }, 1100);
+    };
 
     // Camera view switcher
     const btnCam = document.getElementById('btn-camera');
@@ -568,16 +807,32 @@ function init() {
         if (rawMag > 1.0) {
             dirX /= rawMag;
             dirZ /= rawMag;
+        } else if (rawMag < 0.08) {
+            dirX = 0;
+            dirZ = 0;
         }
         const down = dirZ > 0.4; // screen-space "down" for motion commands (uppercut)
 
-        // screen-relative stick -> world axes, following the current camera yaw
-        const yaw = threeScene.getInputYaw();
-        const c = Math.cos(yaw), sn = Math.sin(yaw);
-        const snap = v => (Math.abs(v) < 0.12 ? 0 : Math.max(-1, Math.min(1, v)));
-        const wx = snap(c * dirX + sn * dirZ);
-        const wz = snap(-sn * dirX + c * dirZ);
-        dirX = wx; dirZ = wz;
+        let aimYaw = null;
+        if (oniCtrl.locked && oniAimAllowed()) {
+            // Oni mouse-look: W/S along Konoko's facing, A/D strafe; the mouse turns her
+            const a = sim.f1.facingAngle + oniCtrl.pendingDX * oniCtrl.sens;
+            oniCtrl.pendingDX = 0;
+            aimYaw = Math.atan2(Math.sin(a), Math.cos(a));
+            const fx = Math.cos(aimYaw), fz = Math.sin(aimYaw);
+            const wx = fx * -dirZ + -fz * dirX;
+            const wz = fz * -dirZ + fx * dirX;
+            dirX = Math.max(-1, Math.min(1, wx));
+            dirZ = Math.max(-1, Math.min(1, wz));
+        } else {
+            // screen-relative stick -> world axes, following the current camera yaw
+            const yaw = threeScene.getInputYaw();
+            const c = Math.cos(yaw), sn = Math.sin(yaw);
+            const wx = c * dirX + sn * dirZ;
+            const wz = -sn * dirX + c * dirZ;
+            dirX = Math.max(-1, Math.min(1, wx));
+            dirZ = Math.max(-1, Math.min(1, wz));
+        }
 
         // Hold-to-Combo rhythmic pulse for mobile touch (holding 👊 or 🦵 smoothly chains 3-hit combos without mashing)
         let touchPunchActive = false;
@@ -602,11 +857,12 @@ function init() {
             swipeSlide = true;
         }
 
-        const punch = !!(keysDown['KeyJ'] || keysDown['KeyZ'] || touchPunchActive);
-        const kick = !!(keysDown['KeyK'] || keysDown['KeyX'] || touchKickActive);
+        const punch = !!(keysDown['KeyJ'] || keysDown['KeyZ'] || keysDown.Mouse0 || touchPunchActive);
+        const kick = !!(keysDown['KeyK'] || keysDown['KeyX'] || keysDown.Mouse2 || touchKickActive);
         const block = !!(keysDown['KeyL'] || keysDown['KeyC'] || touchState.block);
         const jump = !!(keysDown['Space'] || touchState.jump);
-        const crouch = !!(keysDown['ShiftLeft'] || keysDown['ShiftRight'] || touchState.crouch);
+        const crouch = !!(keysDown['ShiftLeft'] || keysDown['ShiftRight'] || keysDown['ControlLeft'] || touchState.crouch);
+        const walk = !!(keysDown['CapsLock'] || keysDown['AltLeft']);
         const slide = !!(keysDown['KeyI'] || keysDown['KeyV'] || touchState.slide || swipeSlide);
         const throwBtn = !!(keysDown['KeyU'] || keysDown['KeyG'] || touchState.throwBtn || (punch && kick));
         const fire = !!(keysDown['KeyF'] || touchState.fire);
@@ -615,7 +871,7 @@ function init() {
         const evade = !!(keysDown['KeyR'] || touchState.evade);
         const special = !!(keysDown['KeyO'] || touchState.special || swipeSpecial);
 
-        return { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn, fire, heal, daodan, evade, special };
+        return { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn, fire, heal, daodan, evade, special, aimYaw, walk };
     }
 
     // Match State
@@ -696,6 +952,7 @@ function init() {
         document.querySelectorAll('.tutorial-highlight').forEach((el) => el.classList.remove('tutorial-highlight'));
     }
 
+    let lastCommsText = '';
     function syncCommsBannerUI() {
         const cs = campaign.commsState;
         if (!commsBanner) return;
@@ -706,9 +963,28 @@ function init() {
         }
         commsBanner.classList.remove('hidden');
         if (commsSpeaker) commsSpeaker.textContent = cs.speaker || 'SHINATAMA';
+        if (commsFreqText) {
+            commsFreqText.textContent = `FREQ: ${cs.frequency || '140.85 MHz'} // ${cs.channel || 'TCTF NEURAL-LINK'}`;
+        }
         if (commsTitle) commsTitle.textContent = cs.title || '';
         if (commsProgress) commsProgress.textContent = cs.progressText || '';
-        if (commsText) commsText.textContent = cs.text || '';
+        if (commsText) {
+            if (cs.text && cs.text !== lastCommsText) {
+                lastCommsText = cs.text;
+                playCommsChirp();
+            }
+            commsText.textContent = cs.text || '';
+        }
+
+        if (commsDiaryBox) {
+            if (cs.diary) {
+                commsDiaryBox.classList.remove('hidden');
+                if (commsDiaryTitle) commsDiaryTitle.textContent = `【${cs.diary.author || 'TCTF INTEL'}】${cs.diary.title}`;
+                if (commsDiaryText) commsDiaryText.textContent = cs.diary.text;
+            } else {
+                commsDiaryBox.classList.add('hidden');
+            }
+        }
 
         clearTutorialHighlights();
         if (cs.highlightBtn) {
@@ -752,9 +1028,10 @@ function init() {
         if (btnNextChapter) btnNextChapter.classList.add('hidden');
         koBanner.style.display = 'none';
         isMultiplayer = false;
+        if (sim) sim.setDifficulty('easy');
         campaign.startTutorial();
         threeScene.setStageMode('INDOOR_DOJO');
-        setBotDifficulty('easy');
+        botBrain.setLevel('easy');
         isPlaying = true;
         document.body.classList.add('in-fight');
         if (modeStatusText) modeStatusText.textContent = '🎓 TCTF 训练营';
@@ -769,13 +1046,16 @@ function init() {
         }
         startOverlay.classList.add('hidden');
         gameoverOverlay.classList.add('hidden');
+        if (moveListOverlay) moveListOverlay.classList.add('hidden');
         if (btnNextChapter) btnNextChapter.classList.add('hidden');
         koBanner.style.display = 'none';
         isMultiplayer = false;
+        setBotDifficulty(botMode); // spawn the chapter with the player's chosen difficulty
         campaign.startChapter(chapterId);
-        const stage = chapterId === 'ch3' ? 'ROOFTOP' : (chapterId === 'ch0' ? 'INDOOR_DOJO' : 'WAREHOUSE');
-        threeScene.setStageMode(stage);
-        setBotDifficulty(sim.f2.aiProfileLevel || 'easy');
+        // each chapter has its own map (LevelLayouts) rendered from the physics obstacle list
+        threeScene.buildCampaignLevel(campaign.activeLevel);
+        threeScene.setStageMode(campaign.activeLevel ? 'CAMPAIGN_LEVEL' : 'WAREHOUSE');
+        applyEnemyTier(sim.f2.aiProfileLevel, sim.f2.isBoss);
         isPlaying = true;
         document.body.classList.add('in-fight');
         if (modeStatusText) modeStatusText.textContent = `📖 战役: ${chapterId.toUpperCase()}`;
@@ -802,8 +1082,9 @@ function init() {
                 session.send({ type: 'start', p1Name: sim.f1.name, p2Name: sim.f2.name });
             }
         } else if (survival) {
+            sim.setDifficulty(botMode);
             sim.enableSurvivalMode(true);
-            setBotDifficulty(sim.f2.aiProfileLevel || 'easy');
+            applyEnemyTier(sim.f2.aiProfileLevel, false);
             if (modeStatusText) modeStatusText.textContent = '🔥 街机生存模式';
         } else {
             setBotDifficulty(botMode);
@@ -980,6 +1261,16 @@ function init() {
                 threeScene.addTrauma(0.55);
                 threeScene.hitFlash(0.28);
                 showActionNotice('DAODAN OVERDRIVE! 道弹蛹完全觉醒!');
+            } else if (ev.type === 'DAODAN_OVERPOWER') {
+                vfx.spawnShockwave(ev.x, 0.95, ev.z, 0xfacc15);
+                vfx.spawnShockwave(ev.x, 0.1, ev.z, 0xd946ef);
+                threeScene.addTrauma(0.65);
+                threeScene.hitFlash(0.35);
+                showActionNotice('💥 DAODAN OVERPOWER! 满血超载霸体! (+50 护盾 & 1.5x 攻击)');
+                playOverrideChime();
+            } else if (ev.type === 'OVERPOWER_SHIELD_ABSORB') {
+                vfx.spawnHitSpark(ev.x, ev.y, ev.z, true, 14);
+                showActionNotice(`🛡️ OVERPOWER SHIELD! [${ev.shieldLeft} 护盾剩余]`);
             } else if (ev.type === 'FALL_DAMAGE') {
                 vfx.spawnShockwave(ev.x, ev.y, ev.z, 0xffaa00);
                 threeScene.addTrauma(0.38);
@@ -991,7 +1282,7 @@ function init() {
             } else if (ev.type === 'WAVE_CLEARED') {
                 showActionNotice(`WAVE ${ev.wave} CLEARED! +1💉 增援接近中!`);
             } else if (ev.type === 'WAVE_SPAWN') {
-                botBrain.setLevel(ev.level || 'normal');
+                applyEnemyTier(ev.level, false);
                 vfx.spawnShockwave(ev.x, 0.15, ev.z, 0xff0077);
                 showActionNotice(`WAVE ${ev.wave}: ${ev.enemyName}!`);
             } else if (ev.type === 'COLLATERAL_SPLASH') {
@@ -1002,6 +1293,23 @@ function init() {
                 showActionNotice(`⚠️ 警报: ${ev.name} 已察觉!`);
                 vfx.spawnShockwave(ev.x, 0.5, ev.z, 0xff0055);
                 playAlertSound();
+            } else if (ev.type === 'ALARM_TRIGGERED') {
+                threeScene.setAlarmState(true);
+                threeScene.addTrauma(0.5);
+                playAlarmSiren();
+                showActionNotice('🚨 警报大作！哨兵拍响警报呼叫武装增援!');
+                syncCommsBannerUI();
+            } else if (ev.type === 'ALARM_DISABLED') {
+                threeScene.setAlarmState(false);
+                playOverrideChime();
+                showActionNotice('✅ 警报切断！武装增援停止入场 (+40 EXP)!');
+                syncCommsBannerUI();
+            } else if (ev.type === 'ALARM_AVERTED') {
+                threeScene.setAlarmState(false);
+                vfx.spawnShockwave(sim.f1.x, 0.4, sim.f1.z, 0x00ff88);
+                threeScene.addTrauma(0.35);
+                showActionNotice('🎯 战术拦截！成功在哨兵触碰控制台前将其制伏 (+60 EXP)!');
+                syncCommsBannerUI();
             } else if (ev.type === 'STEALTH_CRIT') {
                 vfx.spawnShockwave(sim.f1.x, 0.5, sim.f1.z, 0xffaa00);
                 threeScene.addTrauma(0.45);
@@ -1026,6 +1334,7 @@ function init() {
             } else if (ev.type === 'CONSOLE_HACKED') {
                 vfx.spawnShockwave(ev.x, 0.5, ev.z, 0x00f0ff);
                 showActionNotice(ev.text || 'CONSOLE HACKED!');
+                playOverrideChime();
                 syncCommsBannerUI();
             } else if (ev.type === 'RPG_LEVEL_UP') {
                 vfx.spawnShockwave(ev.x, 0.9, ev.z, 0xa855f7);
@@ -1033,11 +1342,15 @@ function init() {
                 threeScene.hitFlash(0.2);
                 showActionNotice(`LEVEL UP! Lv.${ev.level} 解锁: ${ev.unlockLabel}`);
                 updateRpgModalStrip();
+            } else if (ev.type === 'ENEMY_DOWN') {
+                showActionNotice(`击败敌军: ${ev.enemyName || 'ENEMY'}`);
+                vfx.spawnShockwave(sim.f1.x, 0.15, sim.f1.z, 0xffe600);
+                syncCommsBannerUI();
             } else if (ev.type === 'ZONE_CLEARED') {
                 showActionNotice(`ZONE ${ev.zoneIndex}/${ev.totalZones} CLEARED!`);
                 syncCommsBannerUI();
             } else if (ev.type === 'ZONE_ADVANCE') {
-                setBotDifficulty(ev.enemyLevel || 'normal');
+                applyEnemyTier(ev.enemyLevel, ev.isBoss);
                 vfx.spawnShockwave(sim.f2.x, 0.2, sim.f2.z, 0xff0077);
                 showActionNotice(`${ev.title}!`);
                 syncCommsBannerUI();
@@ -1104,6 +1417,9 @@ function init() {
             lastFpsUpdate = currentTime;
         }
 
+        // Release the captured mouse whenever a menu / result screen is up
+        if (oniCtrl.locked && !isPlaying && document.exitPointerLock) document.exitPointerLock();
+
         // Fixed 60Hz Physics & Logic Ticks
         while (accumulator >= FIXED_DT) {
             accumulator -= FIXED_DT;
@@ -1134,7 +1450,7 @@ function init() {
                             const extra = sim.extraEnemies[i];
                             let eb = extraBrains.get(extra.id);
                             if (!eb) {
-                                eb = new BotBrain(extra.aiProfileLevel || 'normal');
+                                eb = new BotBrain(BotBrain.resolveTier(extra.aiProfileLevel || 'normal', botMode, extra.isBoss));
                                 extraBrains.set(extra.id, eb);
                             }
                             extra.cachedAiInput = eb.think(extra, sim.f1, sim);
@@ -1181,7 +1497,7 @@ function init() {
                 activeIds.add(extra.id);
                 let eMesh = extraMeshes.get(extra.id);
                 if (!eMesh) {
-                    eMesh = new ProceduralFighterMesh(threeScene.scene, false);
+                    eMesh = new ProceduralFighterMesh(threeScene.scene, false, { archetype: extra.archetype || 'STRIKER' });
                     extraMeshes.set(extra.id, eMesh);
                 }
                 eMesh.camYaw = threeScene.camYaw;
@@ -1189,9 +1505,7 @@ function init() {
             }
             for (const [id, eMesh] of extraMeshes.entries()) {
                 if (!activeIds.has(id)) {
-                    if (eMesh.group && eMesh.group.parent) {
-                        eMesh.group.parent.remove(eMesh.group);
-                    }
+                    eMesh.destroy();
                     extraMeshes.delete(id);
                 }
             }
@@ -1209,6 +1523,7 @@ function init() {
         if (p1NameEl) p1NameEl.textContent = sim.f1.name || 'KONOKO';
         if (p2NameEl) p2NameEl.textContent = activeEnemy.name || 'SYNDI-BOT';
         p1HpFill.style.width = `${Math.max(0, (sim.f1.hp / sim.f1.maxHp) * 100)}%`;
+        p1HpFill.classList.toggle('overpower-active', !!sim.f1.daodanOverpower);
         p2HpFill.style.width = `${Math.max(0, (activeEnemy.hp / activeEnemy.maxHp) * 100)}%`;
         if (p1PoiseFill) p1PoiseFill.style.width = `${Math.max(0, (sim.f1.poise / sim.f1.maxPoise) * 100)}%`;
         if (p2PoiseFill) p2PoiseFill.style.width = `${Math.max(0, (activeEnemy.poise / activeEnemy.maxPoise) * 100)}%`;
@@ -1224,7 +1539,15 @@ function init() {
                 p2DaodanFill.parentElement.classList.toggle('overdrive', !!sim.f2.daodanOverdrive);
             }
         }
-        if (p1DaodanStage) p1DaodanStage.textContent = sim.f1.daodanOverdrive ? 'OVR' : `S${sim.f1.daodanStage}`;
+        if (p1DaodanStage) {
+            if (sim.f1.daodanOverpower) {
+                p1DaodanStage.textContent = `OVERPOWER +${Math.round(sim.f1.overpowerShield)}`;
+                p1DaodanStage.classList.add('overpower-badge');
+            } else {
+                p1DaodanStage.textContent = sim.f1.daodanOverdrive ? 'OVR' : `S${sim.f1.daodanStage}`;
+                p1DaodanStage.classList.remove('overpower-badge');
+            }
+        }
         if (p2DaodanStage) p2DaodanStage.textContent = sim.f2.daodanOverdrive ? 'OVR' : `S${sim.f2.daodanStage}`;
         if (p1HypoBadge) {
             p1HypoBadge.textContent = `💉×${sim.f1.hypoCount}`;
@@ -1264,7 +1587,11 @@ function init() {
                 p2WeaponBadge.classList.remove('armed');
             }
         }
-        p1HpText.textContent = `${Math.ceil(sim.f1.hp)} / ${sim.f1.maxHp}`;
+        if (sim.f1.daodanOverpower && sim.f1.overpowerShield > 0) {
+            p1HpText.textContent = `${Math.ceil(sim.f1.hp)} (+${Math.ceil(sim.f1.overpowerShield)}🛡️) / ${sim.f1.maxHp}`;
+        } else {
+            p1HpText.textContent = `${Math.ceil(sim.f1.hp)} / ${sim.f1.maxHp}`;
+        }
         p2HpText.textContent = `${Math.ceil(sim.f2.hp)} / ${sim.f2.maxHp}`;
         roundTimerEl.textContent = Math.ceil(sim.roundTimer / 60);
 

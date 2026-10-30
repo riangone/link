@@ -47,8 +47,9 @@ const cx = (n - 1) * spacing / 2;
 if (view === 'front') cam.position.set(cx - dist * 0.25, 1.1, dist); // fighters face +x; front-ish view
 else if (view === 'three') cam.position.set(cx + 2, 2.2, dist * 0.95);
 else if (view === 'face') { cam.position.set(cx + 0.9, 1.6, 1.6); }
+else if (view === 'top') { cam.position.set(cx, dist * 0.9, 0.01); }
 else cam.position.set(cx, 1.0, dist);
-if (view === 'face') cam.lookAt(cx, 1.45, 0); else
+if (view === 'face') cam.lookAt(cx, 1.45, 0); else if (view === 'top') cam.lookAt(cx, 0, 0); else
 cam.lookAt(cx, 0.95, 0);
 
 const move = moveId ? MOVES[moveId] : null;
@@ -58,12 +59,24 @@ const labels = [];
 function makeFighter() {
     return {
         id: isP1 ? 'p1' : 'p2', state: FIGHTER_STATE.IDLE, stateTimer: 0, currentMove: null,
-        x: 0, y: 0, z: 0, vx: 0, vy: 0, facing: 1, isGrounded: true, isBlocking: false,
+        x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, facing: 1, facingAngle: 0, isGrounded: true, isBlocking: false,
         hp: 100, maxHp: 100, hitStunDuration: 18
     };
 }
 
+const raw = qs.get('raw') ? JSON.parse(qs.get('raw')) : null;   // [{key:value,...}, ...] semantic poses, no springs
+import { makePose } from '../src/render/AnimationLibrary.js';
+if (raw) frames.length = 0, raw.forEach((_, i) => frames.push(i));
 frames.forEach((frame, i) => {
+    if (raw) {
+        const mesh = new ProceduralFighterMesh(scene, isP1);
+        const f = makeFighter(); f.x = i * spacing;
+        mesh.pose = makePose(raw[i]);
+        mesh.applyRoot(f); mesh.applyPose(mesh.pose, false);
+        mesh.updateDecals && mesh.updateDecals(f);
+        labels.push(JSON.stringify(raw[i]));
+        return;
+    }
     const mesh = new ProceduralFighterMesh(scene, isP1);
     const f = makeFighter();
     const baseX = i * spacing;

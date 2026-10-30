@@ -701,7 +701,7 @@ test('Oni Combat core module loading and P0+P1 simulation verification', async (
         campaign.setupCampaignZone(CAMPAIGN_CHAPTERS[1], 2, false);
         assert.strictEqual(campaign.zoneIndex, 2);
         assert.strictEqual(campaign.cinematic.active, true, 'Entering Boss zone initiates cinematic cutscene');
-        assert.strictEqual(campaign.cinematic.bossName, 'BARABAS (巴拉巴斯)');
+        assert.strictEqual(campaign.cinematic.bossName, '仓库守卫队长'); // original order: Barabas first appears in Ch.3
 
         // Typewriter advances progressively
         const initialText = campaign.cinematic.typedText;
@@ -837,5 +837,367 @@ test('Oni Combat core module loading and P0+P1 simulation verification', async (
         assert.strictEqual(sniper.isSniper, true);
 
         sim.clearExtraEnemies();
+    });
+
+    await t.test('P12 All-Enemies-Must-Fall Victory Rule & Uppercut Martial Posture Check', async () => {
+        const { CampaignManager } = await import('../../client/oni/src/core/CampaignManager.js');
+        const { ATTACK_ANIMS } = await import('../../client/oni/src/render/AnimationLibrary.js');
+        const sim = new Simulation();
+        const campaign = new CampaignManager(sim);
+
+        // 1. Verify Uppercut posture: No straight-arm IK distortion (rAW === 0), 90-degree bent elbow (rEB >= 1.5)
+        const uppercutAnim = ATTACK_ANIMS.UPPERCUT;
+        assert.ok(uppercutAnim !== undefined, 'UPPERCUT animation must exist');
+        const hitKey = uppercutAnim.keys.find((k) => k.at === 'hit');
+        assert.ok(hitKey !== undefined, 'UPPERCUT hit keyframe must exist');
+        assert.strictEqual(hitKey.pose.rAW, 0, 'Uppercut MUST NOT use straight-arm punch IK (rAW must be 0)');
+        assert.ok(hitKey.pose.rEB >= 1.5, 'Uppercut elbow must remain tightly flexed around 90 degrees');
+        assert.ok(hitKey.pose.lEB >= 1.5, 'Left arm must remain in guard position protecting chin');
+
+        // 2. Verify Campaign victory requires defeating ALL enemies (primary + extra squad)
+        campaign.startChapter('ch1');
+        // Advance to Zone 3 (Boss zone with Barabas + 2 royal guards)
+        campaign.zoneIndex = 2;
+        campaign.zoneCleared = false;
+        const chapter = (await import('../../client/oni/src/core/CampaignManager.js')).CAMPAIGN_CHAPTERS.find((c) => c.id === 'ch1');
+        campaign.setupCampaignZone(chapter, 2, false);
+        campaign.skipBossCinematic();
+
+        assert.strictEqual(campaign.zoneIndex, 2);
+        assert.ok(sim.extraEnemies.length >= 2, 'Boss zone should have squad guards');
+
+        // Only defeat primary Boss (f2), but keep royal guards alive
+        sim.f2.hp = 0;
+        const events1 = [];
+        campaign.updateTick({}, events1);
+
+        // Must NOT complete chapter if guards are still alive!
+        assert.strictEqual(campaign.zoneCleared, false, 'Zone should NOT be cleared when squad guards are alive');
+        assert.strictEqual(events1.some((e) => e.type === 'CHAPTER_COMPLETED'), false, 'Chapter should NOT be completed while guards survive');
+
+        // Now defeat all royal guards as well
+        for (const e of sim.extraEnemies) e.hp = 0;
+        const events2 = [];
+        campaign.updateTick({}, events2);
+
+        // ALL enemies fallen -> Now chapter is victorious!
+        assert.strictEqual(campaign.zoneCleared, true, 'Zone should be cleared when ALL enemies fall');
+        assert.strictEqual(events2.some((e) => e.type === 'CHAPTER_COMPLETED'), true, 'Chapter completes only after all enemies fall');
+
+        campaign.disableCampaign();
+        sim.clearExtraEnemies();
+    });
+
+    await t.test('P13 Infiltration Integrity: Single enemy defeat emits ENEMY_DOWN, never premature KO', async () => {
+        const { CampaignManager } = await import('../../client/oni/src/core/CampaignManager.js');
+        const sim = new Simulation();
+        const campaign = new CampaignManager(sim);
+
+        // Start Ch.1
+        campaign.startChapter('ch1');
+        assert.strictEqual(sim.campaignMode, true, 'CampaignManager must activate campaignMode on Simulation');
+        assert.strictEqual(sim.isMatchOver, false);
+
+        // Ch.1 Zone 1 naturally starts with f2 + extra squad enemy (2 enemies total)
+        const enemies = sim.getEnemies();
+        assert.strictEqual(enemies.length, 2, 'Zone 1 should have primary sentry + 1 squad brawler');
+        const squadEnemy = sim.extraEnemies[0];
+
+        // Deliver a fatal blow to f2 via takeHit / applyDamageResult
+        const fatalHit = {
+            move: { damage: 300, name: 'TEST_FATAL_STRIKE', knockdown: true, knockback: { x: 3.5, y: 4.0 } },
+            contactX: sim.f2.x,
+            contactY: 1.0,
+            contactZ: sim.f2.z
+        };
+        sim.applyDamageResult(sim.f1, sim.f2, fatalHit);
+
+        assert.strictEqual(sim.f2.hp, 0, 'f2 must be at 0 HP');
+        assert.strictEqual(sim.isMatchOver, false, 'Simulation MUST NOT end match when squad enemies remain');
+        assert.strictEqual(sim.winner, null);
+        assert.ok(sim.events.some((e) => e.type === 'ENEMY_DOWN'), 'Must emit ENEMY_DOWN event');
+        assert.ok(!sim.events.some((e) => e.type === 'KO'), 'Must NEVER emit KO event on single enemy defeat in campaign');
+
+        // Tick simulation: match must remain active!
+        sim.tick({}, {});
+        assert.strictEqual(sim.isMatchOver, false, 'Next tick must NOT end match prematurely');
+
+        // Now defeat the squad brawler as well
+        sim.applyDamageResult(sim.f1, squadEnemy, fatalHit);
+        assert.strictEqual(squadEnemy.hp, 0);
+        assert.strictEqual(sim.isMatchOver, false, 'Intermediate zone defeat still should NOT end chapter match');
+
+        // Campaign updateTick handles zone clearing
+        const tickEvents = [...sim.events];
+        campaign.updateTick({}, tickEvents);
+        assert.strictEqual(campaign.zoneCleared, true, 'All enemies down should clear the zone');
+        assert.strictEqual(sim.isMatchOver, false, 'Intermediate zone completion must keep match alive for zone advance');
+
+        campaign.disableCampaign();
+        sim.clearExtraEnemies();
+    });
+
+    await t.test('P14 Synchronized Throws Dynamic Grapple & Specialized Victim Animations', async () => {
+        const { resolvePose, makePose } = await import('../../client/oni/src/render/AnimationLibrary.js');
+        const sim = new Simulation();
+        sim.f1.x = 0; sim.f1.y = 0; sim.f1.z = 0;
+        sim.f1.setFacingAngle(0); // Forward along +X
+        sim.f2.x = 0.8; sim.f2.y = 0; sim.f2.z = 0;
+
+        // 1. THROW_FRONT: Over-the-shoulder throw lifts and flips defender
+        sim.f1.startThrow(MOVES.THROW_FRONT, sim.f2, sim.events);
+        assert.strictEqual(sim.f1.state, FIGHTER_STATE.THROW);
+        assert.strictEqual(sim.f2.state, FIGHTER_STATE.BEING_THROWN);
+
+        // Advance 5 frames into lift
+        sim.f1.stateTimer = 5;
+        sim.f1.handleThrow({}, sim.events);
+        assert.ok(sim.f2.y > 0, 'Defender must be dynamically elevated into the air during throw lift');
+
+        // Verify AnimationLibrary creates distinct inverted flip pose for THROW_FRONT
+        sim.f2.stateTimer = 10;
+        const frontPose = makePose();
+        resolvePose(frontPose, sim.f2, {}, 1.0);
+        assert.ok(frontPose.lift > 0, 'Pose must have vertical lift');
+        assert.ok(frontPose.hipP < 0, 'THROW_FRONT pose must invert hip pitch forward over shoulder');
+
+        // Advance to release frame
+        sim.f1.stateTimer = MOVES.THROW_FRONT.releaseFrame;
+        sim.f1.hasHitThisMove = false;
+        sim.f1.handleThrow({}, sim.events);
+        assert.strictEqual(sim.f2.state, FIGHTER_STATE.KNOCKED_DOWN);
+        assert.strictEqual(sim.f2.isGrounded, false);
+
+        // 2. THROW_BACK: German Suplex creates distinct arched bridge pose
+        sim.f1.transitionTo(FIGHTER_STATE.IDLE);
+        sim.f2.transitionTo(FIGHTER_STATE.IDLE);
+        sim.f1.startThrow(MOVES.THROW_BACK, sim.f2, sim.events);
+        sim.f2.stateTimer = 10;
+        const backPose = makePose();
+        resolvePose(backPose, sim.f2, {}, 1.0);
+        assert.ok(backPose.hipP > 0, 'THROW_BACK pose must arch hips and spine backwards');
+    });
+
+    await t.test('P15 Tactical Gun-Fu & Laser Gate Slide Penetration', () => {
+        const sim = new Simulation();
+
+        // 1. Setup security laser gate obstacle
+        CollisionSystem.setObstacles([
+            { id: 'laser_1', type: 'SECURITY_GATE', minX: 1.0, maxX: 1.4, minZ: -2.0, maxZ: 2.0, height: 2.5, active: true }
+        ]);
+
+        // Upright standing/walking fighter is blocked by laser gate
+        sim.f1.state = FIGHTER_STATE.WALK;
+        sim.f1.x = 1.1; sim.f1.z = 0;
+        CollisionSystem.resolveObstacles(sim.f1);
+        assert.notStrictEqual(sim.f1.x, 1.1, 'Upright fighter must be pushed back by security laser gate');
+
+        // Low profile SLIDE_KICK slides cleanly under the tripwire
+        sim.f1.x = 1.1; sim.f1.z = 0;
+        sim.f1.state = FIGHTER_STATE.ATTACK;
+        sim.f1.currentMove = MOVES.SLIDE_KICK;
+        CollisionSystem.resolveObstacles(sim.f1);
+        assert.strictEqual(sim.f1.x, 1.1, 'Tactical SLIDE_KICK must slide cleanly under security laser gate');
+
+        CollisionSystem.clearObstacles();
+    });
+
+    await t.test('P16 Tactical Infiltration & Stealth Intercept', async () => {
+        const { CampaignManager } = await import('../../client/oni/src/core/CampaignManager.js');
+        const sim = new Simulation();
+        const campaign = new CampaignManager(sim);
+        sim.campaignManager = campaign;
+
+        // 1. Silent Crouch-Sneak
+        sim.f1.state = FIGHTER_STATE.CROUCH;
+        sim.f1.handleCrouch({ dirX: 1, dirZ: 0, crouch: true }, sim.f2, sim.events);
+        assert.ok(sim.f1.vx > 0.8, 'Crouch sneak must allow silent movement forward');
+
+        // Sentry behind hearing test: running alerts sentry, crouch-sneak remains silent
+        const bb = new BotBrain('normal');
+        sim.f2.isAlerted = false;
+        sim.f2.x = 2.0; sim.f2.z = 0;
+        sim.f1.x = 0.5; sim.f1.z = 0; // Behind sentry who faces +X
+        sim.f2.facing = 1;
+        sim.f2.patrolDir = 1;
+
+        // Unalerted sentry does not hear crouch sneak
+        const status = bb.branchPatrolAndAlert({
+            bot: sim.f2,
+            opp: sim.f1,
+            dist: 1.5,
+            input: bb.createBlankInput(),
+            sim
+        });
+        assert.strictEqual(sim.f2.isAlerted, false, 'Crouch sneak behind sentry must remain completely silent');
+
+        // 2. Ambush behind unalerted sentry emits STEALTH_CRIT
+        sim.f1.startThrow(MOVES.THROW_BACK, sim.f2, sim.events);
+        sim.f1.stateTimer = MOVES.THROW_BACK.releaseFrame;
+        sim.f1.hasHitThisMove = false;
+        sim.f1.handleThrow({}, sim.events);
+        assert.ok(sim.events.some((e) => e.type === 'STEALTH_CRIT'), 'Takedown on unalerted enemy must emit STEALTH_CRIT');
+
+        // 3. Sentry sprinting to alarm console is intercepted -> ALARM_AVERTED (+60 EXP)
+        campaign.startChapter('ch1');
+        const sentry = sim.f2;
+        sentry.canTriggerAlarm = true;
+        sentry.isAlerted = true;
+        sentry.isRunningToAlarm = true;
+
+        // Player hits sentry before reaching console
+        sim.applyDamageResult(sim.f1, sentry, {
+            move: MOVES.SLIDE_KICK,
+            contactX: sentry.x,
+            contactY: 1.0,
+            contactZ: sentry.z
+        });
+        assert.strictEqual(campaign.alarmAverted, true, 'Interrupted sentry must avert alarm');
+        assert.ok(sim.events.some((e) => e.type === 'ALARM_AVERTED'), 'Must emit ALARM_AVERTED event');
+
+        campaign.disableCampaign();
+    });
+
+    await t.test('P17 Daodan Overpower Mechanics, Shinatama LCD Comms HUD & 14-Chapter Campaign Lore', async () => {
+        const { CampaignManager, CAMPAIGN_CHAPTERS } = await import('../../client/oni/src/core/CampaignManager.js');
+        const { DAODAN_CONFIG } = await import('../../client/oni/src/core/Constants.js');
+        const sim = new Simulation();
+        const campaign = new CampaignManager(sim);
+        sim.campaignManager = campaign;
+
+        // 1. USE_HYPO at 100% full HP triggers Daodan Overpower (Golden Body, +50 Overshield)
+        sim.f1.hp = sim.f1.maxHp;
+        sim.f1.hypoCount = 1;
+        sim.tick({ heal: true }, {});
+        assert.strictEqual(sim.f1.state, FIGHTER_STATE.ATTACK, 'Fighter should begin USE_HYPO move');
+        assert.strictEqual(sim.f1.currentMove.id, 'USE_HYPO');
+
+        // Advance until move startup hits
+        let emittedOverpower = false;
+        while (sim.f1.state === FIGHTER_STATE.ATTACK && !sim.f1.daodanOverpower) {
+            sim.tick({}, {});
+            if (sim.events.some((e) => e.type === 'DAODAN_OVERPOWER')) {
+                emittedOverpower = true;
+            }
+        }
+
+        assert.strictEqual(sim.f1.daodanOverpower, true, 'Full HP Hypo injection must activate Daodan Overpower');
+        assert.strictEqual(sim.f1.daodanOverdrive, true, 'Overpower implies Daodan Overdrive active');
+        assert.strictEqual(sim.f1.overpowerShield, DAODAN_CONFIG.OVERPOWER_SHIELD_AMOUNT, 'Should grant full overpower shield amount');
+        assert.ok(emittedOverpower, 'Must emit DAODAN_OVERPOWER event');
+
+        // 2. Overshield absorbs incoming damage before draining HP
+        const prevHp = sim.f1.hp;
+        sim.applyDamageResult(sim.f2, sim.f1, {
+            move: MOVES.PUNCH_1,
+            contactX: sim.f1.x,
+            contactY: 1.0,
+            contactZ: sim.f1.z
+        });
+        assert.strictEqual(sim.f1.hp, prevHp, 'HP must remain untouched while Overpower shield absorbs blow');
+        assert.ok(sim.f1.overpowerShield < DAODAN_CONFIG.OVERPOWER_SHIELD_AMOUNT, 'Shield must absorb the strike damage');
+
+        // 3. Attack in Overpower deals +50% boosted damage
+        const baseDmg = MOVES.PUNCH_1.damage;
+        const res = sim.f2.takeHit({ move: MOVES.PUNCH_1 }, sim.f1);
+        const expectedDmg = Math.round(baseDmg * DAODAN_CONFIG.OVERPOWER_DAMAGE_MULT);
+        assert.strictEqual(res.damage, expectedDmg, 'Overpower attacks must deal 1.5x damage');
+
+        // 4. Shinatama LCD Comms HUD Tactical Link Metadata
+        campaign.startChapter('ch1');
+        assert.strictEqual(campaign.commsState.frequency, '140.85 MHz');
+        assert.strictEqual(campaign.commsState.speakerCode, 'SLD-044');
+        assert.strictEqual(campaign.commsState.channel, 'TCTF NEURAL-LINK');
+
+        // 5. Terminal Hack emits classified Diary Intelligence
+        const currentZone = campaign.getCurrentZone();
+        assert.ok(currentZone.consoleDiary, 'Ch.1 Zone 1 must possess classified console diary');
+        assert.strictEqual(currentZone.consoleDiary.title, 'CH.1 集装箱迷宫 · 终端记录');
+
+        // Simulate hacking the console
+        const consoleProp = campaign.interactables.find((i) => i.type === 'CONSOLE');
+        assert.ok(consoleProp, 'Console prop must exist in zone');
+        sim.f1.x = consoleProp.x;
+        sim.f1.z = consoleProp.z;
+        campaign.zoneCleared = true;
+        campaign.updateTick({ punch: true }, sim.events);
+        const hackEv = sim.events.find((e) => e.type === 'CONSOLE_HACKED');
+        assert.ok(hackEv, 'Must emit CONSOLE_HACKED event');
+        assert.ok(hackEv.diary, 'CONSOLE_HACKED event must contain tactical intelligence diary');
+        assert.strictEqual(hackEv.diary.title, 'CH.1 集装箱迷宫 · 终端记录');
+
+        // 6. 14-Chapter Campaign Saga Chronicle Coverage
+        assert.ok(CAMPAIGN_CHAPTERS.length >= 14, 'Must define the full 14-chapter saga archive');
+        const ch14 = CAMPAIGN_CHAPTERS.find((c) => c.id === 'ch14');
+        assert.ok(ch14, 'Chapter 14 The Final Battle must exist');
+        assert.strictEqual(ch14.code, 'CH.14');
+        assert.ok(ch14.briefing.includes('穆罗') && ch14.name.includes('山地要塞'), 'Ch.14 is the final showdown with Muro at the mountain compound');
+
+        campaign.disableCampaign();
+    });
+
+    await t.test('P18 Full 14-Chapter Live Campaign, P-P-P & Sledgehammer Combos, Anti-Gank Multi-Sweep & Throw I-Frames', async () => {
+        const { CampaignManager, CAMPAIGN_CHAPTERS } = await import('../../client/oni/src/core/CampaignManager.js');
+        const { Simulation } = await import('../../client/oni/src/core/Simulation.js');
+        const { MOVES, FIGHTER_STATE } = await import('../../client/oni/src/core/Constants.js');
+        const { CollisionSystem } = await import('../../client/oni/src/core/CollisionSystem.js');
+        const { BotBrain } = await import('../../client/oni/src/core/BotBrain.js');
+
+        const sim = new Simulation(998877);
+        const campaign = new CampaignManager(sim);
+
+        // 1. Full 14 Chapters have playable zones and can be directly started
+        assert.strictEqual(CAMPAIGN_CHAPTERS.length, 15, 'CH.0 through CH.14 must all exist');
+        for (let idx = 1; idx <= 14; idx++) {
+            const ch = CAMPAIGN_CHAPTERS[idx];
+            assert.ok(Array.isArray(ch.zones) && ch.zones.length === 3, `${ch.code} must have 3 fully configured playable zones`);
+        }
+
+        // Verify starting Chapter 14 (The Final Battle)
+        campaign.startChapter('ch14');
+        assert.strictEqual(campaign.activeChapterId, 'ch14');
+        assert.strictEqual(campaign.zoneIndex, 0);
+        const z0 = campaign.getCurrentZone();
+        assert.strictEqual(z0.enemy.archetype, 'BLACK_OPS');
+
+        // 2. Original Oni Combo: P -> P -> P (Triple Punch finish) & SLEDGEHAMMER
+        assert.ok(MOVES.PUNCH_3, 'PUNCH_3 move definition must exist');
+        assert.ok(MOVES.PUNCH_2.cancelTo.includes('PUNCH_3'), 'PUNCH_2 must be cancelable to PUNCH_3');
+        assert.ok(MOVES.SLEDGEHAMMER, 'SLEDGEHAMMER move definition must exist');
+        assert.ok(MOVES.KICK_MID.cancelTo.includes('SLEDGEHAMMER'), 'KICK_MID must be cancelable to SLEDGEHAMMER');
+
+        // 3. Multi-Target Sweep Attacks (Slide Kick, Rising Fury, Devil Spin Kick)
+        assert.strictEqual(MOVES.SLIDE_KICK.isMultiTarget, true, 'Slide Kick must be marked as multi-target sweep');
+        assert.strictEqual(MOVES.DEVIL_SPIN_KICK.isMultiTarget, true, 'Devil Spin Kick must be multi-target');
+        assert.strictEqual(MOVES.RISING_FURY.isMultiTarget, true, 'Rising Fury must be multi-target');
+
+        // Spawn multiple adjacent enemies
+        sim.clearExtraEnemies();
+        const e1 = sim.spawnExtraEnemy({ id: 'squad_1', x: 2.0, z: 0.0, maxHp: 40 });
+        const e2 = sim.spawnExtraEnemy({ id: 'squad_2', x: 2.2, z: 0.2, maxHp: 40 });
+        sim.f1.x = 1.0;
+        sim.f1.z = 0.0;
+        sim.f1.facing = 1;
+        sim.f1.transitionTo(FIGHTER_STATE.ATTACK, MOVES.SLIDE_KICK);
+        sim.f1.stateTimer = MOVES.SLIDE_KICK.startup + 1;
+
+        // Slide kick must be capable of striking both enemies in range without getting blocked by single-hit flag
+        sim.resolveAttackHit(sim.f1, e1);
+        sim.resolveAttackHit(sim.f1, e2);
+        assert.ok(sim.f1.hitTargets.has('squad_1'), 'Slide Kick must strike squad_1');
+        assert.ok(sim.f1.hitTargets.has('squad_2'), 'Slide Kick must strike squad_2 in the same move');
+
+        // 4. Throw Invulnerability (Attacker cannot be hit during throw animation)
+        sim.f1.transitionTo(FIGHTER_STATE.THROW, MOVES.THROW_FRONT);
+        const hitOnThrower = CollisionSystem.checkHit(e1, sim.f1);
+        assert.strictEqual(hitOnThrower, null, 'Fighter in THROW state must be completely invulnerable');
+
+        // 5. Squad Ranged Token Coordination (Prevents simultaneous sniper/pistol firing)
+        const canShooter1 = BotBrain.requestRangedToken('bot_gun_1', 10, 80);
+        const canShooter2 = BotBrain.requestRangedToken('bot_gun_2', 15, 80);
+        assert.strictEqual(canShooter1, true, 'First shooter obtains firing token');
+        assert.strictEqual(canShooter2, false, 'Second shooter must wait for token to expire before firing');
+
+        campaign.disableCampaign();
     });
 });

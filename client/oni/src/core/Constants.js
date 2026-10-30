@@ -14,10 +14,16 @@ export const DIFFICULTY_PRESETS = {
         playerDamageTakenMult: 0.65,
         playerPoiseTakenMult: 0.70,
         enemyHpMult: 0.75,
-        enemySpeedMult: 0.78,
+        enemySpeedMult: 0.9,
         enemyReactionFrames: 24,
         enemyAggression: 0.35,
-        enemyStunBonusFrames: 5
+        enemyStunBonusFrames: 5,
+        // Squad AI tuning (consumed by BotBrain)
+        aiAttackIntervalMult: 1.6,   // enemies swing ~40% less often
+        aiBlockMult: 0.55,           // per-attack block chance scaled down
+        squadTokenHold: 75,          // one attacker engages for ~1.25s
+        squadTokenGap: 50,           // then ~0.8s breathing room before the next one
+        shootersWaitForMelee: true   // gunmen hold fire while someone is brawling with you
     },
     normal: {
         id: 'normal',
@@ -28,7 +34,12 @@ export const DIFFICULTY_PRESETS = {
         enemySpeedMult: 1.0,
         enemyReactionFrames: 14,
         enemyAggression: 0.7,
-        enemyStunBonusFrames: 0
+        enemyStunBonusFrames: 0,
+        aiAttackIntervalMult: 1.15,
+        aiBlockMult: 0.85,
+        squadTokenHold: 90,
+        squadTokenGap: 24,
+        shootersWaitForMelee: true
     },
     hard: {
         id: 'hard',
@@ -39,7 +50,12 @@ export const DIFFICULTY_PRESETS = {
         enemySpeedMult: 1.15,
         enemyReactionFrames: 6,
         enemyAggression: 0.95,
-        enemyStunBonusFrames: -2
+        enemyStunBonusFrames: -2,
+        aiAttackIntervalMult: 1.0,
+        aiBlockMult: 1.0,
+        squadTokenHold: 110,
+        squadTokenGap: 8,
+        shootersWaitForMelee: false
     }
 };
 
@@ -82,8 +98,8 @@ export const STAGE_CONFIG = {
 // Physics
 export const GRAVITY = -32;
 export const MOVE_SPEED = {
-    WALK_FORWARD: 2.6,
-    WALK_BACK: 1.8,
+    WALK_FORWARD: 2.0,   // natural upright walk; out of combat the player breaks into a run (Oni style)
+    WALK_BACK: 1.5,
     RUN: 5.6,
     DASH: 8.0,
     EVADE_IMPULSE: 7.2
@@ -106,8 +122,11 @@ export const DAODAN_CONFIG = {
     OVERDRIVE_THRESHOLD: 100,     // meter required to trigger Daodan Overdrive (Full Awakening)
     OVERDRIVE_DRAIN_PER_TICK: 0.22, // ~450 frames (7.5s) of Overdrive duration
     OVERDRIVE_DAMAGE_MULT: 1.35,  // +35% strike damage in Overdrive
+    OVERPOWER_DAMAGE_MULT: 1.50,  // +50% strike damage in Daodan Overpower
     OVERDRIVE_POISE_FLOOR: 35,    // passive hyper-armor against light/medium pokes during Overdrive
+    OVERPOWER_POISE_FLOOR: 50,    // unbreakable hyper-armor during Daodan Overpower
     OVERDRIVE_REGEN_PER_TICK: 0.04, // passive bio-regeneration per tick in Overdrive
+    OVERPOWER_SHIELD_AMOUNT: 50,  // extra bio-shield HP on 100% full-HP Hypo Overpower
     HYPO_HEAL_AMOUNT: 35,         // HP restored by Hypo-Spray (打针回血)
     STAGE_THRESHOLDS: {
         STAGE_1: 0,               // Base TCTF Combatives
@@ -242,13 +261,14 @@ export const MOVES = {
     // --- Basic Punch String: P -> P -> K (Jab -> Cross -> Crescent Kick) ---
     PUNCH_1: {
         id: 'PUNCH_1',
-        name: '刺拳 (Jab)',
+        chain: { P: 'PUNCH_2' },
+        name: '刺拳 (P)',
         startup: 4,
         active: 3,
         recovery: 8,
         damage: 8,
         poiseDamage: 18,
-        hitStun: 14,
+        hitStun: 15,
         blockStun: 8,
         knockback: { x: 1.4, y: 0 },
         cancelTo: ['PUNCH_2', 'KICK_LOW'],
@@ -257,7 +277,8 @@ export const MOVES = {
     },
     PUNCH_2: {
         id: 'PUNCH_2',
-        name: '直拳 (Cross)',
+        chain: { P: 'PUNCH_3', K: 'COMBO_PUNCH_KICK' },
+        name: '直拳 (P,P)',
         startup: 5,
         active: 4,
         recovery: 11,
@@ -266,69 +287,105 @@ export const MOVES = {
         hitStun: 18,
         blockStun: 10,
         knockback: { x: 2.2, y: 0 },
-        cancelTo: ['COMBO_PUNCH_KICK', 'KICK_HEAVY', 'UPPERCUT'],
+        cancelTo: ['PUNCH_3', 'COMBO_PUNCH_KICK', 'KICK_HEAVY', 'UPPERCUT'],
         cancelWindowStart: 6,
         hitbox: { offset: { x: 1.05, y: 1.25, z: 0 }, radius: 0.38 }
     },
-    COMBO_PUNCH_KICK: {
-        id: 'COMBO_PUNCH_KICK',
-        name: '三段终结旋踢 (Crescent Kick)',
-        startup: 7,
-        active: 5,
-        recovery: 16,
-        damage: 18,
-        poiseDamage: 45,
+    PUNCH_3: {
+        id: 'PUNCH_3',
+        name: '三连重拳 Triple-Hit Haymaker (P,P,P)',
+        startup: 6,
+        active: 4,
+        recovery: 14,
+        damage: 16,
+        poiseDamage: 40,
         hitStun: 24,
-        blockStun: 12,
-        knockback: { x: 4.2, y: 2.2 },
+        blockStun: 11,
+        knockback: { x: 3.5, y: 0.5 },
         knockdown: true,
         cancelTo: [],
+        hitbox: { offset: { x: 1.1, y: 1.25, z: 0 }, radius: 0.42 }
+    },
+    COMBO_PUNCH_KICK: {
+        id: 'COMBO_PUNCH_KICK',
+        cancelWindowStart: 10,
+        chain: { K: 'PPK_K' },
+        name: '锤踵踢 Sledgehammer Heel (P,P,K)',
+        startup: 9,
+        active: 6,
+        recovery: 19,
+        damage: 18,
+        poiseDamage: 45,
+        hitStun: 26,
+        blockStun: 13,
+        knockback: { x: 1.8, y: 0 },
+        knockdown: false,
+        cancelTo: ['PPK_K'],
         hitbox: { offset: { x: 1.15, y: 1.35, z: 0 }, radius: 0.46 }
     },
 
     // --- Basic Kick String: K -> K -> K (Low Kick -> Mid Side Kick -> Spin Roundhouse) ---
     KICK_LOW: {
         id: 'KICK_LOW',
-        name: '低踢 (Low Kick)',
-        startup: 6,
+        chain: { K: 'KICK_MID' },
+        name: '踢 (K)',
+        startup: 7,
         active: 4,
-        recovery: 12,
+        recovery: 14,
         damage: 10,
         poiseDamage: 20,
-        hitStun: 16,
-        blockStun: 9,
+        hitStun: 18,
+        blockStun: 10,
         knockback: { x: 1.8, y: 0 },
         cancelTo: ['KICK_MID', 'KICK_HEAVY'],
-        cancelWindowStart: 7,
+        cancelWindowStart: 8,
         hitbox: { offset: { x: 0.95, y: 0.5, z: 0 }, radius: 0.35 }
     },
     KICK_MID: {
         id: 'KICK_MID',
-        name: '中段侧踢 (Side Kick)',
-        startup: 6,
-        active: 4,
-        recovery: 13,
+        chain: { K: 'KICK_HEAVY', KF: 'CRESCENT_MOON_KICK' },
+        name: '连踢 (K,K)',
+        startup: 8,
+        active: 5,
+        recovery: 15,
         damage: 14,
         poiseDamage: 30,
-        hitStun: 19,
-        blockStun: 11,
-        knockback: { x: 2.6, y: 0 },
-        cancelTo: ['KICK_HEAVY', 'RISING_FURY'],
-        cancelWindowStart: 7,
+        hitStun: 21,
+        blockStun: 12,
+        knockback: { x: 2.5, y: 0 },
+        cancelTo: ['KICK_HEAVY', 'CRESCENT_MOON_KICK', 'SLEDGEHAMMER', 'RISING_FURY'],
+        cancelWindowStart: 9,
         hitbox: { offset: { x: 1.1, y: 1.05, z: 0 }, radius: 0.42 }
+    },
+    SLEDGEHAMMER: {
+        id: 'SLEDGEHAMMER',
+        name: '前冲重拳 (前+P)',
+        startup: 8,
+        active: 5,
+        recovery: 16,
+        damage: 20,
+        poiseDamage: 55,
+        armorThreshold: 20,
+        hitStun: 28,
+        blockStun: 14,
+        knockback: { x: 4.5, y: 1.5 },
+        knockdown: true,
+        disarms: true,
+        cancelTo: [],
+        hitbox: { offset: { x: 1.15, y: 1.2, z: 0 }, radius: 0.45 }
     },
     KICK_HEAVY: {
         id: 'KICK_HEAVY',
-        name: '回旋重踢 (Spin Roundhouse)',
-        startup: 8,
+        name: '旋身侧踢 Spinning Sidekick (K,K,K)',
+        startup: 10,
         active: 6,
-        recovery: 18,
+        recovery: 20,
         damage: 22,
         poiseDamage: 55,
         armorThreshold: 22,
-        hitStun: 26,
+        hitStun: 28,
         blockStun: 14,
-        knockback: { x: 4.5, y: 1.8 },
+        knockback: { x: 4.2, y: 1.5 },
         knockdown: true,
         disarms: true,
         cancelTo: [],
@@ -338,95 +395,98 @@ export const MOVES = {
     // --- Directional & Command Specials ---
     UPPERCUT: {
         id: 'UPPERCUT',
-        name: '升龙升拳 (Rising Uppercut)',
-        startup: 7,
-        active: 5,
-        recovery: 16,
+        name: '升拳 (蹲+前+P)',
+        startup: 8,
+        active: 6,
+        recovery: 18,
         damage: 20,
         poiseDamage: 50,
         armorThreshold: 22,
-        hitStun: 28,
-        blockStun: 14,
-        knockback: { x: 2.8, y: 7.5 },
+        hitStun: 30,
+        blockStun: 15,
+        knockback: { x: 2.4, y: 5.6 },
         isLauncher: true,
         cancelTo: [],
-        hitbox: { offset: { x: 0.8, y: 1.6, z: 0 }, radius: 0.45 }
+        hitbox: { offset: { x: 0.8, y: 1.5, z: 0 }, radius: 0.45 }
     },
     RISING_FURY: {
         id: 'RISING_FURY',
-        name: '旋风升龙腿 (Rising Fury)',
-        startup: 6,
-        active: 8,
-        recovery: 16,
+        name: '旋风升踢 (蹲+跳+K · 本作原创)',
+        startup: 8,
+        active: 9,
+        recovery: 18,
         damage: 24,
         poiseDamage: 60,
         armorThreshold: 25,
-        hitStun: 30,
-        blockStun: 15,
-        knockback: { x: 2.5, y: 8.2 },
+        hitStun: 32,
+        blockStun: 16,
+        knockback: { x: 2.2, y: 6.2 },
         isLauncher: true,
         disarms: true,
-        velocityImpulse: 4.0,
-        verticalImpulse: 8.5,
+        isMultiTarget: true,
+        velocityImpulse: 2.8,
+        verticalImpulse: 6.2,
         cancelTo: [],
         hitbox: { offset: { x: 0.95, y: 1.5, z: 0 }, radius: 0.5 }
     },
     DASH_PUNCH: {
         id: 'DASH_PUNCH',
-        name: '冲刺穿心拳 (Haymaker)',
-        startup: 5,
+        name: '奔跑冲拳 (跑+P)',
+        startup: 6,
         active: 6,
-        recovery: 14,
+        recovery: 16,
         damage: 18,
         poiseDamage: 50,
         armorThreshold: 22,
-        hitStun: 24,
+        hitStun: 26,
         blockStun: 13,
-        knockback: { x: 5.0, y: 1.2 },
+        knockback: { x: 4.2, y: 1.0 },
         knockdown: true,
-        velocityImpulse: 11.5,
+        velocityImpulse: 7.2,
         cancelTo: [],
         hitbox: { offset: { x: 1.1, y: 1.2, z: 0 }, radius: 0.44 }
     },
     FLYING_KICK: {
         id: 'FLYING_KICK',
-        name: '疾风飞踢 (Flying Kick)',
-        startup: 6,
+        name: '飞踢 (跑/跳+K)',
+        startup: 8,
         active: 9,
-        recovery: 15,
+        recovery: 17,
         damage: 20,
         poiseDamage: 55,
-        hitStun: 26,
-        blockStun: 12,
-        knockback: { x: 5.5, y: 2.5 },
+        hitStun: 28,
+        blockStun: 13,
+        knockback: { x: 4.2, y: 2.0 },
         knockdown: true,
         disarms: true,
-        velocityImpulse: 12.5,
-        verticalImpulse: 5.2,
+        isMultiTarget: true,
+        velocityImpulse: 7.2,
+        verticalImpulse: 3.8,
         cancelTo: [],
         hitbox: { offset: { x: 1.15, y: 1.15, z: 0 }, radius: 0.48 }
     },
     SLIDE_KICK: {
         id: 'SLIDE_KICK',
-        name: '疾风滑铲 (Slide Sweep)',
-        startup: 6,
+        name: '滑铲 (跑+蹲)',
+        startup: 7,
         active: 10,
-        recovery: 14,
+        recovery: 16,
         damage: 16,
         poiseDamage: 40,
-        hitStun: 22,
+        hitStun: 24,
         blockStun: 12,
-        knockback: { x: 4.0, y: 3.2 },
+        knockback: { x: 3.6, y: 2.4 },
         knockdown: true,
         isLow: true,
         disarms: true,
+        isMultiTarget: true,
         velocityImpulse: 12.0,
         cancelTo: [],
         hitbox: { offset: { x: 1.1, y: 0.3, z: 0 }, radius: 0.45 }
     },
     BACK_SPIN_FIST: {
         id: 'BACK_SPIN_FIST',
-        name: '背身后摆拳 (Spinning Backfist)',
+        name: '转身里拳 (后+P)',
         startup: 5,
         active: 4,
         recovery: 12,
@@ -441,7 +501,7 @@ export const MOVES = {
     },
     WILLOW_KICK: {
         id: 'WILLOW_KICK',
-        name: '倒挂金钩 (Willow Kick)',
+        name: '柳枝踢 Willow Kick (后 然后 前+K)',
         startup: 7,
         active: 5,
         recovery: 15,
@@ -467,6 +527,7 @@ export const MOVES = {
         knockback: { x: 1.2, y: 2.0 },
         hitsGrounded: true,
         isLow: true,
+        isMultiTarget: true,
         cancelTo: [],
         hitbox: { offset: { x: 0.75, y: 0.25, z: 0 }, radius: 0.48 }
     },
@@ -474,7 +535,7 @@ export const MOVES = {
     // --- Context-Sensitive Throws ---
     THROW_FRONT: {
         id: 'THROW_FRONT',
-        name: '过肩摔 (Shoulder Throw)',
+        name: '过肩摔 (近身 前+P)',
         isThrow: true,
         startup: 5,
         active: 18,
@@ -489,7 +550,7 @@ export const MOVES = {
     },
     THROW_RUN: {
         id: 'THROW_RUN',
-        name: '剪刀脚绞头摔 (Head Scissors)',
+        name: '奔跑投 (跑+前+P 贴近)',
         isThrow: true,
         startup: 4,
         active: 20,
@@ -505,7 +566,7 @@ export const MOVES = {
     },
     THROW_BACK: {
         id: 'THROW_BACK',
-        name: '背身抱腰过桥摔 (Backbreaker Suplex)',
+        name: '背后抱摔 (背后 前+P)',
         isThrow: true,
         startup: 4,
         active: 22,
@@ -518,6 +579,127 @@ export const MOVES = {
         disarms: true,
         techable: false, // Untechable back ambush
         cancelTo: []
+    },
+
+    // ======================================================================
+    // Oni 2001 Konoko move-list completion (input map per the OniGalore Combat_moves table).
+    // Frame data / damage are our own tuning — the original values are not published.
+    // `animId` reuses another move's keyframe track where the original reuses a similar motion.
+    // ======================================================================
+    // P,P,K,K / P,P,K,K,K / P,P,K,K,K,K extended heel string (comb_p_p_k_k...)
+    PPK_K: {
+        id: 'PPK_K', name: '锤踵连踢 (P,P,K,K)', animId: 'KICK_MID',
+        startup: 7, active: 3, recovery: 12, damage: 10, poiseDamage: 22, hitStun: 20, blockStun: 9,
+        knockback: { x: 1.6, y: 0 }, chain: { K: 'PPK_KK' }, cancelTo: ['PPK_KK'], cancelWindowStart: 8,
+        hitbox: { offset: { x: 1.05, y: 1.05, z: 0 }, radius: 0.4 }
+    },
+    PPK_KK: {
+        id: 'PPK_KK', name: '锤踵三连踢 (P,P,K,K,K)', animId: 'KICK_LOW',
+        startup: 7, active: 3, recovery: 12, damage: 10, poiseDamage: 22, hitStun: 20, blockStun: 9,
+        knockback: { x: 1.6, y: 0 }, chain: { K: 'PPK_KKK' }, cancelTo: ['PPK_KKK'], cancelWindowStart: 8,
+        hitbox: { offset: { x: 0.95, y: 0.6, z: 0 }, radius: 0.38 }
+    },
+    PPK_KKK: {
+        id: 'PPK_KKK', name: '锤踵旋踢终结 (P,P,K,K,K,K)', animId: 'KICK_HEAVY',
+        startup: 10, active: 4, recovery: 18, damage: 18, poiseDamage: 50, hitStun: 26, blockStun: 12,
+        knockback: { x: 3.6, y: 1.2 }, knockdown: true, cancelTo: [],
+        hitbox: { offset: { x: 1.2, y: 1.3, z: 0 }, radius: 0.5 }
+    },
+    // K,K, forward+K (comb_k_k_kfw) — learned in Ch.5
+    CRESCENT_MOON_KICK: {
+        id: 'CRESCENT_MOON_KICK', name: '新月踢 (K,K,前+K)',
+        startup: 9, active: 4, recovery: 16, damage: 22, poiseDamage: 60, hitStun: 26, blockStun: 12,
+        knockback: { x: 3.4, y: 2.4 }, knockdown: true, cancelTo: [],
+        hitbox: { offset: { x: 1.15, y: 1.45, z: 0 }, radius: 0.5 }
+    },
+    // Directional standing attacks (punch_fw/bk/lt/rt, kick_fw/bk/lt/rt)
+    SIDE_PUNCH: {
+        id: 'SIDE_PUNCH', name: '侧步拳 (←/→+P)',
+        startup: 5, active: 3, recovery: 10, damage: 10, poiseDamage: 20, hitStun: 16, blockStun: 8,
+        knockback: { x: 1.6, y: 0 }, cancelTo: ['PUNCH_2'], chain: { P: 'PUNCH_2' }, cancelWindowStart: 6,
+        hitbox: { offset: { x: 0.95, y: 1.25, z: 0 }, radius: 0.4 }
+    },
+    SIDE_KICK: {
+        id: 'SIDE_KICK', name: '侧步踢 (←/→+K)', animId: 'KICK_MID',
+        startup: 7, active: 3, recovery: 13, damage: 13, poiseDamage: 28, hitStun: 19, blockStun: 9,
+        knockback: { x: 2.4, y: 0 }, cancelTo: [],
+        hitbox: { offset: { x: 1.1, y: 1.05, z: 0 }, radius: 0.42 }
+    },
+    KICK_FW: {
+        id: 'KICK_FW', name: '前蹬踢 (前+K)',
+        startup: 7, active: 3, recovery: 14, damage: 14, poiseDamage: 32, hitStun: 20, blockStun: 10,
+        knockback: { x: 3.0, y: 0 }, velocityImpulse: 2.2, cancelTo: [],
+        hitbox: { offset: { x: 1.15, y: 1.0, z: 0 }, radius: 0.42 }
+    },
+    BACK_KICK: {
+        id: 'BACK_KICK', name: '转身后踢 (后+K)',
+        startup: 8, active: 4, recovery: 15, damage: 15, poiseDamage: 34, hitStun: 21, blockStun: 10,
+        knockback: { x: 3.0, y: 0.4 }, cancelTo: [],
+        hitbox: { offset: { x: 1.1, y: 1.1, z: 0 }, radius: 0.44 }
+    },
+    // ←/→ then forward+K (lt_fw_kick / rt_fw_kick) — learned in Ch.10
+    TWISTER_KICK: {
+        id: 'TWISTER_KICK', name: '龙卷踢 (←/→ 后 前+K)',
+        startup: 10, active: 5, recovery: 18, damage: 24, poiseDamage: 65, hitStun: 26, blockStun: 13,
+        knockback: { x: 3.8, y: 2.0 }, knockdown: true, cancelTo: [],
+        hitbox: { offset: { x: 1.15, y: 1.25, z: 0 }, radius: 0.55 }
+    },
+    // Crouch attacks (crouch_punch1 / crouch_kick1 & kick_low1 sweep)
+    CROUCH_PUNCH: {
+        id: 'CROUCH_PUNCH', name: '蹲身拳 (蹲+P)',
+        startup: 4, active: 3, recovery: 9, damage: 8, poiseDamage: 16, hitStun: 14, blockStun: 7,
+        knockback: { x: 1.2, y: 0 }, lowAttack: true, cancelTo: [],
+        hitbox: { offset: { x: 0.9, y: 0.75, z: 0 }, radius: 0.36 }
+    },
+    CROUCH_SWEEP: {
+        id: 'CROUCH_SWEEP', name: '扫堂腿 (蹲+K)',
+        startup: 7, active: 4, recovery: 16, damage: 12, poiseDamage: 40, hitStun: 22, blockStun: 10,
+        knockback: { x: 1.4, y: 1.2 }, knockdown: true, lowAttack: true, cancelTo: [],
+        hitbox: { offset: { x: 1.05, y: 0.22, z: 0 }, radius: 0.48 }
+    },
+    // Release crouch, then P (punch_heavy) — learned in Ch.8
+    RISING_FURY_PUNCH: {
+        id: 'RISING_FURY_PUNCH', name: '升龙怒拳 (蹲→松开+P)',
+        startup: 8, active: 5, recovery: 20, damage: 24, poiseDamage: 70, hitStun: 28, blockStun: 14,
+        knockback: { x: 1.4, y: 7.0 }, knockdown: true, verticalImpulse: 4.2, cancelTo: [],
+        hitbox: { offset: { x: 0.85, y: 1.55, z: 0 }, radius: 0.48 }
+    },
+    // Running punch close to a foe — learned in Ch.7
+    RUNNING_LARIAT: {
+        id: 'RUNNING_LARIAT', name: '奔跑套索臂 (跑+P 贴近)',
+        startup: 5, active: 5, recovery: 18, damage: 20, poiseDamage: 60, hitStun: 26, blockStun: 12,
+        knockback: { x: 3.8, y: 2.6 }, knockdown: true, velocityImpulse: 5.0, cancelTo: [],
+        hitbox: { offset: { x: 0.9, y: 1.4, z: 0 }, radius: 0.55 }
+    },
+    // Jump attacks (jump_punch / jump_crouch flip)
+    JUMP_PUNCH: {
+        id: 'JUMP_PUNCH', name: '跳跃下劈拳 (跳+P)',
+        startup: 6, active: 4, recovery: 10, damage: 14, poiseDamage: 32, hitStun: 20, blockStun: 10,
+        knockback: { x: 2.4, y: 0.6 }, cancelTo: [],
+        hitbox: { offset: { x: 0.95, y: 1.1, z: 0 }, radius: 0.46 }
+    },
+    JUMP_FLIP: {
+        id: 'JUMP_FLIP', name: '空翻 (跳+蹲)',
+        startup: 2, active: 1, recovery: 24, damage: 0, poiseDamage: 0, hitStun: 0, blockStun: 0,
+        knockback: { x: 0, y: 0 }, noHit: true, invulnFrames: 16, verticalImpulse: 3.5, cancelTo: []
+    },
+    // Get-up attacks (getup_kick_fw / getup_kick_fw2)
+    GETUP_KICK: {
+        id: 'GETUP_KICK', name: '起身扫踢 (倒地+P/K)',
+        startup: 8, active: 4, recovery: 14, damage: 12, poiseDamage: 36, hitStun: 20, blockStun: 10,
+        knockback: { x: 2.4, y: 0.8 }, invulnFrames: 8, lowAttack: true, cancelTo: [],
+        hitbox: { offset: { x: 0.95, y: 0.4, z: 0 }, radius: 0.5 }
+    },
+    // Kick throws (throw_fw_k / throw_bk_k). Front kick throw doubles as the Ch.13 Stepping Disarm.
+    THROW_FRONT_K: {
+        id: 'THROW_FRONT_K', name: '踢投·翻身绞摔 (近身 前+K)', isThrow: true,
+        startup: 4, active: 20, recovery: 10, releaseFrame: 18, damage: 24, poiseDamage: 60,
+        knockback: { x: 4.2, y: 3.6 }, knockdown: true, techable: true, cancelTo: []
+    },
+    BACKBREAKER: {
+        id: 'BACKBREAKER', name: '断脊摔 (背后 前+K)', isThrow: true,
+        startup: 4, active: 22, recovery: 12, releaseFrame: 18, damage: 30, poiseDamage: 100,
+        knockback: { x: 0.6, y: 2.2 }, knockdown: true, techable: false, cancelTo: []
     },
 
     // --- P2 Gun-Fu & Disarm Moves ---
@@ -586,21 +768,22 @@ export const MOVES = {
     },
     DEVIL_SPIN_KICK: {
         id: 'DEVIL_SPIN_KICK',
-        name: '鬼神烈风脚 (Devil Spin Kick)',
-        startup: 5,
-        active: 10,
-        recovery: 14,
+        name: '恶魔旋踢 Devil Spin Kick (蹲→松开+K)',
+        startup: 8,
+        active: 11,
+        recovery: 17,
         damage: 28,
         poiseDamage: 75,
         armorThreshold: 40,
-        hitStun: 30,
+        hitStun: 32,
         blockStun: 16,
-        knockback: { x: 5.8, y: 4.5 },
+        knockback: { x: 4.8, y: 3.2 },
         knockdown: true,
         disarms: true,
         piercesGuard: true,
-        velocityImpulse: 13.5,
-        verticalImpulse: 3.5,
+        isMultiTarget: true,
+        velocityImpulse: 6.8,
+        verticalImpulse: 2.6,
         cancelTo: [],
         hitbox: { offset: { x: 1.15, y: 1.25, z: 0 }, radius: 0.62 }
     },
@@ -620,6 +803,7 @@ export const MOVES = {
         knockdown: true,
         disarms: true,
         piercesGuard: true,
+        isMultiTarget: true,
         cancelTo: [],
         hitbox: { offset: { x: 0.4, y: 1.1, z: 0 }, radius: 1.45 }
     }
@@ -648,7 +832,7 @@ export const FIGHTER_STATE = {
  * Declarative Move Table (Sorted by priority descending)
  * Evaluated by Fighter.resolveCommandTable(input, opponent, relContext)
  */
-export const MOVE_TABLE = [
+const MOVE_TABLE_RAW = [
     // 0. P4 Daodan Chrysalis Burst / Overdrive Activation & P3 Hypo-Spray Heal
     {
         id: 'DAODAN_SURGE',
@@ -662,7 +846,7 @@ export const MOVE_TABLE = [
         priority: 105,
         states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.CROUCH],
         button: 'heal',
-        condition: (f) => f.isGrounded && f.hypoCount > 0 && f.hp < f.maxHp
+        condition: (f) => f.isGrounded && f.hypoCount > 0 && (!f.daodanOverpower || f.hp < f.maxHp)
     },
 
     // 1. Context-Sensitive Throws (Close range + Punch or Throw input, or holding forward + Punch like Oni 2001)
@@ -707,6 +891,56 @@ export const MOVE_TABLE = [
         button: 'throw',
         condition: (f, input, opp, ctx) =>
             opp && ctx.dist <= THROW_RANGE + 0.35 && ctx.canBeThrown
+    },
+
+    // 1a. Kick throws: forward+K from the front (throw_fw_k, also the Ch.13 Stepping Disarm)
+    //     and from behind (Backbreaker, throw_bk_k)
+    {
+        id: 'BACKBREAKER',
+        priority: 99,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN],
+        button: 'kick',
+        condition: (f, input, opp, ctx) =>
+            opp && ctx.dist <= THROW_RANGE && ctx.canBeThrown && ctx.sector === 'BACK' && ctx.holdingForward
+    },
+    {
+        id: 'THROW_FRONT_K',
+        priority: 93.5,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK],
+        button: 'kick',
+        condition: (f, input, opp, ctx) =>
+            opp && ctx.canBeThrown && ctx.holdingForward &&
+            (ctx.dist <= 1.25 || (ctx.oppArmed && f.canSteppingDisarm && ctx.dist <= THROW_RANGE + 0.2))
+    },
+    // 1a'. Release crouch, then P / K (punch_heavy = Rising Fury Punch, kick_heavy = Devil Spin Kick)
+    {
+        id: 'RISING_FURY_PUNCH',
+        priority: 90,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK],
+        button: 'punch',
+        condition: (f) => f.isGrounded && f.crouchReleasedRecently()
+    },
+    {
+        id: 'DEVIL_SPIN_KICK',
+        priority: 90,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK],
+        button: 'kick',
+        condition: (f) => f.isGrounded && f.crouchReleasedRecently()
+    },
+    // 1a''. Get-up attacks while lying on the floor (getup_kick_fw / getup_kick_fw2)
+    {
+        id: 'GETUP_KICK',
+        priority: 89,
+        states: [FIGHTER_STATE.KNOCKED_DOWN, FIGHTER_STATE.WAKEUP],
+        button: 'kick',
+        condition: (f) => f.isGrounded && f.hp > 0
+    },
+    {
+        id: 'GETUP_KICK',
+        priority: 89,
+        states: [FIGHTER_STATE.KNOCKED_DOWN, FIGHTER_STATE.WAKEUP],
+        button: 'punch',
+        condition: (f) => f.isGrounded && f.hp > 0
     },
 
     // 1b. Dedicated One-Button Special Triggers (Direct arcade action buttons for Uppercut / Evade / Heavy Kick)
@@ -773,12 +1007,13 @@ export const MOVE_TABLE = [
         button: 'kick',
         condition: (f) => f.isGrounded
     },
+
     {
-        id: 'FLYING_KICK',
-        priority: 81.5,
-        states: [FIGHTER_STATE.WALK],
-        button: 'kick',
-        condition: (f, input, opp, ctx) => f.isGrounded && ctx.holdingForward && ctx.dist > 1.75 && ctx.dist <= 3.4
+        id: 'RUNNING_LARIAT',
+        priority: 82.5,
+        states: [FIGHTER_STATE.RUN],
+        button: 'punch',
+        condition: (f, input, opp, ctx) => f.isGrounded && opp && opp.hp > 0 && ctx.dist <= 1.9
     },
     {
         id: 'DASH_PUNCH',
@@ -796,11 +1031,18 @@ export const MOVE_TABLE = [
         condition: (f) => !f.isGrounded
     },
     {
-        id: 'DISARM_KICK',
+        id: 'JUMP_PUNCH',
         priority: 80,
         states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK],
         button: 'punch',
         condition: (f) => !f.isGrounded
+    },
+    {
+        id: 'JUMP_FLIP',
+        priority: 81.2,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN],
+        button: 'crouch',
+        condition: (f) => !f.isGrounded && f.vy > -2 && f.inputBuffer.wasRecentlyPressed('crouch', 6)
     },
 
     // 4b. Firearm Actions (Dedicated Fire button, or Punch at medium/long range when armed)
@@ -855,6 +1097,14 @@ export const MOVE_TABLE = [
         button: 'punch',
         condition: (f) => f.inputBuffer.checkUppercut(f.facing)
     },
+    // 5b. Sledgehammer Punch (Forward + Punch when not in close throw range)
+    {
+        id: 'SLEDGEHAMMER',
+        priority: 70,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK],
+        button: 'punch',
+        condition: (f, input, opp, ctx) => f.isGrounded && ctx.holdingForward && ctx.dist > 1.38
+    },
 
     // 6. Directional Back Attacks (Back + Punch / Back + Kick)
     {
@@ -865,11 +1115,64 @@ export const MOVE_TABLE = [
         condition: (f, input, opp, ctx) => ctx.holdingBack
     },
     {
-        id: 'WILLOW_KICK',
+        id: 'BACK_KICK',
         priority: 64,
         states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK],
         button: 'kick',
-        condition: (f, input, opp, ctx) => ctx.holdingBack
+        condition: (f, input, opp, ctx) => f.isGrounded && ctx.holdingBack
+    },
+    // Motion kicks: back -> forward+K (Willow), left/right -> forward+K (Twister)
+    {
+        id: 'TWISTER_KICK',
+        priority: 66.5,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK],
+        button: 'kick',
+        condition: (f, input, opp, ctx) => f.isGrounded && ctx.holdingForward && f.recentDirThenForward('SIDE')
+    },
+    {
+        id: 'WILLOW_KICK',
+        priority: 66,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK],
+        button: 'kick',
+        condition: (f, input, opp, ctx) => f.isGrounded && ctx.holdingForward && f.recentDirThenForward('BACK')
+    },
+    // Sidestep attacks (punch_lt/rt, kick_lt/rt; also ss_*_punch/kick while running)
+    {
+        id: 'SIDE_PUNCH',
+        priority: 63,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN],
+        button: 'punch',
+        condition: (f, input, opp, ctx) => f.isGrounded && ctx.holdingSide
+    },
+    {
+        id: 'SIDE_KICK',
+        priority: 63,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN],
+        button: 'kick',
+        condition: (f, input, opp, ctx) => f.isGrounded && ctx.holdingSide
+    },
+    {
+        id: 'KICK_FW',
+        priority: 62,
+        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK],
+        button: 'kick',
+        condition: (f, input, opp, ctx) => f.isGrounded && ctx.holdingForward
+    },
+
+    // 6b. Crouch attacks (crouch_punch1 / crouch_kick1 + low sweep)
+    {
+        id: 'CROUCH_PUNCH',
+        priority: 74,
+        states: [FIGHTER_STATE.CROUCH],
+        button: 'punch',
+        condition: (f) => f.isGrounded
+    },
+    {
+        id: 'CROUCH_SWEEP',
+        priority: 74,
+        states: [FIGHTER_STATE.CROUCH],
+        button: 'kick',
+        condition: (f) => f.isGrounded
     },
 
     // 7. Standard Starters
@@ -888,3 +1191,26 @@ export const MOVE_TABLE = [
         condition: () => true
     }
 ];
+
+// Evaluate strictly by priority (stable for equal priorities)
+export const MOVE_TABLE = MOVE_TABLE_RAW
+    .map((e, i) => ({ e, i }))
+    .sort((a, b) => (b.e.priority - a.e.priority) || (a.i - b.i))
+    .map(({ e }) => e);
+
+/**
+ * Oni 2001 chapter in which Konoko learns each special (per the in-game diary pages).
+ * Moves not listed are available from the start. Only enforced in Campaign mode.
+ */
+export const MOVE_CHAPTER_UNLOCK = {
+    PUNCH_3: 2,            // Triple-Hit Haymaker
+    KICK_HEAVY: 3,         // Spinning Sidekick
+    WILLOW_KICK: 4,        // Willow Kick
+    CRESCENT_MOON_KICK: 5, // Crescent Moon Kick
+    DEVIL_SPIN_KICK: 6,    // Devil Spin Kick
+    RUNNING_LARIAT: 7,     // Running Lariat
+    RISING_FURY_PUNCH: 8,  // Rising Fury Punch
+    TWISTER_KICK: 10       // Twister Kick
+    // Stepping Disarm (Ch.13) is a property of THROW_FRONT_K: Fighter.canSteppingDisarm
+};
+export const STEPPING_DISARM_CHAPTER = 13;

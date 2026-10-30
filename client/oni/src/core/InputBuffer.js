@@ -54,6 +54,8 @@ export class InputBuffer {
             healJustPressed: false,
             evadeJustPressed: false,
             specialJustPressed: false,
+            aimYaw: null,
+            walk: false,
             consumedButtons: 0,
             frame: 0
         };
@@ -122,6 +124,9 @@ export class InputBuffer {
             healJustPressed,
             evadeJustPressed,
             specialJustPressed,
+            // Oni 2001 mouse-look: absolute facing yaw chosen by the player (null = legacy auto-face)
+            aimYaw: typeof raw.aimYaw === 'number' && Number.isFinite(raw.aimYaw) ? raw.aimYaw : null,
+            walk: !!raw.walk,
             consumedButtons: 0,
             frame: this.currentFrame
         };

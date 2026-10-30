@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>鬼神对决 · Oni Combat - Link</title>
+    <title>奥尼 · Oni Combat - Link</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,83 +13,112 @@
 
         <!-- Combat HUD Overlay -->
         <div class="hud">
-            <!-- Top Health & Round Timer -->
-            <div class="top-bar">
-                <div class="fighter-card p1">
-                    <div class="fighter-info">
-                        <span id="p1-name">KONOKO</span>
-                        <span id="p1-rpg-badge" class="rpg-badge" title="TCTF 战术等级与经验值 (RPG Progression)">Lv.1</span>
-                        <span id="p1-hypo-badge" class="hypo-badge" title="再生剂 (Hypo-Spray) - 按 H 键或点击注射回血">💉×1</span>
-                        <span id="p1-weapon-badge" class="weapon-badge">徒手 (UNARMED)</span>
-                        <span id="p1-hp-text">100 / 100</span>
-                    </div>
-                    <div class="hp-bar-bg">
-                        <div id="p1-hp-fill" class="hp-bar-fill" style="width: 100%;"></div>
-                    </div>
-                    <div class="sub-bars-row">
-                        <div class="poise-bar-bg" title="韧性条 (Poise) - 耗尽进入眩晕可被正面抓投">
-                            <div id="p1-poise-fill" class="poise-bar-fill" style="width: 100%;"></div>
+            <!-- Top HUD Region (Utility Actions & Symmetrical Health Bar) -->
+            <header class="top-hud">
+                <nav class="hud-actions" aria-label="快捷系统操作">
+                    <button type="button" id="btn-menu" class="hud-pill-btn" title="打开战役章节与模式选择菜单">
+                        <span class="btn-icon">🗺️</span><span id="btn-menu-text" class="btn-text">章节/模式</span>
+                    </button>
+                    <button type="button" id="btn-difficulty" class="hud-pill-btn" title="切换人机难度 (简单 / 标准 / 鬼神)">
+                        <span class="btn-icon">🤖</span><span id="btn-difficulty-text" class="btn-text">难度: 新兵</span>
+                    </button>
+                    <button type="button" id="btn-camera" class="hud-pill-btn" title="切换视角 (1-4) · 拖动画面旋转 · 滚轮缩放 · 双击复位">
+                        <span class="btn-icon">🎥</span><span id="btn-camera-text" class="btn-text">侧视</span>
+                    </button>
+                    <button type="button" id="btn-fullscreen" class="hud-pill-btn" title="切换全屏显示 (F11 / Z)">
+                        <span class="btn-icon">⛶</span><span id="btn-fullscreen-text" class="btn-text">全屏</span>
+                    </button>
+                    <button type="button" id="btn-toggle-moves" class="hud-pill-btn" title="查看出招表与已解锁技能">
+                        <span class="btn-icon">📖</span><span id="btn-moves-text" class="btn-text">招式表</span>
+                    </button>
+                </nav>
+
+                <div class="top-bar">
+                    <div class="fighter-card p1">
+                        <div class="fighter-info">
+                            <span id="p1-name">KONOKO</span>
+                            <span id="p1-rpg-badge" class="rpg-badge" title="TCTF 战术等级与经验值 (RPG Progression)">Lv.1</span>
+                            <span id="p1-hypo-badge" class="hypo-badge" title="再生剂 (Hypo-Spray) - 按 H 键或点击注射回血">💉×1</span>
+                            <span id="p1-weapon-badge" class="weapon-badge">徒手 (UNARMED)</span>
+                            <span id="p1-hp-text">100 / 100</span>
                         </div>
-                        <div class="daodan-bar-bg" title="道弹蛹觉醒槽 (Daodan Chrysalis) - 满50%按 Q/E 爆发超载">
-                            <div id="p1-daodan-fill" class="daodan-bar-fill" style="width: 0%;"></div>
-                            <span id="p1-daodan-stage" class="daodan-stage-label">S1</span>
+                        <div class="hp-bar-bg">
+                            <div id="p1-hp-fill" class="hp-bar-fill" style="width: 100%;"></div>
+                        </div>
+                        <div class="sub-bars-row">
+                            <div class="poise-bar-bg" title="韧性条 (Poise) - 耗尽进入眩晕可被正面抓投">
+                                <div id="p1-poise-fill" class="poise-bar-fill" style="width: 100%;"></div>
+                            </div>
+                            <div class="daodan-bar-bg" title="道弹蛹觉醒槽 (Daodan Chrysalis) - 满50%按 Q/E 爆发超载">
+                                <div id="p1-daodan-fill" class="daodan-bar-fill" style="width: 0%;"></div>
+                                <span id="p1-daodan-stage" class="daodan-stage-label">S1</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="timer-box">
+                        <span id="round-timer" class="timer-num">99</span>
+                        <span id="round-wave-label" class="timer-label">TIME</span>
+                    </div>
+
+                    <div class="fighter-card p2">
+                        <div class="fighter-info">
+                            <span id="p2-name">SYNDI-BOT</span>
+                            <span id="p2-hypo-badge" class="hypo-badge">💉×1</span>
+                            <span id="p2-weapon-badge" class="weapon-badge">徒手 (UNARMED)</span>
+                            <span id="p2-hp-text">100 / 100</span>
+                        </div>
+                        <div class="hp-bar-bg">
+                            <div id="p2-hp-fill" class="hp-bar-fill" style="width: 100%;"></div>
+                        </div>
+                        <div class="sub-bars-row">
+                            <div class="poise-bar-bg" title="韧性条 (Poise) - 耗尽进入眩晕可被正面抓投">
+                                <div id="p2-poise-fill" class="poise-bar-fill" style="width: 100%;"></div>
+                            </div>
+                            <div class="daodan-bar-bg" title="道弹蛹觉醒槽 (Daodan Chrysalis)">
+                                <div id="p2-daodan-fill" class="daodan-bar-fill" style="width: 0%;"></div>
+                                <span id="p2-daodan-stage" class="daodan-stage-label">S1</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-
-                <div class="timer-box">
-                    <span id="round-timer" class="timer-num">99</span>
-                    <span id="round-wave-label" class="timer-label">TIME</span>
-                </div>
-
-                <div class="fighter-card p2">
-                    <div class="fighter-info">
-                        <span id="p2-name">SYNDI-BOT</span>
-                        <span id="p2-hypo-badge" class="hypo-badge">💉×1</span>
-                        <span id="p2-weapon-badge" class="weapon-badge">徒手 (UNARMED)</span>
-                        <span id="p2-hp-text">100 / 100</span>
-                    </div>
-                    <div class="hp-bar-bg">
-                        <div id="p2-hp-fill" class="hp-bar-fill" style="width: 100%;"></div>
-                    </div>
-                    <div class="sub-bars-row">
-                        <div class="poise-bar-bg" title="韧性条 (Poise) - 耗尽进入眩晕可被正面抓投">
-                            <div id="p2-poise-fill" class="poise-bar-fill" style="width: 100%;"></div>
-                        </div>
-                        <div class="daodan-bar-bg" title="道弹蛹觉醒槽 (Daodan Chrysalis)">
-                            <div id="p2-daodan-fill" class="daodan-bar-fill" style="width: 0%;"></div>
-                            <span id="p2-daodan-stage" class="daodan-stage-label">S1</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Top Right Utility Actions -->
-                <button type="button" id="btn-menu" class="hud-pill-btn" title="打开战役章节与模式选择菜单">
-                    🗺️ <span id="btn-menu-text">章节/模式</span>
-                </button>
-                <button type="button" id="btn-difficulty" class="hud-pill-btn" title="切换人机难度 (简单 / 标准 / 鬼神)">
-                    🤖 <span id="btn-difficulty-text">难度: 新兵</span>
-                </button>
-                <button type="button" id="btn-camera" class="hud-pill-btn" title="切换视角 (1-4) · 拖动画面旋转 · 滚轮缩放 · 双击复位">
-                    🎥 <span id="btn-camera-text">侧视</span>
-                </button>
-                <button type="button" id="btn-fullscreen" class="hud-pill-btn" title="切换全屏显示 (F11 / Z)">
-                    ⛶ <span id="btn-fullscreen-text">全屏</span>
-                </button>
-                <button type="button" id="btn-toggle-moves" class="hud-pill-btn" title="查看出招表与已解锁技能">
-                    📖 <span id="btn-moves-text">招式表</span>
-                </button>
-            </div>
+            </header>
 
             <!-- Shinatama Holographic Tactical Comms & Campaign Objective Banner (Oni 2001 Style) -->
-            <div id="comms-banner" class="comms-banner hidden">
-                <div class="comms-avatar">📡 <span id="comms-speaker">SHINATAMA</span></div>
-                <div class="comms-body">
-                    <div class="comms-header-row">
-                        <strong id="comms-title">🎓 TCTF 训练基地</strong>
-                        <span id="comms-progress" class="comms-progress">0 / 2</span>
+            <div id="comms-banner" class="comms-banner hidden" role="region" aria-label="TCTF Tactical Comms">
+                <div class="comms-crt-scanline" aria-hidden="true"></div>
+                <div class="comms-meta-bar">
+                    <div class="comms-freq"><span class="comm-live-dot">●</span> <span id="comms-freq-text">FREQ: 140.85 MHz // TCTF NEURAL-LINK</span></div>
+                    <div class="comms-waveform" id="comms-waveform" aria-hidden="true">
+                        <span class="w-bar b1"></span>
+                        <span class="w-bar b2"></span>
+                        <span class="w-bar b3"></span>
+                        <span class="w-bar b4"></span>
+                        <span class="w-bar b5"></span>
+                        <span class="w-bar b6"></span>
+                        <span class="w-bar b7"></span>
                     </div>
-                    <p id="comms-text">推动摇杆走位，前推+⚡闪避使出疾风滑铲！</p>
+                </div>
+                <div class="comms-content-row">
+                    <div class="comms-avatar">
+                        <div class="comms-portrait-box">
+                            <span class="sld-badge">SLD-044</span>
+                            <span class="comms-icon">📡</span>
+                        </div>
+                        <span id="comms-speaker" class="speaker-name">SHINATAMA</span>
+                    </div>
+                    <div class="comms-body">
+                        <div class="comms-header-row">
+                            <strong id="comms-title">🎓 TCTF 训练基地</strong>
+                            <span id="comms-progress" class="comms-progress">0 / 2</span>
+                        </div>
+                        <p id="comms-text">推动摇杆走位，前推+⚡闪避使出疾风滑铲！</p>
+                        <div id="comms-diary-box" class="comms-diary-box hidden">
+                            <div class="diary-tag">💾 终端绝密解密档案 (TACTICAL INTEL)</div>
+                            <strong id="comms-diary-title"></strong>
+                            <p id="comms-diary-text"></p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -131,6 +160,7 @@
                         <span><strong>O / S+D+J</strong> 升龙拳 / 鬼神烈风脚(必杀) · <strong>U / G</strong> 贴身摔投/拆投</span>
                         <span><strong>F (或远距 J)</strong> 射击 / 掷空枪 · <strong>靠近枪械 J/滑铲</strong> 拾取</span>
                         <span><strong>Q / E</strong> 道弹蛹超载爆发 · <strong>H</strong> 注射再生剂回血 · <strong>L</strong> 格挡</span>
+                        <span><strong>滚轮 / +/- 键 / 双指捏合</strong> 拉近拉远视距 · <strong>0 键</strong> 重置视距</span>
                     </div>
                 </div>
                 <div class="mobile-tip-bar" id="mobile-tip-bar">
@@ -190,8 +220,8 @@
         <div id="start-overlay" class="overlay">
             <div class="modal start-modal">
                 <div class="modal-badge">ONI 2001 · 3D CYBER ACTION RPG &amp; BEAT 'EM UP</div>
-                <h1 id="modal-title">⚔️ 鬼神对决 · ONI</h1>
-                <p id="modal-desc">《Oni》3D 动作闯关 + 格斗对战：TCTF 互动训练营、RPG 招式成长、终端骇入与 1v1 竞技对决。</p>
+                <h1 id="modal-title">⚔️ 奥尼 · ONI</h1>
+                <p id="modal-desc">《奥尼》3D 动作闯关 + 格斗对战：TCTF 互动训练营、RPG 招式成长、终端骇入与 1v1 竞技对决。</p>
 
                 <!-- Konoko RPG Status Bar -->
                 <div class="rpg-status-strip" id="rpg-status-strip">
@@ -200,28 +230,109 @@
                     <span id="rpg-strip-moves">招式: 基础连段+滑铲+过肩摔</span>
                 </div>
 
-                <!-- Story Campaign & Training Chapter Selector -->
+                <!-- Story Campaign & Training Chapter Selector (Full 14 Chapters + Tutorial) -->
+                <div class="chapter-selector-header">
+                    <span>📑 战役章节选择 (CH.0 ~ CH.14 · 自由直达体验)</span>
+                    <span class="chapter-count-badge" id="chapter-count-badge">CH.1 辛迪加仓库</span>
+                </div>
+                <!-- Act Tabs for instant 14-chapter navigation -->
+                <div class="act-tabs" id="act-tabs" role="tablist" aria-label="战役卷宗筛选">
+                    <button type="button" class="act-tab active" data-act="all">🌐 全部 15 关</button>
+                    <button type="button" class="act-tab" data-act="act1">卷一 特工 (0-4)</button>
+                    <button type="button" class="act-tab" data-act="act2">卷二 背叛 (5-9)</button>
+                    <button type="button" class="act-tab" data-act="act3">卷三 蛹化 (10-14)</button>
+                </div>
                 <div class="chapter-selector" id="chapter-selector" role="group" aria-label="选择战役章节或训练营">
-                    <button type="button" class="chapter-card" data-chapter="ch0" id="btn-chapter-0">
+                    <button type="button" class="chapter-card" data-chapter="ch0" data-act="act1" id="btn-chapter-0">
                         <span class="ch-code">🎓 CH.0</span>
                         <strong class="ch-name">TCTF 训练营</strong>
                         <small class="ch-sub">Shinatama 实操教学</small>
                     </button>
-                    <button type="button" class="chapter-card active" data-chapter="ch1" id="btn-chapter-1">
-                        <span class="ch-code">📖 CH.1</span>
+                    <button type="button" class="chapter-card active" data-chapter="ch1" data-act="act1" id="btn-chapter-1">
+                        <span class="ch-code">📦 CH.1</span>
                         <strong class="ch-name">辛迪加仓库</strong>
-                        <small class="ch-sub">终端骇入 · 巴拉巴斯</small>
+                        <small class="ch-sub">「试炼」</small>
                     </button>
-                    <button type="button" class="chapter-card" data-chapter="ch2" id="btn-chapter-2">
-                        <span class="ch-code">🧬 CH.2</span>
-                        <strong class="ch-name">生物实验室</strong>
-                        <small class="ch-sub">道弹觉醒 · 暗影百足</small>
+                    <button type="button" class="chapter-card" data-chapter="ch2" data-act="act1" id="btn-chapter-2">
+                        <span class="ch-code">🏭 CH.2</span>
+                        <strong class="ch-name">武藏工厂</strong>
+                        <small class="ch-sub">「邪恶引擎」</small>
                     </button>
-                    <button type="button" class="chapter-card" data-chapter="ch3" id="btn-chapter-3">
-                        <span class="ch-code">⚡ CH.3</span>
-                        <strong class="ch-name">天台最终决战</strong>
-                        <small class="ch-sub">高低差擂台 · 宿敌穆罗</small>
+                    <button type="button" class="chapter-card" data-chapter="ch3" data-act="act1" id="btn-chapter-3">
+                        <span class="ch-code">🧬 CH.3</span>
+                        <strong class="ch-name">生物研究所</strong>
+                        <small class="ch-sub">「拼图碎片」</small>
                     </button>
+                    <button type="button" class="chapter-card" data-chapter="ch4" data-act="act1" id="btn-chapter-4">
+                        <span class="ch-code">✈️ CH.4</span>
+                        <strong class="ch-name">万山区域机场</strong>
+                        <small class="ch-sub">「骑虎难下」</small>
+                    </button>
+                    <button type="button" class="chapter-card" data-chapter="ch5" data-act="act2" id="btn-chapter-5">
+                        <span class="ch-code">🛩️ CH.5</span>
+                        <strong class="ch-name">机场货运机库</strong>
+                        <small class="ch-sub">「紧追不舍」</small>
+                    </button>
+                    <button type="button" class="chapter-card" data-chapter="ch6" data-act="act2" id="btn-chapter-6">
+                        <span class="ch-code">🏢 CH.6</span>
+                        <strong class="ch-name">TCTF 总部</strong>
+                        <small class="ch-sub">「反击」</small>
+                    </button>
+                    <button type="button" class="chapter-card" data-chapter="ch7" data-act="act2" id="btn-chapter-7">
+                        <span class="ch-code">🌀 CH.7</span>
+                        <strong class="ch-name">大气转换中心</strong>
+                        <small class="ch-sub">「患难之交」</small>
+                    </button>
+                    <button type="button" class="chapter-card" data-chapter="ch8" data-act="act2" id="btn-chapter-8">
+                        <span class="ch-code">⚙️ CH.8</span>
+                        <strong class="ch-name">大气转换中心深处</strong>
+                        <small class="ch-sub">「无辜之命」</small>
+                    </button>
+                    <button type="button" class="chapter-card" data-chapter="ch9" data-act="act2" id="btn-chapter-9">
+                        <span class="ch-code">🏛️ CH.9</span>
+                        <strong class="ch-name">州政府大楼</strong>
+                        <small class="ch-sub">「真相与代价」</small>
+                    </button>
+                    <button type="button" class="chapter-card" data-chapter="ch10" data-act="act3" id="btn-chapter-10">
+                        <span class="ch-code">🌧️ CH.10</span>
+                        <strong class="ch-name">城市天台</strong>
+                        <small class="ch-sub">「猫鼠游戏」</small>
+                    </button>
+                    <button type="button" class="chapter-card" data-chapter="ch11" data-act="act3" id="btn-chapter-11">
+                        <span class="ch-code">🌙 CH.11</span>
+                        <strong class="ch-name">长谷川博士实验室</strong>
+                        <small class="ch-sub">「潜梦者」</small>
+                    </button>
+                    <button type="button" class="chapter-card" data-chapter="ch12" data-act="act3" id="btn-chapter-12">
+                        <span class="ch-code">🔒 CH.12</span>
+                        <strong class="ch-name">科学监狱 112</strong>
+                        <small class="ch-sub">「父之罪」</small>
+                    </button>
+                    <button type="button" class="chapter-card" data-chapter="ch13" data-act="act3" id="btn-chapter-13">
+                        <span class="ch-code">🔥 CH.13</span>
+                        <strong class="ch-name">强攻 TCTF 总部</strong>
+                        <small class="ch-sub">「凤凰涅槃」</small>
+                    </button>
+                    <button type="button" class="chapter-card" data-chapter="ch14" data-act="act3" id="btn-chapter-14">
+                        <span class="ch-code">🏔️ CH.14</span>
+                        <strong class="ch-name">辛迪加山地要塞</strong>
+                        <small class="ch-sub">「蛹之黎明」</small>
+                    </button>
+                </div>
+                <div class="chapter-scroll-hint" id="chapter-scroll-hint">
+                    <span>共 15 关 (CH.0 ~ CH.14)，可直接点选任意一关</span>
+                </div>
+
+                <!-- 14-Chapter Campaign Saga Dossier Dropdown / Inspector -->
+                <div class="dossier-container">
+                    <button type="button" class="dossier-toggle-btn" id="btn-toggle-dossier">📂 查阅 14 章战役剧情档案库 (Oni 2001 Saga Dossiers) <span id="dossier-caret">▼</span></button>
+                    <div id="campaign-dossier-drawer" class="campaign-dossier-drawer hidden">
+                        <div class="dossier-header-bar">
+                            <span class="dossier-chip">TCTF CLASSIFIED ARCHIVES</span>
+                            <small class="dossier-note">2032 新生联合体战术作战编年史</small>
+                        </div>
+                        <div id="dossier-items-list" class="dossier-items-list"></div>
+                    </div>
                 </div>
 
                 <div class="difficulty-selector" id="difficulty-selector" role="group" aria-label="选择AI难度">
@@ -252,6 +363,74 @@
                     <button type="button" class="cyber-btn" id="btn-rematch">再来一局</button>
                     <button type="button" class="cyber-btn secondary" id="btn-back-menu">🗺️ 返回模式/章节选择</button>
                     <a href="../play/" class="cyber-btn secondary" style="text-decoration: none; display: block;">返回对战大厅</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Move List Overlay Modal (Oni 2001 Signature Move Compendium) -->
+        <div id="move-list-overlay" class="overlay hidden">
+            <div class="modal move-list-modal">
+                <div class="modal-badge">TCTF COMBAT ARCHIVES // ONI 2001 MOVE COMPENDIUM</div>
+                <div class="move-list-header">
+                    <h2>📜 《奥尼》经典格斗招式秘籍 (MOVE LIST)</h2>
+                    <button type="button" class="close-modal-btn" id="btn-close-moves">✕</button>
+                </div>
+                <div class="move-list-scrollable">
+                    <p class="move-note">P = 拳（J / 鼠标左键），K = 踢（K / 鼠标右键），蹲 = Shift / Ctrl。方向以麦玉的朝向为准。招式输入参照原作招式表，伤害与帧数为本作自行调校；战役中部分特技按原作章节习得（标注 Ch.x）。</p>
+                    <div class="move-category">
+                        <div class="cat-title">🥊 连段 (Strings)</div>
+                        <div class="move-row"><span class="m-name">刺拳 / 直拳</span><span class="m-cmd">P → P</span><span class="m-desc">基础拳连段</span></div>
+                        <div class="move-row"><span class="m-name">三连重拳 Triple-Hit Haymaker</span><span class="m-cmd">P → P → P</span><span class="m-desc">第三拳击倒 · Ch.2 习得</span></div>
+                        <div class="move-row"><span class="m-name">锤踵踢 Sledgehammer Heel</span><span class="m-cmd">P → P → K</span><span class="m-desc">可继续接 K → K → K，最后一击击倒</span></div>
+                        <div class="move-row"><span class="m-name">踢 / 连踢</span><span class="m-cmd">K → K</span><span class="m-desc">基础踢连段</span></div>
+                        <div class="move-row"><span class="m-name">旋身侧踢 Spinning Sidekick</span><span class="m-cmd">K → K → K</span><span class="m-desc">击倒 · Ch.3 习得</span></div>
+                        <div class="move-row"><span class="m-name">新月踢 Crescent Moon Kick</span><span class="m-cmd">K → K → 前+K</span><span class="m-desc">击倒 · Ch.5 习得</span></div>
+                    </div>
+                    <div class="move-category">
+                        <div class="cat-title">💥 方向技与特技 (Directional & Specials)</div>
+                        <div class="move-row"><span class="m-name">前冲重拳</span><span class="m-cmd">前 + P</span><span class="m-desc">中距离突进重拳</span></div>
+                        <div class="move-row"><span class="m-name">前蹬踢</span><span class="m-cmd">前 + K</span><span class="m-desc">把敌人蹬开</span></div>
+                        <div class="move-row"><span class="m-name">转身里拳 / 转身后踢</span><span class="m-cmd">后 + P / 后 + K</span><span class="m-desc">向后转身出招</span></div>
+                        <div class="move-row"><span class="m-name">侧步拳 / 侧步踢</span><span class="m-cmd">左右 + P / 左右 + K</span><span class="m-desc">侧移中出招，奔跑侧移同样可用</span></div>
+                        <div class="move-row"><span class="m-name">柳枝踢 Willow Kick</span><span class="m-cmd">后 → 前 + K</span><span class="m-desc">Ch.4 习得</span></div>
+                        <div class="move-row"><span class="m-name">龙卷踢 Twister Kick</span><span class="m-cmd">左/右 → 前 + K</span><span class="m-desc">腾空 360° 旋踢 · Ch.10 习得</span></div>
+                        <div class="move-row"><span class="m-name">恶魔旋踢 Devil Spin Kick</span><span class="m-cmd">蹲 → 松开 + K</span><span class="m-desc">Ch.6 习得</span></div>
+                        <div class="move-row"><span class="m-name">升龙怒拳 Rising Fury Punch</span><span class="m-cmd">蹲 → 松开 + P</span><span class="m-desc">腾空上击 · Ch.8 习得</span></div>
+                        <div class="move-row"><span class="m-name">升拳</span><span class="m-cmd">蹲 + 前 + P</span><span class="m-desc">蹲姿上勾拳</span></div>
+                    </div>
+                    <div class="move-category">
+                        <div class="cat-title">🦵 蹲、跳、起身 (Crouch / Jump / Get-up)</div>
+                        <div class="move-row"><span class="m-name">蹲身拳 / 扫堂腿</span><span class="m-cmd">蹲住 + P / 蹲住 + K</span><span class="m-desc">低段攻击，扫堂腿击倒</span></div>
+                        <div class="move-row"><span class="m-name">跳拳 / 飞踢</span><span class="m-cmd">跳 + P / 跳 + K</span><span class="m-desc">空中攻击</span></div>
+                        <div class="move-row"><span class="m-name">空翻 Jump Flip</span><span class="m-cmd">跳 + 蹲</span><span class="m-desc">空中前空翻，短暂无敌</span></div>
+                        <div class="move-row"><span class="m-name">起身踢</span><span class="m-cmd">倒地时 P 或 K</span><span class="m-desc">起身同时扫踢，起手无敌</span></div>
+                        <div class="move-row"><span class="m-name">受身</span><span class="m-cmd">落地瞬间按 Space</span><span class="m-desc">立即翻身站起</span></div>
+                        <div class="move-row"><span class="m-name">倒地追击</span><span class="m-cmd">敌人倒地时 K</span><span class="m-desc">践踏</span></div>
+                    </div>
+                    <div class="move-category">
+                        <div class="cat-title">🥋 投技与缴械 (Throws & Disarms)</div>
+                        <div class="move-row"><span class="m-name">过肩摔</span><span class="m-cmd">贴身正面 前 + P</span><span class="m-desc">可被受身</span></div>
+                        <div class="move-row"><span class="m-name">翻身绞摔</span><span class="m-cmd">贴身正面 前 + K</span><span class="m-desc">腿绞翻摔</span></div>
+                        <div class="move-row"><span class="m-name">背后抱摔</span><span class="m-cmd">敌人背后 P</span><span class="m-desc">不可受身</span></div>
+                        <div class="move-row"><span class="m-name">断脊摔 Backbreaker</span><span class="m-cmd">敌人背后 前 + K</span><span class="m-desc">开局即会</span></div>
+                        <div class="move-row"><span class="m-name">奔跑投</span><span class="m-cmd">奔跑中贴身 前 + P</span><span class="m-desc">剪刀脚绞摔</span></div>
+                        <div class="move-row"><span class="m-name">奔跑套索臂 Running Lariat</span><span class="m-cmd">奔跑中靠近敌人 P</span><span class="m-desc">Ch.7 习得</span></div>
+                        <div class="move-row"><span class="m-name">踏步缴械 Stepping Disarm</span><span class="m-cmd">持枪敌人面前 前 + K</span><span class="m-desc">夺下对方武器 · Ch.13 习得</span></div>
+                    </div>
+                    <div class="move-category">
+                        <div class="cat-title">🌪️ 移动与枪械 (Movement & Guns)</div>
+                        <div class="move-row"><span class="m-name">奔跑 / 滑铲</span><span class="m-cmd">按住前进自动跑 · 跑 + 蹲</span><span class="m-desc">滑铲可穿过激光门</span></div>
+                        <div class="move-row"><span class="m-name">翻滚 Escape</span><span class="m-cmd">移动中按 蹲</span><span class="m-desc">向该方向翻滚闪避</span></div>
+                        <div class="move-row"><span class="m-name">潜行</span><span class="m-cmd">先蹲下再移动</span><span class="m-desc">静音移动，可绕后偷袭</span></div>
+                        <div class="move-row"><span class="m-name">射击 / 掷枪</span><span class="m-cmd">U 或 F</span><span class="m-desc">空枪时把枪扔出去</span></div>
+                        <div class="move-row"><span class="m-name">再生剂</span><span class="m-cmd">H</span><span class="m-desc">满血时注射触发超载</span></div>
+                    </div>
+                    <div class="move-category">
+                        <div class="cat-title">🖱️ 原作操控 (PC)</div>
+                        <div class="move-row"><span class="m-name">进入原作操控</span><span class="m-cmd">点击游戏画面</span><span class="m-desc">鼠标转向、镜头锁在背后；Esc 释放鼠标；M 键开关</span></div>
+                        <div class="move-row"><span class="m-name">移动</span><span class="m-cmd">W / S 前后，A / D 平移</span><span class="m-desc">按住 W 自动奔跑；CapsLock 或 Alt 走路</span></div>
+                        <div class="move-row"><span class="m-name">拳 / 踢</span><span class="m-cmd">鼠标左键 / 右键</span><span class="m-desc">键盘 J / K 同样可用</span></div>
+                    </div>
                 </div>
             </div>
         </div>

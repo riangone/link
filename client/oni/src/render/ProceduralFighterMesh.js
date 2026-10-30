@@ -11,7 +11,7 @@
 
 import * as THREE from '../../vendor/three.module.js';
 import { FIGHTER_STATE } from '../core/Constants.js';
-import { POSE_KEYS, makePose, resolvePose, ATTACK_ANIMS, GAIT } from './AnimationLibrary.js';
+import { POSE_KEYS, makePose, resolvePose, ATTACK_ANIMS, GAIT, getAttackAnim } from './AnimationLibrary.js';
 import { CharacterModel, SIDE_L, SIDE_R } from './CharacterModel.js';
 
 const CAM_TURN = 0.38; // rad the stance opens toward the camera at turn = 1
@@ -44,23 +44,25 @@ function wrapAngle(a) {
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
 const _pole = new THREE.Vector3(), _hip = new THREE.Vector3();
 const _bx = new THREE.Vector3(), _by = new THREE.Vector3(), _bz = new THREE.Vector3();
-const _m4 = new THREE.Matrix4();
+const _m4 = new THREE.Matrix4(), _m4b = new THREE.Matrix4();
 const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 const _qInv = new THREE.Quaternion();
 const _e = new THREE.Euler();
 const AX_X = new THREE.Vector3(1, 0, 0), AX_Y = new THREE.Vector3(0, 1, 0);
 
 export class ProceduralFighterMesh {
-    constructor(scene, isP1 = true) {
+    constructor(scene, isP1 = true, opts = {}) {
         this.scene = scene;
         this.isP1 = isP1;
+        this.archetype = opts.archetype || (isP1 ? 'KONOKO' : 'STRIKER');
 
         this.root = new THREE.Group();
         this.scene.add(this.root);
 
-        this.model = new CharacterModel(isP1);
+        this.model = new CharacterModel(isP1, { ...opts, archetype: this.archetype });
         this.body = this.model.root;
-        this.body.scale.setScalar(isP1 ? 1.0 : 1.06); // syndicate trooper is slightly bigger
+        const scale = isP1 ? 1.0 : (this.archetype === 'TANKER' || this.archetype === 'BARABAS' ? 1.15 : (this.archetype === 'FURY' ? 0.96 : 1.06));
+        this.body.scale.setScalar(scale);
         this.root.add(this.body);
         const m = this.model;
         this.pelvis = m.pelvis; this.spine = m.spine; this.chest = m.chest;
@@ -85,6 +87,32 @@ export class ProceduralFighterMesh {
         this.lastX = 0;
         this.lastZ = 0;
         this.hair = { lag: null, vel: new THREE.Vector3(), rx: 0, rz: 0 };
+    }
+
+    setArchetype(archetype) {
+        if (!archetype || this.isP1 || this.archetype === archetype) return;
+        this.archetype = archetype;
+        if (this.heldGunGroup && this.heldGunGroup.parent) {
+            this.heldGunGroup.parent.remove(this.heldGunGroup);
+        }
+        this.root.remove(this.body);
+        this.model = new CharacterModel(this.isP1, { archetype: this.archetype });
+        this.body = this.model.root;
+        const scale = this.archetype === 'TANKER' || this.archetype === 'BARABAS' ? 1.15 : (this.archetype === 'FURY' ? 0.96 : 1.06);
+        this.body.scale.setScalar(scale);
+        this.root.add(this.body);
+        const m = this.model;
+        this.pelvis = m.pelvis; this.spine = m.spine; this.chest = m.chest;
+        this.neck = m.neck; this.head = m.head; this.arms = m.arms; this.legs = m.legs;
+        this.meshes = m.meshes;
+        this.dims = m.dims;
+        this.accent = m.p.accent;
+        if (this.ring && this.ring.material) {
+            this.ring.material.color.setHex(this.accent);
+        }
+        if (this.arms && this.arms.r && this.arms.r.fist && this.heldGunGroup) {
+            this.arms.r.fist.add(this.heldGunGroup);
+        }
     }
 
     // ------------------------------------------------------------------ build
@@ -243,6 +271,45 @@ export class ProceduralFighterMesh {
 
         this.heldGunGroup.visible = false;
         this.arms.r.fist.add(this.heldGunGroup);
+
+        // 4. Tactical Right Thigh Holster (Bungie Oni iconic sidearm dock)
+        this.thighHolsterGroup = new THREE.Group();
+        this.holsterVariants = {};
+
+        const holsterMat = new THREE.MeshToonMaterial({ color: 0x181b26 });
+        const holsterBase = new THREE.Mesh(new THREE.BoxGeometry(0.048, 0.13, 0.078), holsterMat);
+        holsterBase.position.set(-0.082, -0.11, 0.01);
+        holsterBase.rotation.z = -0.05;
+        this.thighHolsterGroup.add(holsterBase);
+
+        const hPistol = new THREE.Group();
+        const hpGrip = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.08, 0.038), gripMat);
+        hpGrip.position.set(-0.084, -0.05, 0.012);
+        hpGrip.rotation.x = 0.26;
+        const hpSlide = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.042, 0.15), slateMetal);
+        hpSlide.position.set(-0.084, -0.10, 0.035);
+        hPistol.add(hpGrip, hpSlide);
+        this.holsterVariants.TCTF_PISTOL = hPistol;
+        this.thighHolsterGroup.add(hPistol);
+
+        const hScram = new THREE.Group();
+        const hsBox = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.10, 0.11), slateMetal);
+        hsBox.position.set(-0.084, -0.08, 0.018);
+        hScram.add(hsBox);
+        hScram.visible = false;
+        this.holsterVariants.SCRAM_CANNON = hScram;
+        this.thighHolsterGroup.add(hScram);
+
+        const hBow = new THREE.Group();
+        const hbGrip = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.045), gripMat);
+        hbGrip.position.set(-0.084, -0.06, 0.018);
+        hBow.add(hbGrip);
+        hBow.visible = false;
+        this.holsterVariants.MERCURY_BOW = hBow;
+        this.thighHolsterGroup.add(hBow);
+
+        this.thighHolsterGroup.visible = false;
+        this.legs.r.hip.add(this.thighHolsterGroup);
     }
 
     buildAlertBadge() {
@@ -320,17 +387,16 @@ export class ProceduralFighterMesh {
         const dx = fighter.x - this.lastX, dz = fighter.z - this.lastZ;
         const moved = Math.hypot(dx, dz);
         this.lastX = fighter.x; this.lastZ = fighter.z;
-        if (fighter.state === FIGHTER_STATE.RUN) {
-            this.loco.phase += moved * GAIT.RUN.perMeter;
-        } else if (fighter.state === FIGHTER_STATE.WALK) {
-            const yaw = typeof fighter.facingAngle === 'number' ? fighter.facingAngle : (fighter.facing === -1 ? Math.PI : 0);
-            const fwdDot = dx * Math.cos(yaw) + dz * Math.sin(yaw);
-            const dir = fwdDot < -0.0005 ? -1 : 1;
-            this.loco.phase += dir * moved * GAIT.WALK.perMeter;
-        }
+        // phase is distance-driven along the actual travel direction (forward, back or sideways)
+        if (fighter.state === FIGHTER_STATE.RUN) this.loco.phase += moved * GAIT.RUN.perMeter;
+        else if (fighter.state === FIGHTER_STATE.WALK) this.loco.phase += moved * GAIT.WALK.perMeter;
+        this.loco.phase %= Math.PI * 4;
 
         // Archetype visual scaling & optical camouflage
-        const targetScale = fighter.scale || (this.isP1 ? 1.0 : 1.06);
+        if (!this.isP1 && fighter.archetype && fighter.archetype !== this.archetype) {
+            this.setArchetype(fighter.archetype);
+        }
+        const targetScale = fighter.scale || (this.isP1 ? 1.0 : (this.archetype === 'TANKER' || this.archetype === 'BARABAS' ? 1.15 : (this.archetype === 'FURY' ? 0.96 : 1.06)));
         if (Math.abs(this.body.scale.x - targetScale) > 0.01) {
             this.body.scale.setScalar(targetScale);
         }
@@ -363,17 +429,35 @@ export class ProceduralFighterMesh {
     updateHeldWeapon(fighter) {
         if (!this.heldGunGroup) return;
         const hasGun = !!(fighter.weapon && fighter.hp > 0);
-        this.heldGunGroup.visible = hasGun;
-        if (hasGun) {
-            const wType = fighter.weapon.type || 'TCTF_PISTOL';
-            for (const [k, grp] of Object.entries(this.weaponVariants)) {
+        if (!hasGun) {
+            this.heldGunGroup.visible = false;
+            if (this.thighHolsterGroup) this.thighHolsterGroup.visible = false;
+            return;
+        }
+
+        const isShooting = (
+            fighter.state === FIGHTER_STATE.ATTACK &&
+            fighter.currentMove &&
+            (fighter.currentMove.isFirearmMove || fighter.currentMove.isWeaponThrow)
+        );
+
+        this.heldGunGroup.visible = isShooting;
+        if (this.thighHolsterGroup) this.thighHolsterGroup.visible = !isShooting;
+
+        const wType = fighter.weapon.type || 'TCTF_PISTOL';
+        for (const [k, grp] of Object.entries(this.weaponVariants)) {
+            grp.visible = (k === wType);
+        }
+        if (this.holsterVariants) {
+            for (const [k, grp] of Object.entries(this.holsterVariants)) {
                 grp.visible = (k === wType);
             }
-            const glowMat = this.weaponGlowMats[wType] || this.weaponGlowMats.TCTF_PISTOL;
-            if (glowMat) {
-                const col = fighter.weapon.color || 0x00f0ff;
-                glowMat.color.setHex(fighter.weapon.ammo > 0 ? col : 0x475569);
-            }
+        }
+
+        const glowMat = this.weaponGlowMats[wType] || this.weaponGlowMats.TCTF_PISTOL;
+        if (glowMat) {
+            const col = fighter.weapon.color || 0x00f0ff;
+            glowMat.color.setHex(fighter.weapon.ammo > 0 ? col : 0x475569);
         }
     }
 
@@ -406,7 +490,7 @@ export class ProceduralFighterMesh {
             const fr = fighter.stateTimer;
             if (fr >= m.startup && fr <= (m.startup + m.active + 1)) {
                 activeSnap = true;
-                const anim = ATTACK_ANIMS[m.id];
+                const anim = getAttackAnim(m);
                 snapLimb = anim ? anim.trail : null;
             }
         }
@@ -419,10 +503,10 @@ export class ProceduralFighterMesh {
             const foot = FOOT_KEYS.has(k);
             let [w0, z] = foot ? FOOT_SPRING : (SPRING[k] || SPRING_DEFAULT);
 
-            // Responsive martial-arts cadence
+            // Responsive martial-arts cadence (smooth, deliberate, pacing matching Oni 2001)
             let w = w0;
             if (isAttack) {
-                w = w0 * 2.2; // crisp strike acceleration & snappy lockout
+                w = w0 * 1.45; // balanced strike acceleration & fluid kinetic delivery
             } else if (isHurt) {
                 w = w0 * 0.90;
             } else if (isLoco) {
@@ -436,10 +520,10 @@ export class ProceduralFighterMesh {
 
             if (activeSnap && snapLimb) {
                 // Strike apex hold: lock attacking limb rigidly to the keyframe pose for maximum impact
-                if (snapLimb === 'lFist' && (k.startsWith('lS') || k.startsWith('lE') || k.startsWith('lW'))) {
+                if (snapLimb === 'lFist' && (k.startsWith('lS') || k.startsWith('lE') || k.startsWith('lW') || k === 'lAW')) {
                     P[k] = target; V[k] = 0; continue;
                 }
-                if (snapLimb === 'rFist' && (k.startsWith('rS') || k.startsWith('rE') || k.startsWith('rW'))) {
+                if (snapLimb === 'rFist' && (k.startsWith('rS') || k.startsWith('rE') || k.startsWith('rW') || k === 'rAW')) {
                     P[k] = target; V[k] = 0; continue;
                 }
                 if (snapLimb === 'lFoot' && (k.startsWith('lH') || k.startsWith('lK') || k.startsWith('lF'))) {
@@ -457,6 +541,15 @@ export class ProceduralFighterMesh {
                 p += v * h;
             }
             P[k] = p; V[k] = v;
+        }
+        // Planted feet must not lag behind their targets (a spring there = skating). While a gait is
+        // active the feet blend onto the authored trajectory within ~0.1 s, then track it exactly.
+        this.gaitW = Math.max(0, Math.min(1, (this.gaitW || 0) + (T.gait ? dt : -dt) / 0.1));
+        if (this.gaitW > 0) {
+            for (const k of FOOT_KEYS) {
+                P[k] += (T[k] - P[k]) * this.gaitW;
+                if (this.gaitW >= 1) V[k] = 0;
+            }
         }
         P.spin = wrapAngle(P.spin);
         P.lIK = Math.max(0, Math.min(1, P.lIK));
@@ -488,6 +581,13 @@ export class ProceduralFighterMesh {
 
         this.applyArm(this.arms.l, SIDE_L, p.lSP, p.lSR, p.lSY, p.lEB, p.lWB);
         this.applyArm(this.arms.r, SIDE_R, p.rSP, p.rSR, p.rSY, p.rEB, p.rWB);
+        if (p.lAW > 0.01 || p.rAW > 0.01) {
+            this.pelvis.updateMatrix(); this.spine.updateMatrix(); this.chest.updateMatrix();
+            _m4.multiplyMatrices(this.pelvis.matrix, this.spine.matrix).multiply(this.chest.matrix);
+            _q3.copy(this.pelvis.quaternion).multiply(this.spine.quaternion).multiply(this.chest.quaternion).invert();
+            if (p.lAW > 0.01) this.aimArm(this.arms.l, SIDE_L, Math.min(1, p.lAW), p.aY, p.aZ);
+            if (p.rAW > 0.01) this.aimArm(this.arms.r, SIDE_R, Math.min(1, p.rAW), p.aY, p.aZ);
+        }
 
         this.pelvis.updateMatrix();
         const sL = autoStep ? Math.min(0.09, Math.hypot(this.vel.lFx, this.vel.lFz) * 0.035) : 0;
@@ -500,6 +600,35 @@ export class ProceduralFighterMesh {
         A.sh.rotation.set(-SP, -SY * side, SR * side);   // order YXZ: roll, pitch, then swing in parent
         A.el.rotation.set(-EB, 0, 0);
         A.fist.rotation.set(-WB, 0, 0);
+    }
+
+    /**
+     * Strike aim: two-bone IK that sends the fist to a point on the body's centre line (aY high, aZ ahead),
+     * whatever the torso twist is. Expects _m4 = chest-to-body matrix and _q3 = body-to-chest rotation.
+     * The elbow hangs below the line of the punch (forearm folds upward), like a real straight punch.
+     */
+    aimArm(A, side, w, aY, aZ) {
+        const d = this.dims;
+        const s = 1 / this.body.scale.x;
+        const sh = _v1.copy(A.sh.position).applyMatrix4(_m4);                  // shoulder in body space
+        const dir = _v2.set(0, aY * s, aZ * s).sub(sh).applyQuaternion(_q3);    // shoulder -> target, chest space
+        const a = d.upperArm, b = d.foreArm + 0.07;
+        const len = Math.max(0.08, Math.min((a + b) * 0.999, dir.length()));
+        const dn = dir.normalize();
+        const pp = _pole.set(-0.35 * side, 1, 0.15);
+        pp.addScaledVector(dn, -pp.dot(dn));
+        if (pp.lengthSq() < 1e-6) pp.set(0, 0, 1);
+        pp.normalize();
+        const cosA = Math.max(-1, Math.min(1, (a * a + len * len - b * b) / (2 * a * len)));
+        const cosE = Math.max(-1, Math.min(1, (a * a + b * b - len * len) / (2 * a * b)));
+        const ca = cosA, sa = Math.sqrt(1 - ca * ca);
+        _by.copy(dn).multiplyScalar(-ca).addScaledVector(pp, sa);   // -upper arm (elbow sits below the line)
+        _bz.copy(pp).multiplyScalar(ca).addScaledVector(dn, sa);    // forearm folds toward +z of the shoulder
+        _bx.crossVectors(_by, _bz);
+        const qIK = _q2.setFromRotationMatrix(_m4b.makeBasis(_bx, _by, _bz));
+        A.sh.quaternion.slerp(qIK, w);
+        const eb = Math.PI - Math.acos(cosE);
+        A.el.rotation.x += (-eb - A.el.rotation.x) * w;
     }
 
     /**
@@ -543,8 +672,8 @@ export class ProceduralFighterMesh {
             _pole.set(sy + side * 0.12, 0, cy).applyQuaternion(_qInv);
 
             const a = d.thigh, b = d.shin;
-            // Limit reach to 96.5% of max length so the knee maintains organic bend and NEVER locks/pops straight
-            const maxReach = (a + b) * 0.965;
+            // Limit reach to 97.5% of max length so the knee maintains organic bend and NEVER locks/pops straight
+            const maxReach = (a + b) * 0.975;
             const len = Math.max(0.05, Math.min(maxReach, dir.length()));
             const dn = dir.normalize();
             const cosA = Math.max(-1, Math.min(1, (a * a + len * len - b * b) / (2 * a * len)));
@@ -611,6 +740,10 @@ export class ProceduralFighterMesh {
         this.ring.position.set(f.x, floorY + 0.015, f.z);
         if (!Number.isFinite(f.floorY)) {
             this.ring.material.opacity = 0;
+        } else if (f.daodanOverpower) {
+            this.ring.material.color.setHex(0xfacc15); // Golden Daodan Overpower aura
+            this.ring.scale.setScalar(1.52 + Math.sin((this.lastTime || 0) * 18) * 0.16);
+            this.ring.material.opacity = 0.95;
         } else if (f.daodanOverdrive) {
             this.ring.material.color.setHex(0xd946ef);
             this.ring.scale.setScalar(1.32 + Math.sin((this.lastTime || 0) * 14) * 0.12);
@@ -625,7 +758,7 @@ export class ProceduralFighterMesh {
     updateTrail(f, dt) {
         const n = this.TRAIL_N;
         const move = (f.state === FIGHTER_STATE.ATTACK || f.state === FIGHTER_STATE.THROW) ? f.currentMove : null;
-        const anim = move ? ATTACK_ANIMS[move.id] : null;
+        const anim = move ? getAttackAnim(move) : null;
         let emitting = false;
         if (anim) {
             const fr = f.stateTimer;
@@ -635,7 +768,7 @@ export class ProceduralFighterMesh {
         for (const s of this.trailSamples) s.age += dt;
         this.trailSamples = this.trailSamples.filter(s => s.age < 0.16);
 
-        if (emitting) {
+        if (emitting && anim.trail) {
             this.root.updateMatrixWorld(true);
             const limb = anim.trail;
             let tipObj, baseObj;
@@ -650,7 +783,7 @@ export class ProceduralFighterMesh {
         }
 
         const samples = this.trailSamples;
-        this.trailColor.setHex(f.daodanOverdrive ? 0xd946ef : this.accent);
+        this.trailColor.setHex(f.daodanOverpower ? 0xfacc15 : (f.daodanOverdrive ? 0xd946ef : this.accent));
         const c = this.trailColor;
         for (let i = 0; i < n; i++) {
             const s = samples[Math.min(i, samples.length - 1)];

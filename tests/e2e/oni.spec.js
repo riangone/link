@@ -9,8 +9,8 @@ test.describe('Oni Combat 3D Fighting Game', () => {
     test.afterAll(async () => { dev && await dev.close(); });
 
     test('Loads 3D arena, starts fight, and simulates combat', async ({ page }) => {
-        // software-rendered WebGL in CI spends ~20s compiling shaders before the start button responds
-        test.setTimeout(60000);
+        // software-rendered WebGL in CI spends ~30-60s compiling shaders before the start button responds
+        test.setTimeout(120_000);
         const errors = [];
         page.on('pageerror', e => errors.push(String(e)));
 
@@ -42,7 +42,7 @@ test.describe('Oni Combat 3D Fighting Game', () => {
         // Check initial state
         await expect.poll(async () => {
             return await page.evaluate(() => window.__oni && window.__oni.getState().isPlaying);
-        }, { timeout: 3000 }).toBe(true);
+        }, { timeout: 10000 }).toBe(true);
 
         // Press 'KeyJ' to attack (Jab)
         await page.keyboard.press('KeyJ');
@@ -63,7 +63,7 @@ test.describe('Oni Combat 3D Fighting Game', () => {
     });
 
     test('Mobile view renders virtual joystick, arcade buttons, and toggles move list', async ({ page }) => {
-        test.setTimeout(60000);
+        test.setTimeout(90_000);
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto(`${dev.url}/oni/?bot=normal`);
 
@@ -124,6 +124,7 @@ test.describe('Oni Combat 3D Fighting Game', () => {
         await page.goto(`${dev.url}/play/?lang=zh`);
         const oniCard = page.locator('#g-oni');
         await expect(oniCard).toBeVisible();
+        await expect(oniCard.locator('.n')).toHaveText('奥尼');
 
         // Switch to PvP mode and verify clicking oni enters matchmaking waiting state (not bad-game error)
         await page.locator('#mode button[data-m="pvp"]').click();
@@ -132,5 +133,24 @@ test.describe('Oni Combat 3D Fighting Game', () => {
         await expect(page.locator('#box .c')).toHaveText(/^\d{4}$/);
         await page.locator('#cx').click();
         await expect(page.locator('#ov.on')).not.toBeVisible();
+    });
+
+    test('Zoom In/Out controls and toast HUD banner work properly', async ({ page }) => {
+        test.setTimeout(60000);
+        await page.goto(`${dev.url}/oni/?bot=normal`);
+        await page.locator('#btn-start').click();
+
+        // Check title displays 奥尼
+        await expect(page).toHaveTitle(/奥尼/);
+
+        // Test Zoom In via key press '='
+        await page.keyboard.press('Equal');
+        const zoomToast = page.locator('#zoom-toast');
+        await expect(zoomToast).toBeVisible({ timeout: 3000 });
+        await expect(zoomToast).toHaveText(/🔍 视距:/);
+
+        // Test Zoom Out via key press '-'
+        await page.keyboard.press('Minus');
+        await expect(zoomToast).toHaveText(/🔍 视距:/);
     });
 });

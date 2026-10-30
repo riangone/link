@@ -7,6 +7,39 @@
 import * as THREE from '../../vendor/three.module.js';
 import { PostFX } from './PostFX.js';
 
+/** Visual themes for the campaign chapter maps (LevelLayouts themes). */
+const LEVEL_THEMES = {
+    WAREHOUSE: { floor: 0xc8d3df, wall: 0xd8e3ee, wallH: 8, lamp: 0xf8fafc, accent: 0xf59e0b, fog: 0xdbe6f2, fogDensity: 0.006,
+        kinds: { CONTAINER: { color: 0x0284c7, metal: 0.25, trim: 0xf8fafc }, CRATE: { color: 0xb45309 }, FORKLIFT: { color: 0xfacc15, metal: 0.3 }, SECTOR_WALL: { color: 0x94a3b8 }, DEFAULT: { color: 0x64748b } } },
+    FACTORY: { floor: 0x9ca3af, wall: 0xb6bcc6, wallH: 9, lamp: 0xfff7d6, accent: 0xf97316, fog: 0xd6d3cb, fogDensity: 0.008,
+        kinds: { CONVEYOR: { color: 0x334155, metal: 0.5, trim: 0xfacc15 }, PRESS: { color: 0xea580c, metal: 0.4 }, FURNACE: { color: 0x7c2d12, trim: 0xfb923c }, PIPE: { color: 0x94a3b8, metal: 0.6 }, SECTOR_WALL: { color: 0x6b7280 }, DEFAULT: { color: 0x6b7280 } } },
+    LAB: { floor: 0xe5f3ee, wall: 0xf1f5f9, wallH: 4.5, lamp: 0xecfeff, accent: 0x10b981, fog: 0xe0f2ee, fogDensity: 0.006,
+        kinds: { GLASS: { color: 0x99f6e4, glass: true }, TANK: { color: 0x34d399, glass: true }, BENCH: { color: 0xf8fafc, trim: 0x10b981 }, SECTOR_WALL: { color: 0xcbd5e1 }, DEFAULT: { color: 0xcbd5e1 } } },
+    AIRPORT: { floor: 0xe7e5e4, wall: 0xdbeafe, wallH: 10, lamp: 0xffffff, accent: 0x3b82f6, fog: 0xe2ecf8, fogDensity: 0.005,
+        kinds: { PILLAR: { color: 0xf8fafc }, COUNTER: { color: 0x1e3a8a, trim: 0x60a5fa }, SEATS: { color: 0x475569 }, CAROUSEL: { color: 0x334155, metal: 0.5 }, KIOSK: { color: 0x0ea5e9 }, SECTOR_WALL: { color: 0xbfdbfe }, DEFAULT: { color: 0x94a3b8 } } },
+    HANGAR: { floor: 0xa8a29e, wall: 0x78716c, wallH: 14, lamp: 0xfef3c7, accent: 0xfacc15, fog: 0xcbc6bf, fogDensity: 0.007,
+        kinds: { CRATE: { color: 0x92400e }, FUSELAGE: { color: 0xe2e8f0, metal: 0.4, trim: 0x1d4ed8 }, WING: { color: 0xcbd5e1, metal: 0.4 }, ENGINE: { color: 0x475569, metal: 0.6 }, PILLAR: { color: 0x57534e }, SECTOR_WALL: { color: 0x57534e }, DEFAULT: { color: 0x78716c } } },
+    OFFICE: { floor: 0xcbd5e1, wall: 0xe2e8f0, wallH: 4, lamp: 0xffffff, accent: 0x22d3ee, fog: 0xe2e8f0, fogDensity: 0.006,
+        kinds: { PARTITION: { color: 0x64748b }, DESK: { color: 0xa16207 }, PILLAR: { color: 0xf1f5f9 }, SECTOR_WALL: { color: 0x94a3b8 }, DEFAULT: { color: 0x94a3b8 } } },
+    ATMOS: { floor: 0x94a3b8, wall: 0x64748b, wallH: 12, lamp: 0xccfbf1, accent: 0x2dd4bf, fog: 0xb8d8d4, fogDensity: 0.01,
+        kinds: { COLUMN: { color: 0x0f766e, metal: 0.5, trim: 0x5eead4 }, PIPE: { color: 0xcbd5e1, metal: 0.6 }, SECTOR_WALL: { color: 0x475569 }, DEFAULT: { color: 0x475569 } } },
+    ATMOS_CORE: { floor: 0x475569, wall: 0x334155, wallH: 6, lamp: 0x99f6e4, accent: 0x14b8a6, fog: 0x8fb3b0, fogDensity: 0.014,
+        kinds: { MACHINE: { color: 0x1e293b, metal: 0.6, trim: 0x2dd4bf }, SECTOR_WALL: { color: 0x1e293b }, DEFAULT: { color: 0x334155 } } },
+    STATE: { floor: 0xf5f5f4, wall: 0xe7e5e4, wallH: 9, lamp: 0xfffbeb, accent: 0xa8a29e, fog: 0xece9e4, fogDensity: 0.005,
+        kinds: { COLONNADE: { color: 0xfafaf9 }, SHELF: { color: 0x78350f }, RECEPTION: { color: 0x44403c, trim: 0xd6d3d1 }, BENCH: { color: 0x57534e }, STATUE: { color: 0xd6d3d1, metal: 0.3 }, SECTOR_WALL: { color: 0xd6d3d1 }, DEFAULT: { color: 0xa8a29e } } },
+    ROOFTOP: { floor: 0x6b7280, wall: 0x4b5563, wallH: 1, lamp: 0xffffff, accent: 0x818cf8, fog: 0x9aa7bd, fogDensity: 0.012, skyline: true, rain: true,
+        kinds: { AC_UNIT: { color: 0xd1d5db, metal: 0.4 }, VENT: { color: 0x9ca3af, metal: 0.5 }, SKYLIGHT: { color: 0x93c5fd, glass: true }, TOWER: { color: 0x7c2d12 }, PARAPET: { color: 0x4b5563 }, SECTOR_WALL: { color: 0x374151 }, DEFAULT: { color: 0x6b7280 } } },
+    DREAM: { floor: 0x2e1065, wall: 0x1e1b4b, wallH: 1, lamp: 0xe9d5ff, accent: 0xe879f9, fog: 0x6d28d9, fogDensity: 0.02,
+        kinds: { MONOLITH: { color: 0x1e1b4b, metal: 0.7, trim: 0xc084fc }, SECTOR_WALL: { color: 0x4c1d95 }, DEFAULT: { color: 0x4c1d95 } } },
+    PRISON: { floor: 0x9ca3af, wall: 0x6b7280, wallH: 5, lamp: 0xfef9c3, accent: 0xfb7185, fog: 0xc7c2b8, fogDensity: 0.009,
+        kinds: { CELL_WALL: { color: 0x78716c }, BARS: { color: 0x1f2937, metal: 0.8 }, BOOTH: { color: 0x334155, trim: 0xfb7185 }, SECTOR_WALL: { color: 0x57534e }, DEFAULT: { color: 0x6b7280 } } },
+    HQ_VAULT: { floor: 0x1f2937, wall: 0x374151, wallH: 6, lamp: 0xfef08a, accent: 0xfacc15, fog: 0x4b5563, fogDensity: 0.011,
+        kinds: { RACK: { color: 0x111827, metal: 0.6, trim: 0x22c55e }, CHECKPOINT: { color: 0xfacc15, metal: 0.3 }, VAULT_PILLAR: { color: 0xa16207, metal: 0.7 }, SECTOR_WALL: { color: 0x111827 }, DEFAULT: { color: 0x374151 } } },
+    COMPOUND: { floor: 0xf1f5f9, wall: 0xcbd5e1, wallH: 1, lamp: 0xffffff, accent: 0xef4444, fog: 0xe2e8f0, fogDensity: 0.012,
+        kinds: { ROCK: { color: 0x64748b, rough: 0.95 }, BUNKER: { color: 0x57534e, trim: 0xef4444 }, SANDBAG: { color: 0xa8a29e, rough: 0.95 }, SECTOR_WALL: { color: 0x475569 }, DEFAULT: { color: 0x64748b } } }
+};
+
+
 // deterministic PRNG so the skyline is identical every load
 function mulberry32(a) {
     return function () {
@@ -58,10 +91,11 @@ export class ThreeScene {
         this.cameraTarget = new THREE.Vector3(0, 1.1, 0);
 
         // camera rig: preset view + user orbit offsets (all render-only)
-        this.camModes = ['side', 'diagonal', 'shoulder', 'top', 'adventure'];
-        this.camMode = 'side';
+        this.camModes = ['adventure', 'side', 'diagonal', 'shoulder', 'top'];
+        this.camMode = 'adventure';
         this.orbit = { yaw: 0, pitch: 0, zoom: 1 };
         this.camYaw = 0;      // smoothed yaw actually used (0 = classic side view from +Z)
+        this.adventureYaw = undefined;
         this.camPitch = 0.1;
         this.camDist = 7;
         this.setupOrbitControls();
@@ -144,6 +178,13 @@ export class ThreeScene {
         const fill = new THREE.DirectionalLight(0xe8f0f8, 0.95);
         fill.position.set(0, 2, 10);
         this.scene.add(fill);
+
+        // Dynamic Tactical Alarm Strobe Light
+        this.alarmActive = false;
+        const alarmLight = new THREE.PointLight(0xff1744, 0, 38, 1.4);
+        alarmLight.position.set(0, 5.0, 0);
+        this.alarmLight = alarmLight;
+        this.scene.add(alarmLight);
     }
 
     makeFloorTextures() {
@@ -743,15 +784,126 @@ export class ThreeScene {
         this.warehouseGroup.add(neonSign);
     }
 
+    // ------------------------------------------------------------------ campaign chapter maps
+    /**
+     * Build a chapter map from LevelLayouts.buildLevel(): the SAME obstacle list the physics uses,
+     * so every visible object collides and nothing invisible blocks the player.
+     */
+    buildCampaignLevel(level) {
+        if (!this.levelGroup) {
+            this.levelGroup = new THREE.Group();
+            this.scene.add(this.levelGroup);
+        }
+        const g = this.levelGroup;
+        for (let i = g.children.length - 1; i >= 0; i--) {
+            const c = g.children[i];
+            g.remove(c);
+            c.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+        }
+        this.levelMats = this.levelMats || new Map();
+        this.activeLevelTheme = null;
+        this.levelObstacles = level ? level.obstacles : null;
+        if (!level) return;
+
+        const T = LEVEL_THEMES[level.theme] || LEVEL_THEMES.WAREHOUSE;
+        this.activeLevelTheme = T;
+        const mat = (hex, rough = 0.7, metal = 0.15, extra = {}) => {
+            const key = `${hex}_${rough}_${metal}_${extra.opacity || 1}`;
+            let m = this.levelMats.get(key);
+            if (!m) {
+                m = new THREE.MeshStandardMaterial({ color: hex, roughness: rough, metalness: metal, ...extra });
+                this.levelMats.set(key, m);
+            }
+            return m;
+        };
+        const { minX, maxX, minZ, maxZ } = level.bounds;
+        const W = maxX - minX, D = maxZ - minZ, cx = (minX + maxX) / 2;
+
+        const floor = new THREE.Mesh(new THREE.BoxGeometry(W + 4, 1, D + 4), mat(T.floor, 0.85, 0.05));
+        floor.position.set(cx, -0.5, 0);
+        floor.receiveShadow = true;
+        g.add(floor);
+
+        // floor markings along the critical path (helps reading the route)
+        const pathMat = new THREE.MeshBasicMaterial({ color: T.accent, transparent: true, opacity: 0.35 });
+        for (let i = 1; i < level.path.length; i++) {
+            const [x0, z0] = level.path[i - 1], [x1, z1] = level.path[i];
+            const len = Math.hypot(x1 - x0, z1 - z0);
+            const strip = new THREE.Mesh(new THREE.BoxGeometry(len, 0.02, 0.18), pathMat);
+            strip.position.set((x0 + x1) / 2, 0.012, (z0 + z1) / 2);
+            strip.rotation.y = -Math.atan2(z1 - z0, x1 - x0);
+            g.add(strip);
+        }
+
+        if (!level.outdoor) {
+            const wallMat = mat(T.wall, 0.9, 0.05);
+            for (const z of [minZ - 0.4, maxZ + 0.4]) {
+                const w = new THREE.Mesh(new THREE.BoxGeometry(W + 2, T.wallH, 0.8), wallMat);
+                w.position.set(cx, T.wallH / 2, z);
+                w.receiveShadow = true;
+                g.add(w);
+            }
+            for (const x of [minX - 0.4, maxX + 0.4]) {
+                const w = new THREE.Mesh(new THREE.BoxGeometry(0.8, T.wallH, D + 2), wallMat);
+                w.position.set(x, T.wallH / 2, 0);
+                g.add(w);
+            }
+            // ceiling light strips
+            const lightMat = new THREE.MeshBasicMaterial({ color: T.lamp });
+            for (let x = minX + 3; x < maxX; x += 6) {
+                const l = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.06, 0.35), lightMat);
+                l.position.set(x, T.wallH - 0.2, 0);
+                g.add(l);
+            }
+        }
+
+        for (const o of level.obstacles) {
+            const style = T.kinds[o.kind] || T.kinds.DEFAULT || { color: 0x94a3b8 };
+            const w = o.maxX - o.minX, d = o.maxZ - o.minZ, h = o.height || 2.6;
+            const m = style.glass
+                ? mat(style.color, 0.1, 0.1, { transparent: true, opacity: 0.38 })
+                : mat(style.color, style.rough ?? 0.7, style.metal ?? 0.15);
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+            mesh.position.set((o.minX + o.maxX) / 2, (o.minY || 0) + h / 2, (o.minZ + o.maxZ) / 2);
+            mesh.castShadow = !style.glass;
+            mesh.receiveShadow = true;
+            mesh.userData.obstacleId = o.id;
+            g.add(mesh);
+            if (style.trim) { // thin coloured band to break up silhouettes
+                const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.02, Math.min(0.12, h * 0.1), d + 0.02),
+                    new THREE.MeshBasicMaterial({ color: style.trim }));
+                band.position.set(mesh.position.x, (o.minY || 0) + h * 0.82, mesh.position.z);
+                g.add(band);
+            }
+        }
+    }
+
     setStageMode(mode = 'ROOFTOP') {
-        const isWarehouse = mode === 'WAREHOUSE';
+        // ROOFTOP_CAMPAIGN = long campaign sector floor (warehouse geometry) under the open rooftop sky
+        const isLevel = mode === 'CAMPAIGN_LEVEL';
+        const isRooftopCampaign = mode === 'ROOFTOP_CAMPAIGN';
+        const isWarehouse = mode === 'WAREHOUSE' || isRooftopCampaign;
         const isIndoor = mode === 'INDOOR_DOJO';
-        const isRooftop = !isWarehouse && !isIndoor;
+        const isRooftop = !isWarehouse && !isIndoor && !isLevel;
         this.stageMode = mode;
+        this.setAlarmState(false);
+        if (this.levelGroup) this.levelGroup.visible = isLevel;
+        if (isLevel) {
+            const T = this.activeLevelTheme || LEVEL_THEMES.WAREHOUSE;
+            if (this.rooftopGroup) this.rooftopGroup.visible = false;
+            if (this.indoorGroup) this.indoorGroup.visible = false;
+            if (this.warehouseGroup) this.warehouseGroup.visible = false;
+            if (this.skylineGroup) this.skylineGroup.visible = !!T.skyline;
+            if (this.rain) this.rain.visible = !!T.rain;
+            if (this.sky) this.sky.visible = true;
+            this.scene.fog.color.setHex(T.fog);
+            this.scene.fog.density = T.fogDensity;
+            return;
+        }
 
         if (this.rooftopGroup) this.rooftopGroup.visible = isRooftop;
-        if (this.skylineGroup) this.skylineGroup.visible = isRooftop;
-        if (this.rain) this.rain.visible = isRooftop;
+        if (this.skylineGroup) this.skylineGroup.visible = isRooftop || isRooftopCampaign;
+        if (this.rain) this.rain.visible = isRooftop || isRooftopCampaign;
         if (this.sky) this.sky.visible = true; // Sky remains visible for airy, bright daylight in all scenes
         if (this.indoorGroup) this.indoorGroup.visible = isIndoor;
         if (this.warehouseGroup) this.warehouseGroup.visible = isWarehouse;
@@ -764,6 +916,13 @@ export class ThreeScene {
             this.scene.fog.density = 0.006;
         } else {
             this.scene.fog.density = 0.008;
+        }
+    }
+
+    setAlarmState(active) {
+        this.alarmActive = !!active;
+        if (!this.alarmActive && this.alarmLight) {
+            this.alarmLight.intensity = 0;
         }
     }
 
@@ -800,7 +959,9 @@ export class ThreeScene {
     setCameraMode(mode) {
         if (!this.camModes.includes(mode)) return this.camMode;
         this.camMode = mode;
+        this.adventureYaw = undefined;
         this.orbit.yaw = 0; this.orbit.pitch = 0; this.orbit.zoom = 1;
+        if (typeof this.onZoomChange === 'function') this.onZoomChange(this.getZoomPercent());
         return mode;
     }
 
@@ -811,6 +972,35 @@ export class ThreeScene {
 
     resetOrbit() {
         this.orbit.yaw = 0; this.orbit.pitch = 0; this.orbit.zoom = 1;
+        if (typeof this.onZoomChange === 'function') this.onZoomChange(this.getZoomPercent());
+    }
+
+    setZoom(val) {
+        const clamped = Math.max(0.45, Math.min(2.2, Number(val) || 1.0));
+        this.orbit.zoom = clamped;
+        if (typeof this.onZoomChange === 'function') this.onZoomChange(this.getZoomPercent());
+        return clamped;
+    }
+
+    adjustZoom(factor) {
+        const next = Math.max(0.45, Math.min(2.2, this.orbit.zoom * factor));
+        this.orbit.zoom = next;
+        if (typeof this.onZoomChange === 'function') this.onZoomChange(this.getZoomPercent());
+        return next;
+    }
+
+    getZoomPercent() {
+        return Math.round(this.orbit.zoom * 100);
+    }
+
+    /** Oni 2001 mouse-look camera: locked directly behind Konoko, pitch from the mouse. */
+    setAimFollow(on) {
+        this.aimFollow = !!on;
+        this.aimPitch = 0.2;
+    }
+
+    adjustAimPitch(d) {
+        this.aimPitch = Math.max(-0.25, Math.min(0.9, (this.aimPitch || 0.2) + d));
     }
 
     /** Yaw used to convert screen-relative stick input to world space. */
@@ -822,27 +1012,105 @@ export class ThreeScene {
         const el = this.renderer.domElement;
         el.style.touchAction = 'none';
         let drag = null;
+        const activePointers = new Map();
+        let initialPinchDist = 0;
+        let initialPinchZoom = 1;
+
         el.addEventListener('pointerdown', (e) => {
             if (e.button !== undefined && e.button > 2) return;
-            drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+            activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
             el.setPointerCapture?.(e.pointerId);
+
+            if (activePointers.size === 1) {
+                drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+            } else if (activePointers.size === 2) {
+                // Two touches down: activate pinch-to-zoom
+                drag = null;
+                const pts = Array.from(activePointers.values());
+                initialPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+                initialPinchZoom = this.orbit.zoom;
+            }
         });
+
         el.addEventListener('pointermove', (e) => {
-            if (!drag || drag.id !== e.pointerId) return;
-            const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-            drag.x = e.clientX; drag.y = e.clientY;
-            this.orbit.yaw -= dx * 0.008;
-            this.orbit.pitch = Math.max(-0.08, Math.min(1.1, this.orbit.pitch + dy * 0.006));
+            if (!activePointers.has(e.pointerId)) return;
+            activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            if (activePointers.size === 2 && initialPinchDist > 5) {
+                const pts = Array.from(activePointers.values());
+                const currDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+                if (currDist > 5) {
+                    const ratio = initialPinchDist / currDist;
+                    this.orbit.zoom = Math.max(0.45, Math.min(2.2, initialPinchZoom * ratio));
+                    if (typeof this.onZoomChange === 'function') this.onZoomChange(this.getZoomPercent());
+                }
+                return;
+            }
+
+            if (drag && drag.id === e.pointerId && activePointers.size === 1) {
+                const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+                drag.x = e.clientX; drag.y = e.clientY;
+                this.orbit.yaw -= dx * 0.008;
+                this.orbit.pitch = Math.max(-0.08, Math.min(1.1, this.orbit.pitch + dy * 0.006));
+            }
         });
-        const end = (e) => { if (drag && drag.id === e.pointerId) drag = null; };
+
+        const end = (e) => {
+            activePointers.delete(e.pointerId);
+            if (drag && drag.id === e.pointerId) drag = null;
+            if (activePointers.size === 1) {
+                const [remId, pt] = Array.from(activePointers.entries())[0];
+                drag = { id: remId, x: pt.x, y: pt.y };
+            }
+        };
         el.addEventListener('pointerup', end);
         el.addEventListener('pointercancel', end);
-        el.addEventListener('wheel', (e) => {
+
+        // Wheel zoom on renderer canvas & parent container
+        const onWheel = (e) => {
             e.preventDefault();
-            this.orbit.zoom = Math.max(0.55, Math.min(1.8, this.orbit.zoom * Math.exp(e.deltaY * 0.001)));
-        }, { passive: false });
+            const factor = Math.exp(e.deltaY * 0.0012);
+            this.adjustZoom(factor);
+        };
+        el.addEventListener('wheel', onWheel, { passive: false });
+        if (this.container && this.container !== el) {
+            this.container.addEventListener('wheel', onWheel, { passive: false });
+        }
         el.addEventListener('dblclick', () => this.resetOrbit());
         el.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
+
+    /**
+     * Oni-style camera collision: if a map obstacle sits between the look target and the camera,
+     * pull the camera in front of it (segment vs. AABB slab test against the physics boxes).
+     */
+    clipCameraToLevel() {
+        const obs = this.levelObstacles;
+        if (!obs || !obs.length) return;
+        const t = this.cameraTarget, c = this.camera.position;
+        const dx = c.x - t.x, dy = c.y - t.y, dz = c.z - t.z;
+        let best = 1;
+        for (const o of obs) {
+            let t0 = 0, t1 = best;
+            const slab = (p, d, lo, hi) => {
+                if (Math.abs(d) < 1e-9) return p >= lo && p <= hi;
+                let a = (lo - p) / d, b = (hi - p) / d;
+                if (a > b) { const tmp = a; a = b; b = tmp; }
+                if (a > t0) t0 = a;
+                if (b < t1) t1 = b;
+                return t0 <= t1;
+            };
+            const pad = 0.12;
+            if (slab(t.x, dx, o.minX - pad, o.maxX + pad) &&
+                slab(t.y, dy, o.minY ? o.minY - pad : -1, (o.minY || 0) + (o.height || 2.6) + pad) &&
+                slab(t.z, dz, o.minZ - pad, o.maxZ + pad) && t0 > 0) {
+                best = t0;
+            }
+        }
+        if (best < 1) {
+            const f = Math.max(0.12, best - 0.04);
+            c.set(t.x + dx * f, t.y + dy * f, t.z + dz * f);
+        }
     }
 
     updateCamera(f1, f2, isPreview = false, timeSeconds = 0, cinematicState = null) {
@@ -877,6 +1145,47 @@ export class ThreeScene {
             return;
         }
 
+        if (this.aimFollow && f1 && !isPreview) {
+            const fa = f1.facingAngle || 0;
+            const yawA = Math.atan2(-Math.cos(fa), -Math.sin(fa)); // camera sits behind her facing
+            const pitchA = this.aimPitch === undefined ? 0.2 : this.aimPitch;
+            const distA = 3.6 * this.orbit.zoom;
+            let dyA = yawA - this.camYaw;
+            while (dyA > Math.PI) dyA -= Math.PI * 2;
+            while (dyA < -Math.PI) dyA += Math.PI * 2;
+            this.camYaw += dyA * (1 - Math.exp(-dt * 30)); // near-rigid, like the original
+            this.camPitch += (pitchA - this.camPitch) * (1 - Math.exp(-dt * 20));
+            this.camDist += (distA - this.camDist) * (1 - Math.exp(-dt * 10));
+            const kA = 1 - Math.exp(-dt * 18);
+            this.cameraTarget.x += (f1.x - this.cameraTarget.x) * kA;
+            this.cameraTarget.y += (1.35 + f1.y * 0.6 - this.cameraTarget.y) * kA;
+            this.cameraTarget.z += (f1.z - this.cameraTarget.z) * kA;
+            const cpA = Math.cos(this.camPitch), spA = Math.sin(this.camPitch);
+            this.camera.position.set(
+                this.cameraTarget.x + Math.sin(this.camYaw) * cpA * this.camDist,
+                Math.max(0.35, this.cameraTarget.y + spA * this.camDist + 0.15),
+                this.cameraTarget.z + Math.cos(this.camYaw) * cpA * this.camDist
+            );
+            this.clipCameraToLevel();
+            this.keyLight.position.set(f1.x + 3, 9, f1.z + 6);
+            this.keyLight.target.position.set(f1.x, 0, f1.z);
+            this.camera.lookAt(this.cameraTarget);
+            if (this.alarmActive && this.alarmLight) {
+                this.alarmLight.position.set(f1.x, 5.0, f1.z);
+                this.alarmLight.intensity = Math.max(0, Math.sin(this.clock * 16.0)) * 4.5;
+            }
+            if (this.shakeIntensity > 0.005) {
+                const sA = this.shakeIntensity;
+                this.camera.position.x += (Math.random() - 0.5) * sA * 0.5;
+                this.camera.position.y += (Math.random() - 0.5) * sA * 0.5;
+                this.shakeIntensity *= Math.pow(this.shakeDecay, dt * 60);
+            } else {
+                this.shakeIntensity = 0;
+            }
+            this.sky.position.copy(this.camera.position);
+            return;
+        }
+
         let midX = (f1.x + f2.x) * 0.5;
         let midZ = (f1.z + f2.z) * 0.5;
         const midY = (f1.y + f2.y) * 0.5;
@@ -900,12 +1209,28 @@ export class ThreeScene {
             pitch = 0.95; camDist *= 1.15; lookY = 0.5;
         } else if (this.camMode === 'adventure') {   // Oni 2001 Adventure 3rd-person follow
             const { fx, fz } = typeof f1.getForwardVector === 'function' ? f1.getForwardVector() : { fx: 1, fz: 0 };
-            yaw = Math.atan2(-fx, fz) * 0.45;
+            const charBackYaw = f1.facingAngle !== undefined ? Math.atan2(-Math.cos(f1.facingAngle), -Math.sin(f1.facingAngle)) : Math.atan2(-fx, fz);
+            if (this.adventureYaw === undefined) {
+                this.adventureYaw = charBackYaw;
+            } else {
+                let diff = charBackYaw - this.adventureYaw;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                const speed = Math.hypot(f1.vx || 0, f1.vz || 0);
+                // Deadzone of ~24 degrees: micro-turns and idle combat never drag the camera, eliminating feedback vibration
+                const deadzone = 0.42;
+                if (speed > 1.2 && Math.abs(diff) > deadzone) {
+                    const excess = (Math.abs(diff) - deadzone) * Math.sign(diff);
+                    const followRate = (f1.state === 'RUN' || f1.state === 2) ? 2.8 : 1.4;
+                    this.adventureYaw += excess * (1 - Math.exp(-dt * followRate));
+                }
+            }
+            yaw = this.adventureYaw;
             pitch = 0.22;
-            camDist = Math.max(5.2, 4.0 + dist * 0.45);
-            midX = f1.x * 0.72 + (f2 ? f2.x : f1.x) * 0.28;
-            midZ = f1.z * 0.72 + (f2 ? f2.z : f1.z) * 0.28;
-            lookY = 1.12 + midY * 0.25;
+            camDist = 3.4 * this.orbit.zoom;
+            midX = f1.x;
+            midZ = f1.z;
+            lookY = 1.25 + (f1.y || 0) * 0.5;
         }
         if (isPreview) {
             yaw += Math.sin(timeSeconds * 0.45) * 0.14;
@@ -934,9 +1259,17 @@ export class ThreeScene {
             this.cameraTarget.z + Math.cos(this.camYaw) * cp * this.camDist
         );
 
+        if (!isPreview) this.clipCameraToLevel();
+
         // shadow frustum follows the action
         this.keyLight.position.set(midX + 3, 9, midZ + 6);
         this.keyLight.target.position.set(midX, 0, midZ);
+
+        if (this.alarmActive && this.alarmLight) {
+            const pulse = Math.max(0, Math.sin(this.clock * 16.0));
+            this.alarmLight.position.set(midX, 5.0, midZ);
+            this.alarmLight.intensity = pulse * 4.5;
+        }
 
         this.camera.lookAt(this.cameraTarget);
         if (this.shakeIntensity > 0.005) {

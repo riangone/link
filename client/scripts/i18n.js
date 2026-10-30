@@ -197,6 +197,8 @@ class I18n {
                 game_desc_kart3d: "Mode-7 perspective 3D kart racing with drift boosts and items",
                 game_name_spin: "Link Spin",
                 game_desc_spin: "Bey battle: let it rip, burst or ring-out your rival",
+                game_name_spin3d: "Link Spin 3D",
+                game_desc_spin3d: "Full 3D arena Beyblade combat with X-DASH rails and burst disassembly",
                 game_name_armor: "Link Armor",
                 game_desc_armor: "Tank duel: 4 tank types, cover, specials — no self-damage",
                 game_name_volley: "Mech Volley",
@@ -399,6 +401,8 @@ class I18n {
                 game_desc_kart3d: "第一/追尾视角 3D 卡丁车 · 漂移喷火抢道具",
                 game_name_spin: "爆旋陀螺",
                 game_desc_spin: "GO SHOOT! 撞飞出场 · 打到爆裂 · 比谁转得久",
+                game_name_spin3d: "3D 爆旋陀螺",
+                game_desc_spin3d: "全视角 3D 陀螺对决 · X-DASH 齿轨极境冲刺 · 爆裂解体判定",
                 game_name_armor: "装甲对决",
                 game_desc_armor: "四种坦克 · 掩体对射 · 必杀技 · 不会误伤自己",
                 game_name_volley: "机甲排球",
@@ -409,7 +413,7 @@ class I18n {
                 game_desc_tennis: "自动跑位 · 划一下决定回球方向和力度",
                 game_name_hoops: "机甲篮球",
                 game_desc_hoops: "1v1 斗牛 · 跳投 · 抢断 · 盖帽 · 扣篮",
-                game_name_oni: "鬼神对决",
+                game_name_oni: "奥尼",
                 game_desc_oni: "3D 枪斗术格斗 · 拳脚连招 · 缴械夺枪 · 天台对决"
             },
             ja: {
