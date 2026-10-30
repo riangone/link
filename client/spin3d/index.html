@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>爆旋陀螺 3D · Link Spin 3D</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 3D Three.js Viewport Container (Unobstructed Fullscreen) -->
+        <div id="canvas-container"></div>
+
+        <!-- Floaters & Combat Callouts Layer (Pointer events pass through) -->
+        <div id="floaters-layer" class="floaters-layer"></div>
+
+        <!-- HUD Layer (Pointer events pass through to canvas by default) -->
+        <div class="hud-layer">
+            <!-- Sleek Minimalist Top Navigation -->
+            <header class="top-nav">
+                <div class="brand-badge">
+                    <span class="logo-link">LINK</span>
+                    <span class="logo-spin">SPIN</span>
+                    <span class="tag-3d">3D</span>
+                </div>
+
+                <!-- Center Compact Score Capsule (Transparent, zero arena obstruction) -->
+                <div class="center-score-capsule">
+                    <span class="score-p1" id="p1-score">0</span>
+                    <span class="score-sep">:</span>
+                    <span class="score-p2" id="p2-score">0</span>
+                    <span class="round-badge" id="round-indicator">ROUND 1</span>
+                </div>
+
+                <div class="action-buttons">
+                    <button type="button" id="btn-camera" class="hud-pill-btn" title="切换机位 (2.5D俯视 / 动作 / 自由)">
+                        <span>🎥</span><span id="btn-camera-text">俯瞰机位</span>
+                    </button>
+                    <button type="button" id="btn-core" class="hud-pill-btn" title="选择陀螺">
+                        <span>🌀</span><span id="btn-core-text">陀螺工坊</span>
+                    </button>
+                    <button type="button" id="btn-diff" class="hud-pill-btn" title="切换电脑难度">
+                        <span>🤖</span><span id="btn-diff-text">难度: 普通</span>
+                    </button>
+                    <button type="button" id="btn-sound" class="hud-pill-btn" title="音效开关">
+                        <span id="sound-icon">🔊</span>
+                    </button>
+                    <button type="button" id="btn-guide" class="hud-pill-btn" title="战斗指南">
+                        <span>📖</span><span id="btn-guide-text">指南</span>
+                    </button>
+                    <button type="button" id="btn-fullscreen" class="hud-pill-btn" title="全屏切换">
+                        <span>⛶</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Corner Miniature Status Gauges (Non-blocking edge alignment) -->
+            <div class="corner-hud-p1">
+                <div class="hud-top-line">
+                    <span id="p1-name" class="corner-player-name">P1</span>
+                    <span id="p1-core-name" class="corner-core-name">STORM STRIKER</span>
+                    <span id="p1-spin-text" class="spin-badge">100 RPM</span>
+                </div>
+                <div class="burst-meter-mini" title="爆裂耐久度">
+                    <div id="p1-burst-fill" class="burst-meter-fill" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <div class="corner-hud-p2">
+                <div class="hud-top-line">
+                    <span id="p2-name" class="corner-player-name">BOT</span>
+                    <span id="p2-core-name" class="corner-core-name">IRON FORTRESS</span>
+                    <span id="p2-spin-text" class="spin-badge">100 RPM</span>
+                </div>
+                <div class="burst-meter-mini" title="爆裂耐久度">
+                    <div id="p2-burst-fill" class="burst-meter-fill" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <!-- X-DASH Alert Banner -->
+            <div id="xdash-banner" class="xdash-banner">⚡ 极境冲刺 X-DASH!!</div>
+
+            <!-- Countdown Box (3-2-1) -->
+            <div id="countdown-box" class="countdown-box" style="display: none;">3</div>
+
+            <!-- Intuitive Dynamic Launch Meter (Oscillating Power Bar) -->
+            <div id="launch-overlay" class="launch-overlay">
+                <div class="launch-meter-container">
+                    <div class="launch-title">LET IT RIP!</div>
+                    <div class="meter-frame">
+                        <div class="meter-perfect-zone">PERFECT</div>
+                        <div id="meter-indicator" class="meter-indicator"></div>
+                    </div>
+                    <div class="meter-hint">[Space / 点击下方按钮] 锁定发条力度</div>
+                    <button type="button" id="launch-btn" class="launch-action-btn">🚀 极限发射 (SHOOT)</button>
+                </div>
+            </div>
+
+            <!-- Classic Responsive Touch & Keyboard Controls -->
+            <div class="touch-controls" id="touch-controls">
+                <!-- Virtual Joystick (Left Hand) -->
+                <div class="joystick-container" id="stick-zone">
+                    <div class="stick-base">
+                        <div class="stick-knob" id="stick-knob"></div>
+                    </div>
+                    <div class="control-label">滑动控制走位</div>
+                </div>
+
+                <!-- Control Keyboard Help Bar (Center) -->
+                <div class="keyboard-legend">
+                    [WASD / 摇杆] 移动 · [Space / 💥] 冲刺 · [K / ⚡] 必杀
+                </div>
+
+                <!-- Action Buttons (Right Hand) -->
+                <div class="touch-actions">
+                    <button type="button" id="dash-btn" class="act-btn act-dash" title="快速冲刺撞击">
+                        <span class="btn-emoji">💥</span>
+                        <span class="btn-txt">冲刺 DASH</span>
+                    </button>
+                    <button type="button" id="special-btn" class="act-btn act-special" disabled title="释放必杀奥义">
+                        <span class="btn-emoji">⚡</span>
+                        <span class="btn-txt" id="special-btn-text">必杀奥义</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Core Selection Modal -->
+        <div id="select-modal" class="modal-backdrop hidden">
+            <div class="modal-window">
+                <div class="modal-header">
+                    <h2>选择出战陀螺 (BEYBLADE GARAGE)</h2>
+                    <button type="button" id="btn-close-select" class="btn-close">×</button>
+                </div>
+                <div class="core-grid" id="core-grid"></div>
+                <div class="modal-footer">
+                    <button type="button" id="btn-confirm-top" class="btn-primary">确认并装备</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Battle Guide Modal -->
+        <div id="guide-modal" class="modal-backdrop hidden">
+            <div class="modal-window">
+                <div class="modal-header">
+                    <h2>爆旋陀螺 3D · 竞技法则</h2>
+                    <button type="button" id="btn-close-guide" class="btn-close">×</button>
+                </div>
+                <div class="guide-content">
+                    <div class="guide-item">
+                        <h3>🌀 2.5D / 3D 俯视微倾立体视角</h3>
+                        <p>完全保留第一版的绝佳操作手感与全场一览无余的战术视野！碗底向心力、立体倾角进动与边缘高光尽收眼底。</p>
+                    </div>
+                    <div class="guide-item">
+                        <h3>🎮 全直观操控</h3>
+                        <p>左手滑动虚拟摇杆自由游走拦截，右手随时点击 💥 冲刺 (Dash) 与 ⚡ 必杀 (Special)；PC 端支持 WASD 移动与 Space 冲刺。</p>
+                    </div>
+                    <div class="guide-item">
+                        <h3>⚡ Xtreme Line (X-DASH 极境齿轨)</h3>
+                        <p>场地上、下两侧设有立体机械齿轨。轴心带齿部件咬合后沿切线爆发超级冲刺，速度与撞击力激增！</p>
+                    </div>
+                    <div class="guide-item">
+                        <h3>💥 扎实碰撞与决胜规则</h3>
+                        <p>陀螺结实耐战，绝不一碰就碎！只有大力冲撞、破甲或低转速失稳时才磨损爆裂耐久：</p>
+                        <ul>
+                            <li><strong>SPIN FINISH (1分)</strong>：对方先耗尽转速停止。</li>
+                            <li><strong>OVER FINISH (2分)</strong>：将对手击飞入左右落穴。</li>
+                            <li><strong>BURST FINISH (2分)</strong>：暴击将对手四层零件炸飞解体！</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Round Finish Overlay -->
+        <div id="round-modal" class="modal-backdrop hidden">
+            <div class="modal-window round-window">
+                <div id="finish-type-title" class="neon-title finish-title">BURST FINISH!</div>
+                <div id="round-winner-text" class="finish-winner">PLAYER 1 获得本回合胜利 (+2分)</div>
+                <div class="round-score-box">
+                    <span id="round-score-summary">2 - 0</span>
+                </div>
+                <button type="button" id="btn-next-round" class="btn-primary">进入下一回合</button>
+            </div>
+        </div>
+
+        <!-- Match Complete Modal -->
+        <div id="gameover-modal" class="modal-backdrop hidden">
+            <div class="modal-window gameover-window">
+                <h1 id="gameover-title" class="neon-title">MATCH COMPLETE</h1>
+                <div id="gameover-score-text" class="gameover-score">最终比分: 3 - 1</div>
+                <button type="button" id="btn-rematch" class="btn-primary">再战一局 (REMATCH)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Game Script Module -->
+    <script type="module" src="game.js"></script>
+</body>
+</html>
