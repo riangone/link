@@ -120,6 +120,59 @@ test.describe('Oni Combat 3D Fighting Game', () => {
         expect(state.isPlaying).toBe(true);
     });
 
+    test('Mobile multi-touch keeps joystick, look drag, and same-button pointers independent', async ({ browser }) => {
+        test.setTimeout(90_000);
+        const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+        const page = await context.newPage();
+        try {
+            await page.goto(`${dev.url}/oni/?bot=normal`);
+            await page.click('#btn-start-tutorial');
+            await expect(page.locator('#start-overlay')).toHaveClass(/hidden/);
+
+            const joystick = page.locator('#joystick-zone');
+            const punch = page.locator('#btn-punch');
+            const look = page.locator('#touch-look-zone');
+            const joyBox = await joystick.boundingBox();
+            const punchBox = await punch.boundingBox();
+            const lookBox = await look.boundingBox();
+            expect(joyBox && punchBox && lookBox).toBeTruthy();
+
+            const joyX = joyBox.x + joyBox.width * 0.28;
+            const joyY = joyBox.y + joyBox.height * 0.72;
+            const punchX = punchBox.x + punchBox.width / 2;
+            const punchY = punchBox.y + punchBox.height / 2;
+            const lookX = lookBox.x + lookBox.width * 0.65;
+            const lookY = lookBox.y + lookBox.height * 0.45;
+
+            const cdp = await context.newCDPSession(page);
+            const touchPoints = new Map();
+            const dispatch = async (type, updates = []) => {
+                for (const [id, x, y] of updates) touchPoints.set(id, { id, x, y });
+                if (type === 'touchEnd') for (const [id] of updates) touchPoints.delete(id);
+                await cdp.send('Input.dispatchTouchEvent', {
+                    type,
+                    touchPoints: [...touchPoints.values()].map(({ id, x, y }) => ({ id, x, y }))
+                });
+            };
+            await dispatch('touchStart', [[1, joyX, joyY]]);
+            await dispatch('touchMove', [[1, joyX + 34, joyY - 4]]);
+            await dispatch('touchStart', [[2, punchX, punchY], [3, punchX + 2, punchY + 2]]);
+            await dispatch('touchStart', [[4, lookX, lookY]]);
+            await dispatch('touchMove', [[4, lookX + 30, lookY - 18]]);
+
+            await expect(punch).toHaveClass(/active/);
+            await expect.poll(() => page.evaluate(() => window.__oni.getState().p1.x)).not.toBe(0);
+            await expect.poll(() => page.evaluate(() => window.__oni.sim.f1.yaw)).not.toBe(0);
+
+            await dispatch('touchEnd', [[2, punchX, punchY]]);
+            await expect(punch).toHaveClass(/active/);
+            await dispatch('touchEnd', [[1, joyX + 34, joyY - 4], [3, punchX + 2, punchY + 2], [4, lookX + 30, lookY - 18]]);
+            await expect(punch).not.toHaveClass(/active/);
+        } finally {
+            await context.close();
+        }
+    });
+
     test('Lobby index includes oni game card and matchmaking accepts all 20 games', async ({ page }) => {
         await page.goto(`${dev.url}/play/?lang=zh`);
         const oniCard = page.locator('#g-oni');

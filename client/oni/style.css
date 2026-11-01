@@ -528,6 +528,11 @@ html:-webkit-full-screen body,
     background: transparent;
 }
 
+.look-stick-base,
+.look-stick {
+    display: none;
+}
+
 @media (min-width: 901px) and (pointer: fine) {
     .joystick-zone {
         opacity: 0.45;
@@ -609,33 +614,65 @@ html:-webkit-full-screen body,
     z-index: 3;
 }
 
-/* Mobile gamepad layout: four primary actions form an ABXY diamond under
-   the right thumb; the look zone stays above/inside the open center. */
+/* Mobile gamepad layout: two virtual sticks and ABXY/shoulder controls. */
 @media (max-width: 900px), (pointer: coarse) {
     .touch-controls {
-        --pad-size: clamp(190px, 42vw, 250px);
-        --main-btn: clamp(56px, 13vw, 68px);
+        --pad-size: clamp(176px, 39vw, 228px);
+        --main-btn: clamp(50px, 11.5vw, 62px);
     }
 
     .touch-look-zone {
-        top: 12%;
-        right: 0;
-        width: 52%;
-        height: 58%;
+        top: auto;
+        right: max(10px, env(safe-area-inset-right));
+        bottom: max(20px, env(safe-area-inset-bottom));
+        width: clamp(112px, 29vw, 150px);
+        height: clamp(112px, 29vw, 150px);
+        border-radius: 50%;
+        border: 1px solid rgba(255, 68, 204, 0.35);
+        background: radial-gradient(circle, rgba(255, 68, 204, 0.08), rgba(15, 22, 38, 0.24) 72%);
+        z-index: 1;
+        display: grid;
+        place-items: center;
+    }
+
+    .look-stick-base {
+        width: 76px;
+        height: 76px;
+        border: 2px solid rgba(255, 68, 204, 0.6);
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 68, 204, 0.16), rgba(15, 22, 38, 0.75));
+        box-shadow: inset 0 0 12px rgba(255, 68, 204, 0.15), 0 0 12px rgba(255, 68, 204, 0.18);
+        display: grid;
+        place-items: center;
+        color: rgba(255, 190, 240, 0.7);
+        font: 700 10px/1 sans-serif;
+        pointer-events: none;
+    }
+
+    .look-stick-base .look-stick {
+        display: block;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #ff8be1, #b32b99);
+        box-shadow: 0 0 12px rgba(255, 68, 204, 0.7);
+        transform: translate(0, 0);
+        transition: transform 0.04s linear;
     }
 
     .joystick-zone {
         left: max(10px, env(safe-area-inset-left));
         bottom: max(12px, env(safe-area-inset-bottom));
-        width: min(40vw, 220px);
-        height: min(38vh, 210px);
+        width: clamp(112px, 29vw, 150px);
+        height: clamp(112px, 29vw, 150px);
         padding: 12px;
         justify-content: flex-end;
+        z-index: 1;
     }
 
     .joystick-base {
-        width: clamp(100px, 25vw, 122px);
-        height: clamp(100px, 25vw, 122px);
+        width: 76px;
+        height: 76px;
         background: radial-gradient(circle, rgba(0, 240, 255, 0.2), rgba(15, 22, 38, 0.82) 78%);
     }
 
@@ -644,6 +681,7 @@ html:-webkit-full-screen body,
         bottom: max(12px, env(safe-area-inset-bottom));
         width: var(--pad-size);
         height: var(--pad-size);
+        z-index: 3;
     }
 
     .t-btn.punch {
@@ -682,14 +720,25 @@ html:-webkit-full-screen body,
     }
 
     .t-btn.sub-pill {
-        width: 38px;
-        height: 38px;
+        width: 40px;
+        height: 40px;
     }
 
-    .t-btn.special { right: 0; bottom: calc(var(--pad-size) + 4px); }
-    .t-btn.slide { right: 46px; bottom: calc(var(--pad-size) + 4px); }
-    .t-btn.throw { right: 92px; bottom: calc(var(--pad-size) + 4px); }
-    .t-btn.block { right: 138px; bottom: calc(var(--pad-size) + 4px); }
+    .t-btn.special { right: 0; bottom: calc(var(--pad-size) + 8px); }
+    .t-btn.slide { right: 46px; bottom: calc(var(--pad-size) + 8px); }
+    .t-btn.throw { right: 92px; bottom: calc(var(--pad-size) + 8px); }
+    .t-btn.block { right: 138px; bottom: calc(var(--pad-size) + 8px); }
+
+    .t-btn .gamepad-letter {
+        position: absolute;
+        top: 3px;
+        right: 7px;
+        color: rgba(255,255,255,.72);
+        font: 800 9px/1 sans-serif;
+    }
+
+    .t-btn.fire .gamepad-letter { font-size: 8px; }
+    .t-btn small { font-size: 8px; }
 }
 
 .t-btn {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>奥尼 · Oni Combat - Link</title>
-    <link rel="stylesheet" href="style.css?v=20261101-mobile-controls-1">
+    <link rel="stylesheet" href="style.css?v=20261101-gamepad-layout-1">
 </head>
 <body>
     <div id="app">
@@ -175,7 +175,9 @@
 
         <!-- On-Screen Action Controls (Oni 2001 Context-Sensitive 4-Core Cluster + Dynamic Floating Joystick) -->
         <div class="touch-controls" id="touch-controls">
-            <div class="touch-look-zone" id="touch-look-zone" aria-label="拖动转向与瞄准"></div>
+            <div class="touch-look-zone" id="touch-look-zone" aria-label="右摇杆：拖动转向与瞄准">
+                <div class="look-stick-base" aria-hidden="true"><div class="look-stick"></div><span>R</span></div>
+            </div>
             <!-- Left Dynamic Floating Virtual Joystick Zone for 360° Soft-Strafe & Sprint -->
             <div class="joystick-zone" id="joystick-zone">
                 <div class="joystick-base" id="joystick-base">
@@ -183,37 +185,37 @@
                 </div>
             </div>
 
-            <!-- Right Oni-Style 4-Core Context-Sensitive Combat Cluster (+ Contextual Fire Button) -->
+            <!-- Gamepad layout: ABXY face buttons plus shoulder/action buttons. -->
             <div class="touch-btn-pad">
                 <!-- 4 Core Oni Triggers -->
-                <button type="button" class="t-btn punch core-btn" id="btn-punch" aria-label="拳击" title="拳击 / 按住自动连击 / 贴身推前过肩摔 / 上划升龙拳 (J)">
-                    <span class="btn-icon">👊</span>
+                <button type="button" class="t-btn punch core-btn" id="btn-punch" aria-label="A：拳击" title="A · 拳击 / 按住自动连击 / 上划升龙拳">
+                    <span class="gamepad-letter">A</span><span class="btn-icon">👊</span>
                     <small id="lbl-punch">拳·连击</small>
                 </button>
-                <button type="button" class="t-btn kick core-btn" id="btn-kick" aria-label="重腿" title="重腿 / 按住三连踢 / 推前飞踢 / 倒地重踏 / 上划旋风腿 (K)">
-                    <span class="btn-icon">🦵</span>
+                <button type="button" class="t-btn kick core-btn" id="btn-kick" aria-label="B：重腿" title="B · 重腿 / 按住三连踢 / 上划旋风腿">
+                    <span class="gamepad-letter">B</span><span class="btn-icon">🦵</span>
                     <small id="lbl-kick">腿·飞踢</small>
                 </button>
-                <button type="button" class="t-btn evade core-btn" id="btn-evade" aria-label="闪避滑铲" title="战术机动：前推摇杆=疾风滑铲夺枪 · 后/侧推=无敌翻滚闪避 (R / I)">
-                    <span class="btn-icon">⚡</span>
+                <button type="button" class="t-btn evade core-btn" id="btn-evade" aria-label="X：闪避" title="X · 闪避 / 结合方向滑铲">
+                    <span class="gamepad-letter">X</span><span class="btn-icon">⚡</span>
                     <small id="lbl-evade">闪避·滑铲</small>
                 </button>
-                <button type="button" class="t-btn jump core-btn" id="btn-jump" aria-label="跳跃受身" title="跳跃 / 空中飞踢 / 落地受身 / 上划必杀 (Space)">
-                    <span class="btn-icon">⬆️</span>
+                <button type="button" class="t-btn jump core-btn" id="btn-jump" aria-label="Y：跳跃与受身" title="Y · 跳跃 / 空中飞踢 / 落地受身">
+                    <span class="gamepad-letter">Y</span><span class="btn-icon">⬆️</span>
                     <small id="lbl-jump">跳跃·受身</small>
                 </button>
 
                 <!-- Context-Sensitive Gun-Fu Action Button (Highlights when armed or weapon is nearby) -->
-                <button type="button" class="t-btn fire context-fire" id="btn-fire" aria-label="射击夺枪" title="开火射击 / 拾取枪械 / 投掷空枪 (F)">
-                    <span class="btn-icon">🔫</span>
+                <button type="button" class="t-btn fire context-fire" id="btn-fire" aria-label="RB：射击与拾枪" title="RB · 开火射击 / 拾取枪械 / 投掷空枪">
+                    <span class="gamepad-letter">RB</span><span class="btn-icon">🔫</span>
                     <small id="lbl-fire">射击·拾枪</small>
                 </button>
 
                 <!-- Compact Secondary Quick-Pills (Direct overrides for Slide / Special / Throw / Block) -->
-                <button type="button" class="t-btn special sub-pill" id="btn-special" aria-label="升龙必杀" title="升龙拳 / 鬼神烈风脚 (O)">🔥<small>必杀</small></button>
-                <button type="button" class="t-btn slide sub-pill" id="btn-slide" aria-label="滑铲" title="疾风滑铲扫堂腿 (I / V)">💨<small>滑铲</small></button>
-                <button type="button" class="t-btn throw sub-pill" id="btn-throw" aria-label="抓投拆投" title="过肩摔 / 拆投 (U / G)">🤼<small>摔投</small></button>
-                <button type="button" class="t-btn block sub-pill" id="btn-block" aria-label="格挡" title="格挡防御 (后退自动格挡 / L)">🛡️<small>格挡</small></button>
+                <button type="button" class="t-btn special sub-pill" id="btn-special" aria-label="RT：必杀" title="RT · 必杀">🔥<small>RT 必杀</small></button>
+                <button type="button" class="t-btn slide sub-pill" id="btn-slide" aria-label="LB：滑铲" title="LB · 滑铲">💨<small>LB 滑铲</small></button>
+                <button type="button" class="t-btn throw sub-pill" id="btn-throw" aria-label="LT：抓投" title="LT · 抓投 / 拆投">🤼<small>LT 抓投</small></button>
+                <button type="button" class="t-btn block sub-pill" id="btn-block" aria-label="格挡" title="按住格挡防御">🛡️<small>格挡</small></button>
             </div>
         </div>
 
@@ -440,6 +442,6 @@
     <!-- Scripts -->
     <script src="../scripts/game-session.js"></script>
     <script src="../scripts/game-bot.js" data-lobby="../play/"></script>
-    <script type="module" src="game.js?v=20261101-mobile-controls-1"></script>
+    <script type="module" src="game.js?v=20261101-gamepad-layout-1"></script>
 </body>
 </html>

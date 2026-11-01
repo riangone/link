@@ -643,20 +643,18 @@ function init() {
     const setupTouchBtn = (id, key, opts = {}) => {
         const el = document.getElementById(id);
         if (!el) return;
-        let startX = 0;
-        let startY = 0;
-        let swiped = false;
-        const activePointers = new Set();
+        const activePointers = new Map();
 
         el.addEventListener('pointerdown', (e) => {
             e.preventDefault();
             e.stopPropagation();
             if (activePointers.has(e.pointerId)) return;
-            activePointers.add(e.pointerId);
+            activePointers.set(e.pointerId, {
+                startX: e.clientX || 0,
+                startY: e.clientY || 0,
+                swiped: false
+            });
             el.setPointerCapture?.(e.pointerId);
-            startX = e.clientX || 0;
-            startY = e.clientY || 0;
-            swiped = false;
             touchState[key] = true;
             if (key in touchHoldFrames) touchHoldFrames[key] = 0;
             el.classList.add('active');
@@ -664,14 +662,15 @@ function init() {
 
         if (opts.swipeUpSpecial || opts.swipeForwardSlide) {
             el.addEventListener('pointermove', (e) => {
-                if (!activePointers.has(e.pointerId) || swiped) return;
-                const dy = (e.clientY || 0) - startY;
-                const dx = (e.clientX || 0) - startX;
+                const pointer = activePointers.get(e.pointerId);
+                if (!pointer || pointer.swiped) return;
+                const dy = (e.clientY || 0) - pointer.startY;
+                const dx = (e.clientX || 0) - pointer.startX;
                 if (opts.swipeUpSpecial && dy < -24) {
-                    swiped = true;
+                    pointer.swiped = true;
                     swipePulseFrames.special = 6;
                 } else if (opts.swipeForwardSlide && Math.hypot(dx, dy) > 24 && dy > -10) {
-                    swiped = true;
+                    pointer.swiped = true;
                     swipePulseFrames.slide = 6;
                 }
             });
@@ -806,12 +805,27 @@ function init() {
         let lookPointerId = null;
         let lastX = 0;
         let lastY = 0;
+        const lookStick = touchLookZone.querySelector('.look-stick');
+        const moveLookStick = (e) => {
+            if (!lookStick) return;
+            const rect = touchLookZone.getBoundingClientRect();
+            const radius = Math.max(1, Math.min(rect.width, rect.height) * 0.34);
+            let dx = e.clientX - (rect.left + rect.width / 2);
+            let dy = e.clientY - (rect.top + rect.height / 2);
+            const distance = Math.hypot(dx, dy);
+            if (distance > radius) {
+                dx = dx / distance * radius;
+                dy = dy / distance * radius;
+            }
+            lookStick.style.transform = `translate(${dx}px, ${dy}px)`;
+        };
         touchLookZone.addEventListener('pointerdown', (e) => {
             if (lookPointerId !== null || !oniAimAllowed()) return;
             e.preventDefault();
             lookPointerId = e.pointerId;
             lastX = e.clientX;
             lastY = e.clientY;
+            moveLookStick(e);
             touchLookZone.setPointerCapture?.(e.pointerId);
         });
         touchLookZone.addEventListener('pointermove', (e) => {
@@ -821,11 +835,14 @@ function init() {
             const dy = e.clientY - lastY;
             lastX = e.clientX;
             lastY = e.clientY;
+            moveLookStick(e);
             oniCtrl.pendingDX += dx;
             threeScene.adjustAimPitch(dy * 0.0022);
         });
         const endTouchLook = (e) => {
-            if (e.pointerId === lookPointerId) lookPointerId = null;
+            if (e.pointerId !== lookPointerId) return;
+            lookPointerId = null;
+            if (lookStick) lookStick.style.transform = 'translate(0px, 0px)';
         };
         touchLookZone.addEventListener('pointerup', endTouchLook);
         touchLookZone.addEventListener('pointercancel', endTouchLook);
