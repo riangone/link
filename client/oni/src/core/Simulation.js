@@ -717,13 +717,15 @@ export class Simulation {
         const muzzleX = attacker.x + fx * 0.65;
         const muzzleY = attacker.y + 1.32;
         const muzzleZ = attacker.z + fz * 0.65;
-
-        // Check obstacle collision along line of fire
+        // Campaign's tactical obstacles are the authoritative map geometry for both
+        // character movement and weapon occlusion. Cast in 3D so low cover can be
+        // shot over and elevated geometry blocks only rays that actually cross it.
         const maxRange = spec.range;
-        const rayEndX = muzzleX + fx * maxRange;
-        const rayEndZ = muzzleZ + fz * maxRange;
-        const obsHit = CollisionSystem.checkRayObstacles ? CollisionSystem.checkRayObstacles(muzzleX, muzzleZ, rayEndX, rayEndZ) : null;
-        const effectiveRange = obsHit ? Math.hypot(obsHit.x - muzzleX, obsHit.z - muzzleZ) : maxRange;
+        const rayDirection = [fx, 0, fz];
+        const obstacleHit = CollisionSystem.checkRayObstacles3D
+            ? CollisionSystem.checkRayObstacles3D([muzzleX, muzzleY, muzzleZ], rayDirection, maxRange)
+            : null;
+        const effectiveRange = obstacleHit ? obstacleHit.distance : maxRange;
 
         if (spec.fireType === 'HITSCAN' || spec.fireType === 'PIERCING_BEAM') {
             const syntheticMove = {
@@ -778,16 +780,17 @@ export class Simulation {
                 fireType: spec.fireType,
                 color: spec.color,
                 muzzle: { x: muzzleX, y: muzzleY, z: muzzleZ },
-                endPoint
+                endPoint,
+                obstacleHit: !!(obstacleHit && (!bestHit || obstacleHit.distance <= bestHit.distance))
             });
 
             if (bestHit && hitDefender) {
                 this.applyDamageResult(attacker, hitDefender, bestHit);
-            } else if (obsHit && endDist >= effectiveRange - 0.05) {
+            } else if (obstacleHit && endDist >= effectiveRange - 0.05) {
                 this.events.push({
                     type: 'OBSTACLE_IMPACT',
                     x: endPoint.x,
-                    y: muzzleY,
+                    y: obstacleHit.y,
                     z: endPoint.z
                 });
             }

@@ -162,6 +162,61 @@ export class CollisionSystem {
     }
 
     /**
+     * Height-aware 3D projectile ray against the active campaign obstacle list.
+     * Obstacle boxes use the same min/max X/Z fields as LevelLayouts; minY defaults
+     * to the floor and height defaults to the campaign's rendered obstacle height.
+     */
+    static checkRayObstacles3D(origin, direction, maxRange) {
+        if (!this.obstacles || this.obstacles.length === 0) return null;
+        let nearestHit = null;
+
+        for (const obstacle of this.obstacles) {
+            if (obstacle.active === false || obstacle.blocksProjectiles === false) continue;
+            const minY = obstacle.minY ?? 0;
+            const maxY = obstacle.maxY ?? (minY + (obstacle.height ?? 3.0));
+            let tMin = 0;
+            let tMax = maxRange;
+            const bounds = [
+                [obstacle.minX, obstacle.maxX],
+                [minY, maxY],
+                [obstacle.minZ, obstacle.maxZ]
+            ];
+            let hit = true;
+
+            for (let axis = 0; axis < 3; axis++) {
+                const o = origin[axis];
+                const d = direction[axis];
+                const [lo, hi] = bounds[axis];
+                if (Math.abs(d) < 1e-8) {
+                    if (o < lo || o > hi) { hit = false; break; }
+                    continue;
+                }
+                let a = (lo - o) / d;
+                let b = (hi - o) / d;
+                if (a > b) [a, b] = [b, a];
+                tMin = Math.max(tMin, a);
+                tMax = Math.min(tMax, b);
+                if (tMin > tMax) { hit = false; break; }
+            }
+
+            if (!hit || tMax < 0) continue;
+            const distance = tMin > 0 ? tMin : tMax;
+            if (distance < 0 || distance > maxRange) continue;
+            if (!nearestHit || distance < nearestHit.distance) {
+                nearestHit = {
+                    hit: true,
+                    distance,
+                    x: origin[0] + direction[0] * distance,
+                    y: origin[1] + direction[1] * distance,
+                    z: origin[2] + direction[2] * distance,
+                    obstacle
+                };
+            }
+        }
+        return nearestHit;
+    }
+
+    /**
      * P5 Rooftop / Indoor Arena Elevation Query
      * Returns the floor height Y at world coordinates (x, z):
      *   - In 'INDOOR_FLAT' mode: flat y = 0.0 everywhere (no ledges, no fall damage, no Ring-Out)
