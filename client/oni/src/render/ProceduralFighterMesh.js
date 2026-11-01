@@ -488,7 +488,9 @@ export class ProceduralFighterMesh {
         if (isAttack && fighter.currentMove) {
             const m = fighter.currentMove;
             const fr = fighter.stateTimer;
-            if (fr >= m.startup && fr <= (m.startup + m.active + 1)) {
+            // Keep the strike apex crisp for one frame; a full active-window lock makes
+            // every attack read like a held pose instead of a fast impact and recoil.
+            if (fr >= m.startup && fr <= (m.startup + Math.min(1, m.active))) {
                 activeSnap = true;
                 const anim = getAttackAnim(m);
                 snapLimb = anim ? anim.trail : null;

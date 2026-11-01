@@ -1243,9 +1243,10 @@ export class Fighter {
                 this.state = prevState;
             }
 
-            // Early Walk/Block Cancel in the late recovery frames (last 35% of recovery) so movement never feels stuck in mud
-            const lateRecoveryStart = activeEnd + Math.max(2, Math.floor(move.recovery * 0.65));
-            if (this.stateTimer >= lateRecoveryStart && this.isGrounded) {
+            // Let grounded fighters regain footwork shortly after the strike, while keeping
+            // authored recovery intact for attacks and preserving the evade/jump cancels above.
+            const footworkRecoveryStart = activeEnd + Math.max(2, Math.floor(move.recovery * 0.28));
+            if (this.stateTimer >= footworkRecoveryStart && this.isGrounded) {
                 if (input.block) {
                     this.transitionTo(FIGHTER_STATE.IDLE);
                     this.isBlocking = true;
