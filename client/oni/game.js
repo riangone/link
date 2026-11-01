@@ -626,12 +626,7 @@ function init() {
         evade: false,
         special: false
     };
-    const touchHoldFrames = {
-        punch: 0,
-        kick: 0
-    };
     const swipePulseFrames = {
-        special: 0,
         slide: 0
     };
     const lblPunch = document.getElementById('lbl-punch');
@@ -656,7 +651,6 @@ function init() {
             });
             el.setPointerCapture?.(e.pointerId);
             touchState[key] = true;
-            if (key in touchHoldFrames) touchHoldFrames[key] = 0;
             el.classList.add('active');
         });
 
@@ -668,7 +662,7 @@ function init() {
                 const dx = (e.clientX || 0) - pointer.startX;
                 if (opts.swipeUpSpecial && dy < -24) {
                     pointer.swiped = true;
-                    swipePulseFrames.special = 6;
+                    // Direction + attack commands are recognized from joystick history.
                 } else if (opts.swipeForwardSlide && Math.hypot(dx, dy) > 24 && dy > -10) {
                     pointer.swiped = true;
                     swipePulseFrames.slide = 6;
@@ -679,19 +673,19 @@ function init() {
         const release = (e) => {
             if (!activePointers.delete(e.pointerId)) return;
             touchState[key] = activePointers.size > 0;
-            if (key in touchHoldFrames) touchHoldFrames[key] = 0;
             if (!touchState[key]) el.classList.remove('active');
         };
         el.addEventListener('pointerup', release);
         el.addEventListener('pointercancel', release);
     };
-    setupTouchBtn('btn-punch', 'punch', { swipeUpSpecial: true });
-    setupTouchBtn('btn-kick', 'kick', { swipeUpSpecial: true });
-    setupTouchBtn('btn-jump', 'jump', { swipeUpSpecial: true });
+    setupTouchBtn('btn-punch', 'punch');
+    setupTouchBtn('btn-kick', 'kick');
+    setupTouchBtn('btn-jump', 'jump');
     setupTouchBtn('btn-evade', 'evade', { swipeForwardSlide: true });
     setupTouchBtn('btn-slide', 'slide');
     setupTouchBtn('btn-block', 'block');
-    setupTouchBtn('btn-special', 'special');
+    // RT charges/activates Daodan; it never bypasses directional move commands.
+    setupTouchBtn('btn-special', 'daodan');
     setupTouchBtn('btn-throw', 'throwBtn');
     setupTouchBtn('btn-fire', 'fire');
     setupTouchBtn('p1-hypo-badge', 'heal');
@@ -893,31 +887,14 @@ function init() {
             dirZ = Math.max(-1, Math.min(1, wz));
         }
 
-        // Hold-to-Combo rhythmic pulse for mobile touch (holding 👊 or 🦵 smoothly chains 3-hit combos without mashing)
-        let touchPunchActive = false;
-        if (touchState.punch) {
-            touchHoldFrames.punch++;
-            touchPunchActive = (touchHoldFrames.punch === 1) || (touchHoldFrames.punch > 6 && touchHoldFrames.punch % 6 < 2);
-        }
-        let touchKickActive = false;
-        if (touchState.kick) {
-            touchHoldFrames.kick++;
-            touchKickActive = (touchHoldFrames.kick === 1) || (touchHoldFrames.kick > 7 && touchHoldFrames.kick % 7 < 2);
-        }
-
-        let swipeSpecial = false;
-        if (swipePulseFrames.special > 0) {
-            swipePulseFrames.special--;
-            swipeSpecial = true;
-        }
         let swipeSlide = false;
         if (swipePulseFrames.slide > 0) {
             swipePulseFrames.slide--;
             swipeSlide = true;
         }
 
-        const punch = !!(keysDown['KeyJ'] || keysDown['KeyZ'] || keysDown.Mouse0 || touchPunchActive);
-        const kick = !!(keysDown['KeyK'] || keysDown['KeyX'] || keysDown.Mouse2 || touchKickActive);
+        const punch = !!(keysDown['KeyJ'] || keysDown['KeyZ'] || keysDown.Mouse0 || touchState.punch);
+        const kick = !!(keysDown['KeyK'] || keysDown['KeyX'] || keysDown.Mouse2 || touchState.kick);
         const block = !!(keysDown['KeyL'] || keysDown['KeyC'] || touchState.block);
         const jump = !!(keysDown['Space'] || touchState.jump);
         const crouch = !!(keysDown['ShiftLeft'] || keysDown['ShiftRight'] || keysDown['ControlLeft'] || touchState.crouch);
@@ -928,7 +905,7 @@ function init() {
         const heal = !!(keysDown['KeyH'] || touchState.heal);
         const daodan = !!(keysDown['KeyQ'] || keysDown['KeyE'] || touchState.daodan);
         const evade = !!(keysDown['KeyR'] || touchState.evade);
-        const special = !!(keysDown['KeyO'] || touchState.special || swipeSpecial);
+        const special = false;
 
         return { dirX, dirZ, down, punch, kick, block, jump, crouch, slide, throwBtn, fire, heal, daodan, evade, special, aimYaw, walk };
     }

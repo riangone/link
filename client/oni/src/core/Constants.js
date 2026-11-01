@@ -838,8 +838,8 @@ const MOVE_TABLE_RAW = [
         id: 'DAODAN_SURGE',
         priority: 110,
         states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN, FIGHTER_STATE.CROUCH],
-        button: 'daodan',
-        condition: (f) => f.daodanMeter >= 50 && !f.daodanOverdrive
+        button: 'punch',
+        condition: (f) => f.daodanMeter >= 50 && !f.daodanOverdrive && f.inputBuffer.checkUppercut(f.facing)
     },
     {
         id: 'USE_HYPO',
@@ -941,22 +941,6 @@ const MOVE_TABLE_RAW = [
         states: [FIGHTER_STATE.KNOCKED_DOWN, FIGHTER_STATE.WAKEUP],
         button: 'punch',
         condition: (f) => f.isGrounded && f.hp > 0
-    },
-
-    // 1b. Dedicated One-Button Special Triggers (Direct arcade action buttons for Uppercut / Evade / Heavy Kick)
-    {
-        id: 'DEVIL_SPIN_KICK',
-        priority: 92,
-        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN, FIGHTER_STATE.CROUCH],
-        button: 'special',
-        condition: (f) => f.daodanStage >= 3 || f.daodanOverdrive
-    },
-    {
-        id: 'UPPERCUT',
-        priority: 91,
-        states: [FIGHTER_STATE.IDLE, FIGHTER_STATE.WALK, FIGHTER_STATE.RUN, FIGHTER_STATE.CROUCH],
-        button: 'special',
-        condition: () => true
     },
 
     // 2. Ground Stomp (Opponent knocked down nearby + Kick or Punch)

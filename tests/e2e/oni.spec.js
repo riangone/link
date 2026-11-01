@@ -67,7 +67,7 @@ test.describe('Oni Combat 3D Fighting Game', () => {
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto(`${dev.url}/oni/?bot=normal`);
 
-        // Check virtual joystick and expanded 9-button arcade action pad exist
+        // Check virtual joystick and gamepad-style action pad exist
         await expect(page.locator('#joystick-zone')).toBeVisible();
         await expect(page.locator('#btn-jump')).toBeVisible();
         await expect(page.locator('#btn-evade')).toBeVisible();

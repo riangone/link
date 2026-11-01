@@ -301,9 +301,10 @@ test('Oni Combat core module loading and P0+P1 simulation verification', async (
         assert.strictEqual(sim.f1.daodanStage, 3, 'Gaining 80 Daodan meter evolves fighter to Stage 3');
         assert.strictEqual(sim.f1.unlockedMoves.has('DEVIL_SPIN_KICK'), true);
 
-        // Trigger Daodan Surge (Overdrive activation) via daodan button
+        // Trigger Daodan Surge through the classic forward motion + punch command
         const hpBefore = sim.f2.hp;
-        sim.tick({ daodan: true }, { block: true });
+        sim.tick({ dirX: 0, dirZ: 1 }, { block: true });
+        sim.tick({ dirX: 1, dirZ: 0, punch: true }, { block: true });
         assert.strictEqual(sim.f1.currentMove.id, 'DAODAN_SURGE');
         for (let i = 0; i < 8; i++) sim.tick({}, { block: true });
 
@@ -350,7 +351,7 @@ test('Oni Combat core module loading and P0+P1 simulation verification', async (
         assert.strictEqual(ringSim.winner, 'p1', 'Opponent Ring-Out should award victory to P1');
     });
 
-    await t.test('UX Enhancements: Bot Difficulty Speed Scaling, Jump Attacks, and One-Button Specials', () => {
+    await t.test('UX Enhancements: Bot Difficulty Speed Scaling, Jump Attacks, and Motion Specials', () => {
         const sim = new Simulation();
         const easyBot = new BotBrain('easy', 101);
         const hardBot = new BotBrain('hard', 202);
@@ -368,11 +369,15 @@ test('Oni Combat core module loading and P0+P1 simulation verification', async (
         assert.strictEqual(sim.f1.state, FIGHTER_STATE.ATTACK, 'Pressing kick in mid-air should trigger aerial attack');
         assert.strictEqual(sim.f1.currentMove.id, 'FLYING_KICK', 'Mid-air kick should trigger FLYING_KICK');
 
-        // 2. Dedicated one-button Special (Uppercut / Devil Spin Kick) and Evade button
+        // 2. Special attacks require directional motion + attack; legacy special flag is ignored.
         const sim2 = new Simulation();
         sim2.tick({ special: true }, {});
-        assert.strictEqual(sim2.f1.state, FIGHTER_STATE.ATTACK);
-        assert.strictEqual(sim2.f1.currentMove.id, 'UPPERCUT', 'Dedicated special button should trigger UPPERCUT');
+        assert.notStrictEqual(sim2.f1.currentMove && sim2.f1.currentMove.id, 'UPPERCUT', 'One-button special must not bypass motion input');
+
+        const simSpecial = new Simulation();
+        simSpecial.tick({ dirX: 0, down: true }, {});
+        simSpecial.tick({ dirX: 1, dirZ: 0, punch: true }, {});
+        assert.strictEqual(simSpecial.f1.currentMove.id, 'UPPERCUT', 'Forward motion + punch triggers UPPERCUT');
 
         const sim3 = new Simulation();
         sim3.tick({ evade: true }, {});

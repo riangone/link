@@ -307,8 +307,10 @@ export class InputBuffer {
             const entry = this.get(i);
             if (!entry) break;
 
-            if (entry.down || entry.crouch) sawDown = true;
+            if (entry.down || entry.crouch || entry.dirZ > 0.45) sawDown = true;
             if (fx !== null) {
+                // In Oni's original motion notation, D, DF, F are consecutive
+                // directional states. Here the stick may cross through neutral.
                 if (entry.dirX * fx + entry.dirZ * fz > 0.45) sawForward = true;
             } else if (Math.sign(entry.dirX) === facingSign && Math.abs(entry.dirX) > 0.3) {
                 sawForward = true;
