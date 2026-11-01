@@ -646,10 +646,14 @@ function init() {
         let startX = 0;
         let startY = 0;
         let swiped = false;
+        const activePointers = new Set();
 
         el.addEventListener('pointerdown', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (activePointers.has(e.pointerId)) return;
+            activePointers.add(e.pointerId);
+            el.setPointerCapture?.(e.pointerId);
             startX = e.clientX || 0;
             startY = e.clientY || 0;
             swiped = false;
@@ -660,7 +664,7 @@ function init() {
 
         if (opts.swipeUpSpecial || opts.swipeForwardSlide) {
             el.addEventListener('pointermove', (e) => {
-                if (!touchState[key] || swiped) return;
+                if (!activePointers.has(e.pointerId) || swiped) return;
                 const dy = (e.clientY || 0) - startY;
                 const dx = (e.clientX || 0) - startX;
                 if (opts.swipeUpSpecial && dy < -24) {
@@ -673,14 +677,14 @@ function init() {
             });
         }
 
-        const release = () => {
-            touchState[key] = false;
+        const release = (e) => {
+            if (!activePointers.delete(e.pointerId)) return;
+            touchState[key] = activePointers.size > 0;
             if (key in touchHoldFrames) touchHoldFrames[key] = 0;
-            el.classList.remove('active');
+            if (!touchState[key]) el.classList.remove('active');
         };
         el.addEventListener('pointerup', release);
         el.addEventListener('pointercancel', release);
-        el.addEventListener('pointerleave', release);
     };
     setupTouchBtn('btn-punch', 'punch', { swipeUpSpecial: true });
     setupTouchBtn('btn-kick', 'kick', { swipeUpSpecial: true });
@@ -711,10 +715,14 @@ function init() {
 
     if (joystickZone && joystickBase && joystickStick) {
         const maxRadius = 42;
+        let joystickPointerId = null;
 
         const onJoyStart = (e) => {
+            if (joystickPointerId !== null) return;
             e.preventDefault();
             e.stopPropagation();
+            joystickPointerId = e.pointerId;
+            joystickZone.setPointerCapture?.(e.pointerId);
             isJoystickDragging = true;
             const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
             const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
@@ -742,7 +750,7 @@ function init() {
         };
 
         const onJoyMove = (e) => {
-            if (!isJoystickDragging) return;
+            if (!isJoystickDragging || (e.pointerId !== undefined && e.pointerId !== joystickPointerId)) return;
             const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
             const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
 
@@ -775,9 +783,10 @@ function init() {
             }
         };
 
-        const onJoyEnd = () => {
-            if (!isJoystickDragging) return;
+        const onJoyEnd = (e) => {
+            if (!isJoystickDragging || (e.pointerId !== undefined && e.pointerId !== joystickPointerId)) return;
             isJoystickDragging = false;
+            joystickPointerId = null;
             touchDirX = 0;
             touchDirZ = 0;
             joystickStick.style.transform = 'translate(0px, 0px)';
@@ -786,9 +795,40 @@ function init() {
         };
 
         joystickZone.addEventListener('pointerdown', onJoyStart);
-        window.addEventListener('pointermove', onJoyMove);
-        window.addEventListener('pointerup', onJoyEnd);
-        window.addEventListener('pointercancel', onJoyEnd);
+        joystickZone.addEventListener('pointermove', onJoyMove);
+        joystickZone.addEventListener('pointerup', onJoyEnd);
+        joystickZone.addEventListener('pointercancel', onJoyEnd);
+    }
+
+    // Right-side empty touch area turns the player/camera without stealing combat buttons.
+    const touchLookZone = document.getElementById('touch-look-zone');
+    if (touchLookZone) {
+        let lookPointerId = null;
+        let lastX = 0;
+        let lastY = 0;
+        touchLookZone.addEventListener('pointerdown', (e) => {
+            if (lookPointerId !== null || !oniAimAllowed()) return;
+            e.preventDefault();
+            lookPointerId = e.pointerId;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            touchLookZone.setPointerCapture?.(e.pointerId);
+        });
+        touchLookZone.addEventListener('pointermove', (e) => {
+            if (e.pointerId !== lookPointerId) return;
+            e.preventDefault();
+            const dx = e.clientX - lastX;
+            const dy = e.clientY - lastY;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            oniCtrl.pendingDX += dx;
+            threeScene.adjustAimPitch(dy * 0.0022);
+        });
+        const endTouchLook = (e) => {
+            if (e.pointerId === lookPointerId) lookPointerId = null;
+        };
+        touchLookZone.addEventListener('pointerup', endTouchLook);
+        touchLookZone.addEventListener('pointercancel', endTouchLook);
     }
 
     function samplePlayerInput() {
