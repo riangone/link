@@ -1572,7 +1572,7 @@ function init() {
             }
         }
         const campaignHudMode = campaign.mode === 'CAMPAIGN' || campaign.mode === 'TUTORIAL';
-        if (versusHud) versusHud.classList.toggle('campaign-hud-hidden', campaignHudMode);
+        if (versusHud) versusHud.classList.toggle('campaign-hud-mode', campaignHudMode);
         if (roundTimerBox) roundTimerBox.classList.toggle('campaign-hud-hidden', campaignHudMode);
         if (p1WeaponBadge) {
             if (sim.f1.weapon) {
