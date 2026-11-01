@@ -45,6 +45,8 @@ function init() {
     const p2HpText = document.getElementById('p2-hp-text');
     const roundTimerEl = document.getElementById('round-timer');
     const roundWaveLabel = document.getElementById('round-wave-label');
+    const versusHud = document.getElementById('versus-hud');
+    const roundTimerBox = roundTimerEl ? roundTimerEl.closest('.timer-box') : null;
     const comboNotice = document.getElementById('combo-notice');
     const koBanner = document.getElementById('ko-banner');
     const startOverlay = document.getElementById('start-overlay');
@@ -1569,6 +1571,9 @@ function init() {
                 roundWaveLabel.textContent = sim.survivalMode ? `WAVE ${sim.waveNumber}` : 'TIME';
             }
         }
+        const campaignHudMode = campaign.mode === 'CAMPAIGN' || campaign.mode === 'TUTORIAL';
+        if (versusHud) versusHud.classList.toggle('campaign-hud-hidden', campaignHudMode);
+        if (roundTimerBox) roundTimerBox.classList.toggle('campaign-hud-hidden', campaignHudMode);
         if (p1WeaponBadge) {
             if (sim.f1.weapon) {
                 p1WeaponBadge.textContent = `🔫 ${sim.f1.weapon.type} [${sim.f1.weapon.ammo}/${sim.f1.weapon.maxAmmo}]`;

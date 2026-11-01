@@ -121,6 +121,10 @@ html:-webkit-full-screen body,
     min-width: 0;
 }
 
+.campaign-hud-hidden {
+    display: none !important;
+}
+
 .fighter-card {
     flex: 1;
     min-width: 0;
