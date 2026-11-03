@@ -24,7 +24,8 @@
             <div class="acts">
                 <button type="button" class="act" id="drone-btn">🛸<small data-i18n="drone"></small><i class="cd"></i></button>
                 <button type="button" class="act" id="sat-btn">🛰️<small data-i18n="sat"></small><i class="cd"></i></button>
-                <button type="button" class="act fire" id="fire-btn">💥<small data-i18n="fire"></small></button>
+                <button type="button" class="act" id="mine-btn">💣<small><span data-i18n="mine"></span> <b id="mine-n">3</b></small></button>
+                <button type="button" class="act fire" id="fire-btn">💥<small data-i18n="fire"></small><i class="cd"></i></button>
             </div>
         </div>
 
@@ -41,6 +42,16 @@
                 <h1 data-i18n="title"></h1>
                 <h2 data-i18n="ready_h"></h2>
                 <p id="role-text"></p>
+                <div class="loadout" id="loadout">
+                    <div class="opt"><span class="opt-h" data-i18n="lo_class"></span><div class="chips" id="cls-chips"></div></div>
+                    <p class="desc" id="cls-desc"></p>
+                    <div class="opt"><span class="opt-h" data-i18n="lo_weapon"></span><div class="chips" id="w-chips"></div></div>
+                    <p class="desc" id="w-desc"></p>
+                    <div class="opt"><span class="opt-h" data-i18n="lo_gear"></span><div class="chips" id="g-chips"></div></div>
+                    <p class="desc" id="g-desc"></p>
+                    <p class="stats" id="lo-stats"></p>
+                    <div class="toggles"><button type="button" id="items-btn"></button><button type="button" id="aim-btn"></button><button type="button" id="af-btn"></button></div>
+                </div>
                 <p class="muted" data-i18n="rule" data-n="3"></p>
                 <button type="button" class="primary" id="start-btn" data-i18n="start"></button>
             </div>
@@ -60,7 +71,8 @@
 
     <aside class="help">
         <span data-i18n="h_move"></span><span data-i18n="h_aim"></span><span data-i18n="h_drone"></span>
-        <span data-i18n="h_sat"></span><span data-i18n="h_forest"></span><span data-i18n="h_ruin"></span>
+        <span data-i18n="h_sat"></span><span data-i18n="h_mine"></span><span data-i18n="h_af"></span>
+        <span data-i18n="h_forest"></span><span data-i18n="h_item"></span><span data-i18n="h_ruin"></span>
     </aside>
     <p class="status"><span id="status-text">--</span> · <span id="ping-text">-- ms</span> · <span id="role-status-text">--</span></p>
 </main>

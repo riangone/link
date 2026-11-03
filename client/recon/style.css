@@ -16,7 +16,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
 .overlay { position: absolute; inset: 0; background: rgba(4, 12, 20, .86); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; text-align: center; z-index: 5; }
 .overlay.hidden, .hidden { display: none !important; }
-.card { max-width: 460px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.card { max-width: 560px; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; align-items: center; }
 h1 { margin: 0; color: #8ef4ff; text-shadow: 0 0 24px #17b9d4; font-size: clamp(24px, 6vw, 36px); }
 h2 { margin: 0; font-size: 18px; color: #cdf; }
 p { margin: 0; }
@@ -30,15 +30,17 @@ button:disabled { opacity: .55; }
 .back { color: #8ef4ff; font-size: 13px; }
 
 /* touch controls overlay the bottom of the field */
-.touch { position: absolute; left: 0; right: 0; bottom: 0; height: 170px; display: none; pointer-events: none; z-index: 3; }
+.touch { position: absolute; left: 0; right: 0; bottom: 0; height: 210px; display: none; pointer-events: none; z-index: 3; }
 body.is-touch .touch { display: block; }
 .stick { position: absolute; left: 14px; bottom: 14px; width: 140px; height: 140px; border-radius: 50%; border: 2px solid #3ac6d855; background: #0a243055; pointer-events: auto; touch-action: none; }
 .stick span { position: absolute; left: 0; right: 0; top: -18px; text-align: center; font-size: 11px; color: #7ab; }
 .knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: #3ac6d8aa; box-shadow: 0 0 14px #3ac6d8; }
-.acts { position: absolute; right: 12px; bottom: 12px; display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; gap: 8px; pointer-events: auto; }
-.act { position: relative; width: 70px; height: 70px; border-radius: 50%; padding: 0; font-size: 24px; line-height: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0f2c37cc; touch-action: none; overflow: hidden; }
+.acts { position: absolute; right: 12px; bottom: 12px; display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto auto; gap: 6px; pointer-events: auto; }
+.act { position: relative; width: 60px; height: 60px; border-radius: 50%; padding: 0; font-size: 24px; line-height: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0f2c37cc; touch-action: none; overflow: hidden; }
 .act small { font-size: 10px; font-weight: 600; margin-top: 2px; }
-.act.fire { grid-column: 2; grid-row: 1 / span 2; width: 88px; height: 88px; align-self: end; background: #5a1f14cc; border-color: #ff9a52; font-size: 30px; }
+.act.fire { grid-column: 2; grid-row: 2 / span 2; width: 96px; height: 96px; align-self: end; background: #5a1f14cc; border-color: #ff9a52; font-size: 30px; }
+#drone-btn { grid-column: 1; grid-row: 1; } #sat-btn { grid-column: 1; grid-row: 2; } #mine-btn { grid-column: 1; grid-row: 3; }
+.act.empty { opacity: .45; }
 .act .cd { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: #000a; pointer-events: none; }
 .act.ready { box-shadow: 0 0 14px #5ef0ff; }
 
@@ -51,3 +53,18 @@ body.is-touch .help, body.is-touch .status { display: none; }
     .logo span { display: none; }
     .field { border-radius: 8px; }
 }
+
+/* loadout picker */
+.loadout { width: 100%; display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.opt { display: flex; align-items: center; gap: 8px; }
+.opt-h { flex: none; width: 3.2em; font-size: 12px; color: #86aab3; font-weight: 700; }
+.chips { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 5px; }
+.chips button { padding: 6px 4px; font-size: 13px; border-radius: 9px; border-color: #245; background: #0a1c24; }
+.chips button.on { border-color: #5ef0ff; background: #12485a; box-shadow: 0 0 10px #17b9d455; }
+.desc { font-size: 12px; color: #9fc2cb; margin: 0 0 4px 3.8em; min-height: 1.3em; }
+.stats { font: 12px ui-monospace, monospace; color: #cfe; background: #0a1c24; border-radius: 8px; padding: 6px 8px; text-align: center; }
+.toggles { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.toggles button { font-size: 13px; padding: 7px 10px; }
+.toggles button.off { opacity: .6; }
+.toggles button:disabled { opacity: .45; }
+@media (max-height: 560px) { .desc { display: none; } .card h1 { font-size: 22px; } .card h2 { display: none; } }

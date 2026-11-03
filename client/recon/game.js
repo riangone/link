@@ -34,6 +34,67 @@
     ];
     const COLORS = [{ body: '#e8a33c', dark: '#8a5a17', turret: '#ffc867' }, { body: '#3cbde8', dark: '#165f7a', turret: '#8fe6ff' }];
 
+    // ---------------------------------------------------------------- loadout: class + weapon mod + gear mod
+    /** Tank classes. sight = vision radius, shot/life = shell speed (px/ms) and lifetime (range = shot*life). */
+    const CLASSES = {
+        mbt:    { icon: '🛡️', hp: 100, speed: 0.19,  sight: 380, dmg: 25, cd: 650,  shot: 0.72, life: 1050, turn: 0.009, droneCd: 14000, size: 1 },
+        scout:  { icon: '🦅', hp: 80,  speed: 0.235, sight: 450, dmg: 19, cd: 480,  shot: 0.78, life: 900,  turn: 0.012, droneCd: 9000,  size: 0.88 },
+        heavy:  { icon: '🐘', hp: 150, speed: 0.15,  sight: 340, dmg: 34, cd: 920,  shot: 0.64, life: 1050, turn: 0.0065, droneCd: 16000, size: 1.16 },
+        sniper: { icon: '🎯', hp: 80,  speed: 0.17,  sight: 400, dmg: 46, cd: 1400, shot: 1.05, life: 1150, turn: 0.006, droneCd: 14000, size: 0.97 }
+    };
+    /** Weapon mods: multipliers on the class gun. splash = blast radius on impact. */
+    const WEAPONS = {
+        std:   { icon: '⚪', dmg: 1, cd: 1, shot: 1 },
+        ap:    { icon: '🔩', dmg: 1.3, cd: 1.25, shot: 1.1 },
+        rapid: { icon: '⚡', dmg: 0.7, cd: 0.62, shot: 1 },
+        he:    { icon: '💥', dmg: 0.85, cd: 1.1, shot: 0.85, splash: 75 }
+    };
+    /** Gear mods. */
+    const GEARS = {
+        radar:  { icon: '📡' },              // sight +70, sees enemy mines from further
+        camo:   { icon: '🍃' },              // still for CAMO_T → hidden on open ground too; harder to spot in forests
+        plate:  { icon: '🧱' },              // +35 hp, -10% speed
+        mines:  { icon: '💣' },              // 6 mines instead of 3, +12 mine damage
+        turbo:  { icon: '🚀' }               // +16% speed, faster turret
+    };
+    const DEFAULT_LO = { cls: 'mbt', w: 'std', g: 'radar' };
+    const validLo = lo => ({
+        cls: lo && CLASSES[lo.cls] ? lo.cls : DEFAULT_LO.cls,
+        w: lo && WEAPONS[lo.w] ? lo.w : DEFAULT_LO.w,
+        g: lo && GEARS[lo.g] ? lo.g : DEFAULT_LO.g
+    });
+    /** Final stats of a loadout. */
+    function statsOf(lo) {
+        const c = CLASSES[lo.cls] || CLASSES.mbt, w = WEAPONS[lo.w] || WEAPONS.std, g = lo.g;
+        return {
+            hp: c.hp + (g === 'plate' ? 35 : 0),
+            speed: c.speed * (g === 'plate' ? 0.9 : 1) * (g === 'turbo' ? 1.16 : 1),
+            sight: c.sight + (g === 'radar' ? 70 : 0),
+            dmg: c.dmg * w.dmg, cd: c.cd * w.cd, shot: c.shot * w.shot, life: c.life,
+            turn: c.turn * (g === 'turbo' ? 1.3 : 1), droneCd: c.droneCd,
+            splash: w.splash || 0, mines: g === 'mines' ? 6 : 3, mineDmg: MINE_DMG + (g === 'mines' ? 12 : 0),
+            spot: g === 'camo' ? 80 : FOREST_SPOT, camo: g === 'camo', size: c.size
+        };
+    }
+
+    const stCache = {};
+    /** Stats of a tank (or any {cls,w,g}); works on host state and client snapshots alike. */
+    const stOf = t => { const k = t.cls + '/' + t.w + '/' + t.g; return stCache[k] || (stCache[k] = statsOf(validLo(t))); };
+
+    // ---------------------------------------------------------------- mines & supply crates
+    const MINE_DMG = 42, MINE_ARM = 900, MINE_R = 30, MINE_SPOT = 85, MINE_MAX = 4;
+    const CAMO_T = 1200, CAMO_SPOT = 210;
+    const ITEM_EVERY = 9000, ITEM_MAX = 4, ITEM_FALL = 1600, ITEM_R = 32, BUFF_T = 9000;
+    const ITEMS = {
+        repair: { icon: '🔧', color: '#7dff9a' },
+        shield: { icon: '🛡️', color: '#8fd3ff' },
+        rapid:  { icon: '⚡', color: '#ffe066' },
+        speed:  { icon: '🚀', color: '#ff9f5a' },
+        mines:  { icon: '💣', color: '#ff7a7a' },
+        intel:  { icon: '📡', color: '#c79bff' }
+    };
+    const ITEM_KEYS = Object.keys(ITEMS);
+
     // ---------------------------------------------------------------- dom
     const $ = id => document.getElementById(id);
     const canvas = $('game'), ctx = canvas.getContext('2d'), field = $('field');
@@ -142,20 +203,70 @@
     let myRole = null, myIdx = 0, channelOpen = false;
     const inputs = [{}, {}], overrides = [null, null];
 
-    function newTank(i, spawn) {
-        const p = SPAWNS[i][spawn % 3];
-        return { x: p.x, y: p.y, a: i ? Math.PI : 0, ta: i ? Math.PI : 0, hp: 100, cd: 0, alive: true, respawnAt: 0,
-            reveal: 0, droneAt: 4000, satAt: 9000, satFrom: 0, satTo: 0, qs: null, es: null };
+    const loadouts = [validLo(null), validLo(null)];
+    let myLoadout = validLo((() => { try { return JSON.parse(localStorage.getItem('recon-loadout')); } catch (e) { return null; } })());
+    function newTank(i, spawn, lo) {
+        const p = SPAWNS[i][spawn % 3], st = statsOf(lo);
+        return { x: p.x, y: p.y, a: i ? Math.PI : 0, ta: i ? Math.PI : 0, hp: st.hp, maxHp: st.hp, cd: 0, alive: true, respawnAt: 0,
+            cls: lo.cls, w: lo.w, g: lo.g,
+            reveal: 0, still: 0, droneAt: 4000, satAt: 9000, satFrom: 0, satTo: 0, qs: null, es: null, ms: null,
+            mines: st.mines, shield: 0, shieldTo: 0, rapidTo: 0, speedTo: 0 };
     }
+    let itemsOn = localStorage.getItem('recon-items') !== '0';
     function startMatch() {
         const seed = 1 + Math.floor(Math.random() * 1e9);
         useMap(seed);
-        S = { seed, T: 0, ph: 'play', sc: [0, 0], tanks: [newTank(0, 0), newTank(1, 0)], shots: [], drones: [null, null], ev: [], evId: 0, spawnN: [0, 0] };
+        loadouts[0] = validLo(myLoadout);
+        if (GameBot.enabled) loadouts[1] = bot.pickLoadout();
+        S = { seed, T: 0, ph: 'play', sc: [0, 0], tanks: [newTank(0, 0, loadouts[0]), newTank(1, 0, loadouts[1])], shots: [], drones: [null, null],
+            mines: [], items: [], itemsOn, itemAt: 2500, itemN: 0, ev: [], evId: 0, spawnN: [0, 0] };
         bot.reset();
         lastEvId = 0;
         event({ k: 'start' });
         showScreen(null);
         broadcast();
+    }
+    /** Drop a crate (and its mirror image, so both sides get an equal chance). */
+    function spawnCrates() {
+        for (let k = 0; k < 40; k++) {
+            const x = 300 + Math.random() * (W - 600), y = 150 + Math.random() * (H - 300);
+            if (blockedTank(x, y) || blockedTank(W - x, H - y) || Math.hypot(x - W / 2, y - H / 2) < 60) continue;
+            if (S.items.some(it => Math.hypot(it.x - x, it.y - y) < 200)) continue;
+            const kind = ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)];
+            for (const [px, py] of [[x, y], [W - x, H - y]]) S.items.push({ id: ++S.itemN, k: kind, x: Math.round(px), y: Math.round(py), land: S.T + ITEM_FALL });
+            event({ k: 'drop', x: Math.round(x), y: Math.round(y) });
+            return;
+        }
+    }
+    function pickUp(t, i, it) {
+        const T = S.T;
+        switch (it.k) {
+            case 'repair': t.hp = Math.min(t.maxHp, t.hp + 45); break;
+            case 'shield': t.shield = 50; t.shieldTo = T + 15000; break;
+            case 'rapid': t.rapidTo = T + BUFF_T; break;
+            case 'speed': t.speedTo = T + BUFF_T; break;
+            case 'mines': t.mines = Math.min(stOf(t).mines + 3, t.mines + 2); break;
+            case 'intel': t.droneAt = Math.min(t.droneAt, T); t.satAt = Math.min(t.satAt, T); break;
+        }
+        event({ k: 'pick', i, it: it.k, x: it.x, y: it.y });
+    }
+    /** Apply damage (shield first); handles kill/score/game over. */
+    function damage(t, i, dmg, by, kind, amb, x, y) {
+        const T = S.T;
+        dmg = Math.round(dmg);
+        if (t.shield > 0 && T < t.shieldTo) {
+            const ab = Math.min(t.shield, dmg);
+            t.shield -= ab; dmg -= ab;
+        }
+        t.hp -= dmg;
+        t.reveal = Math.max(t.reveal, T + 600);
+        event({ k: 'hit', i, x: Math.round(x ?? t.x), y: Math.round(y ?? t.y), dmg, amb, src: kind });
+        if (t.hp <= 0) {
+            t.hp = 0; t.alive = false; t.respawnAt = T + RESPAWN;
+            S.sc[by]++;
+            event({ k: 'kill', i, by, x: Math.round(t.x), y: Math.round(t.y), src: kind });
+            if (S.sc[by] >= WIN) { S.ph = 'over'; S.win = by; event({ k: 'over', w: by }); }
+        }
     }
     function event(e) {
         e.id = ++S.evId; e.t = S.T;
@@ -169,10 +280,35 @@
         const me = D.tanks[team], dr = D.drones[team];
         if (dr && dr.hover && Math.hypot(dr.x - t.x, dr.y - t.y) < DRONE_R) return true;
         if (!me.alive) return false;
-        const d = dist(me, t);
-        if (d > SIGHT || !losClear(me, t)) return false;
-        if (inForest(t.x, t.y) && d > FOREST_SPOT && D.T > t.reveal) return false;
+        const d = dist(me, t), ts = stOf(t);
+        if (d > stOf(me).sight || !losClear(me, t)) return false;
+        if (D.T <= t.reveal) return true;
+        if (inForest(t.x, t.y) && d > ts.spot) return false;
+        if (ts.camo && D.T - t.still > CAMO_T && d > CAMO_SPOT) return false;
         return true;
+    }
+    /** Can `team` see mine `m` (own mines always; enemy ones up close or under a drone)? */
+    function mineVisible(D, team, m) {
+        if (m.o === team) return true;
+        const me = D.tanks[team], dr = D.drones[team];
+        if (dr && dr.hover && Math.hypot(dr.x - m.x, dr.y - m.y) < DRONE_R) return true;
+        return me.alive && Math.hypot(me.x - m.x, me.y - m.y) < MINE_SPOT + (me.g === 'radar' ? 40 : 0);
+    }
+    /** Edge-triggered gadget: a counter in the input increases once per press. */
+    function pressed(t, key, v) {
+        if (typeof v !== 'number') return false;
+        if (t[key] === null) { t[key] = v; return false; }
+        if (v > t[key]) { t[key] = v; return true; }
+        return false;
+    }
+    function fireShot(t, i, T) {
+        const st = stOf(t);
+        const amb = !visibleTo(S, 1 - i, t);
+        S.shots.push({ x: t.x + Math.cos(t.ta) * 30, y: t.y + Math.sin(t.ta) * 30, vx: Math.cos(t.ta) * st.shot, vy: Math.sin(t.ta) * st.shot,
+            o: i, life: st.life, amb, dmg: st.dmg, sp: st.splash });
+        t.cd = st.cd * (T < t.rapidTo ? 0.5 : 1);
+        t.reveal = T + FIRE_REVEAL;
+        event({ k: 'fire', i, x: Math.round(t.x), y: Math.round(t.y), a: Math.round(t.ta * 100) / 100 });
     }
 
     function stepSim(dt) {
@@ -181,10 +317,10 @@
         if (overrides[1]) inputs[1] = overrides[1];
         else if (GameBot.enabled) inputs[1] = bot.think(T);
         for (let i = 0; i < 2; i++) {
-            const t = S.tanks[i], v = inputs[i] || {}, foe = S.tanks[1 - i];
+            const t = S.tanks[i], v = inputs[i] || {}, foe = S.tanks[1 - i], st = stOf(t);
             if (!t.alive) {
                 if (T >= t.respawnAt && S.ph === 'play') {
-                    Object.assign(t, newTank(i, ++S.spawnN[i]), { droneAt: t.droneAt, satAt: t.satAt, qs: t.qs, es: t.es });
+                    Object.assign(t, newTank(i, ++S.spawnN[i], t), { droneAt: t.droneAt, satAt: t.satAt, qs: t.qs, es: t.es, ms: t.ms, still: T });
                     event({ k: 'spawn', i });
                 }
                 continue;
@@ -195,50 +331,72 @@
             const m = Math.hypot(mx, my);
             if (m > 1) { mx /= m; my /= m; }
             if (m > 0.12) {
-                const sp = SPEED * dt * (inForest(t.x, t.y) ? FOREST_SLOW : 1);
+                const sp = st.speed * dt * (inForest(t.x, t.y) ? FOREST_SLOW : 1) * (T < t.speedTo ? 1.35 : 1);
                 t.a = Math.atan2(my, mx);
                 const nx = t.x + mx * sp, ny = t.y + my * sp;
                 if (!blockedTank(nx, t.y)) t.x = nx;
                 if (!blockedTank(t.x, ny)) t.y = ny;
+                t.still = T;
             }
-            // aim: explicit (mouse/bot) > auto-track a visible enemy > follow hull
+            // aim: explicit (mouse/drag/bot) > auto-track a visible enemy (unless the player turned it off) > follow hull
+            const sees = visibleTo(S, i, foe), toFoe = Math.atan2(foe.y - t.y, foe.x - t.x);
             let want = t.a;
-            if (typeof v.ax === 'number' && isFinite(v.ax)) want = v.ax;
-            else if (visibleTo(S, i, foe)) want = Math.atan2(foe.y - t.y, foe.x - t.x);
-            const da = angDiff(want, t.ta), turn = 0.009 * dt;
+            const explicit = typeof v.ax === 'number' && isFinite(v.ax);
+            if (explicit) want = v.ax;
+            else if (v.aa !== false && sees) want = toFoe;
+            const da = angDiff(want, t.ta), turn = st.turn * dt;
             t.ta += clamp(da, -turn, turn);
-            // fire
+            // fire: held trigger; `fw` = wait until the turret is on target (touch drag-release);
+            // `af` = auto-fire when the gun is lined up on a visible enemy within range
             t.cd = Math.max(0, t.cd - dt);
-            if (v.f && t.cd <= 0) {
-                const amb = !visibleTo(S, 1 - i, t);
-                S.shots.push({ x: t.x + Math.cos(t.ta) * 30, y: t.y + Math.sin(t.ta) * 30, vx: Math.cos(t.ta) * SHOT_SPEED, vy: Math.sin(t.ta) * SHOT_SPEED, o: i, life: SHOT_LIFE, amb });
-                t.cd = FIRE_CD;
-                t.reveal = T + FIRE_REVEAL;
-                event({ k: 'fire', i, x: Math.round(t.x), y: Math.round(t.y) });
+            if (t.cd <= 0) {
+                const aligned = Math.abs(angDiff(want, t.ta)) < 0.08;
+                let shoot = !!v.f && (!v.fw || aligned);
+                if (!shoot && v.af && sees && dist(t, foe) < st.shot * st.life * 0.95 && Math.abs(angDiff(toFoe, t.ta)) < 0.09 && losClear(t, foe)) shoot = true;
+                if (shoot) fireShot(t, i, T);
             }
-            // drone (edge-triggered by a sequence number so lost packets can't double-fire)
-            if (typeof v.q === 'number') {
-                if (t.qs === null) t.qs = v.q;
-                else if (v.q > t.qs) {
-                    t.qs = v.q;
-                    if (T >= t.droneAt) {
-                        const tx = clamp(t.x + Math.cos(t.ta) * DRONE_RANGE, 40, W - 40), ty = clamp(t.y + Math.sin(t.ta) * DRONE_RANGE, 40, H - 40);
-                        S.drones[i] = { x: t.x, y: t.y, tx, ty, hover: false, until: 0 };
-                        t.droneAt = T + DRONE_CD;
-                        event({ k: 'drone', i });
-                    }
+            // drone / satellite / mine (edge-triggered by a sequence number so lost packets can't double-fire)
+            if (pressed(t, 'qs', v.q) && T >= t.droneAt) {
+                const tx = clamp(t.x + Math.cos(t.ta) * DRONE_RANGE, 40, W - 40), ty = clamp(t.y + Math.sin(t.ta) * DRONE_RANGE, 40, H - 40);
+                S.drones[i] = { x: t.x, y: t.y, tx, ty, hover: false, until: 0 };
+                t.droneAt = T + st.droneCd;
+                event({ k: 'drone', i });
+            }
+            if (pressed(t, 'es', v.e) && T >= t.satAt) {
+                t.satFrom = T + SAT_DELAY; t.satTo = T + SAT_DELAY + SAT_TIME; t.satAt = T + SAT_CD;
+                event({ k: 'sat', i });
+            }
+            if (pressed(t, 'ms', v.m) && t.mines > 0) {
+                const x = t.x - Math.cos(t.a) * 30, y = t.y - Math.sin(t.a) * 30;
+                if (!blockedTank(x, y) || !blockedShot(x, y)) {
+                    const own = S.mines.filter(q => q.o === i);
+                    if (own.length >= MINE_MAX) S.mines.splice(S.mines.indexOf(own[0]), 1);
+                    S.mines.push({ x: Math.round(x), y: Math.round(y), o: i, arm: T + MINE_ARM, dmg: st.mineDmg });
+                    t.mines--;
+                    event({ k: 'mine_set', i });
                 }
             }
-            if (typeof v.e === 'number') {
-                if (t.es === null) t.es = v.e;
-                else if (v.e > t.es) {
-                    t.es = v.e;
-                    if (T >= t.satAt) {
-                        t.satFrom = T + SAT_DELAY; t.satTo = T + SAT_DELAY + SAT_TIME; t.satAt = T + SAT_CD;
-                        event({ k: 'sat', i });
-                    }
-                }
+            // crates
+            for (let j = S.items.length - 1; j >= 0; j--) {
+                const it = S.items[j];
+                if (T >= it.land && Math.hypot(it.x - t.x, it.y - t.y) < ITEM_R) { S.items.splice(j, 1); pickUp(t, i, it); }
             }
+            if (t.shield > 0 && T >= t.shieldTo) t.shield = 0;
+        }
+        // mines
+        for (let j = S.mines.length - 1; j >= 0; j--) {
+            const mn = S.mines[j], t = S.tanks[1 - mn.o];
+            if (S.ph === 'play' && T >= mn.arm && t.alive && Math.hypot(mn.x - t.x, mn.y - t.y) < MINE_R) {
+                S.mines.splice(j, 1);
+                event({ k: 'boom_mine', x: mn.x, y: mn.y });
+                t.speedTo = 0;
+                damage(t, 1 - mn.o, mn.dmg, mn.o, 'mine', false, mn.x, mn.y);
+            }
+        }
+        // crates drop in over time
+        if (S.itemsOn && S.ph === 'play' && T >= S.itemAt) {
+            S.itemAt = T + ITEM_EVERY;
+            if (S.items.length <= ITEM_MAX - 2) spawnCrates();
         }
         // drones fly out, hover, then return to base (vanish)
         for (let i = 0; i < 2; i++) {
@@ -254,24 +412,19 @@
         for (let j = S.shots.length - 1; j >= 0; j--) {
             const b = S.shots[j];
             b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
-            if (b.life <= 0 || blockedShot(b.x, b.y)) {
-                if (b.life > 0) event({ k: 'spark', x: Math.round(b.x), y: Math.round(b.y) });
-                S.shots.splice(j, 1);
-                continue;
-            }
             const t = S.tanks[1 - b.o];
-            if (t.alive && Math.hypot(b.x - t.x, b.y - t.y) < TANK_R + 6) {
-                const dmg = Math.round(DMG * (b.amb ? AMBUSH_MUL : 1));
-                t.hp -= dmg;
-                t.reveal = Math.max(t.reveal, T + 600);
-                S.shots.splice(j, 1);
-                event({ k: 'hit', i: 1 - b.o, x: Math.round(t.x), y: Math.round(t.y), dmg, amb: b.amb });
-                if (t.hp <= 0) {
-                    t.hp = 0; t.alive = false; t.respawnAt = T + RESPAWN;
-                    S.sc[b.o]++;
-                    event({ k: 'kill', i: 1 - b.o, by: b.o, x: Math.round(t.x), y: Math.round(t.y) });
-                    if (S.sc[b.o] >= WIN) { S.ph = 'over'; S.win = b.o; event({ k: 'over', w: b.o }); }
-                }
+            const hit = t.alive && Math.hypot(b.x - t.x, b.y - t.y) < TANK_R * stOf(t).size + 6;
+            const wall = b.life <= 0 || blockedShot(b.x, b.y);
+            if (!hit && !wall) continue;
+            S.shots.splice(j, 1);
+            if (S.ph !== 'play') continue;
+            const mul = b.amb ? AMBUSH_MUL : 1;
+            if (hit) damage(t, 1 - b.o, b.dmg * mul, b.o, 'shell', b.amb, t.x, t.y);
+            else if (b.life > 0 || b.sp) event({ k: 'spark', x: Math.round(b.x), y: Math.round(b.y), sp: b.sp || 0 });
+            // high-explosive splash also catches a near miss (and a tank hugging the wall)
+            if (b.sp) {
+                if (hit) event({ k: 'spark', x: Math.round(b.x), y: Math.round(b.y), sp: b.sp });
+                else if (t.alive && Math.hypot(b.x - t.x, b.y - t.y) < b.sp) damage(t, 1 - b.o, b.dmg * 0.55 * mul, b.o, 'splash', b.amb, t.x, t.y);
             }
         }
     }
@@ -281,9 +434,11 @@
         return {
             type: 'state', seed: S.seed, T: Math.round(S.T), ph: S.ph, sc: S.sc, win: S.win,
             tanks: S.tanks.map(t => ({ x: r(t.x), y: r(t.y), a: r(t.a * 100) / 100, ta: r(t.ta * 100) / 100, hp: t.hp, alive: t.alive, respawnAt: t.respawnAt,
-                reveal: t.reveal, droneAt: t.droneAt, satAt: t.satAt, satFrom: t.satFrom, satTo: t.satTo })),
+                reveal: t.reveal, still: t.still, droneAt: t.droneAt, satAt: t.satAt, satFrom: t.satFrom, satTo: t.satTo,
+                cls: t.cls, w: t.w, g: t.g, maxHp: t.maxHp, mines: t.mines, shield: t.shield, shieldTo: t.shieldTo, rapidTo: t.rapidTo, speedTo: t.speedTo, cd: Math.round(t.cd) })),
             shots: S.shots.map(b => ({ x: r(b.x), y: r(b.y), vx: b.vx, vy: b.vy, o: b.o })),
             drones: S.drones.map(d => d && { x: r(d.x), y: r(d.y), hover: d.hover, until: d.until }),
+            mines: S.mines, items: S.items, itemsOn: S.itemsOn,
             ev: S.ev
         };
     }
@@ -291,7 +446,20 @@
 
     // ---------------------------------------------------------------- bot (host side, uses only what its own side can know)
     const bot = {
-        reset() { Object.assign(this, { wp: null, seen: null, seenT: -1e9, since: 0, side: 1, q: 0, e: 0, lastPos: null, lastPosT: 0, burstErr: 0, strafeT: 0, camp: 0, frozen: this.frozen || false }); },
+        reset() { Object.assign(this, { wp: null, seen: null, seenT: -1e9, since: 0, side: 1, q: 0, e: 0, m: 0, mineT: 0, lastPos: null, lastPosT: 0, burstErr: 0, strafeT: 0, camp: 0, frozen: this.frozen || false }); },
+        pickLoadout() {
+            const any = o => { const k = Object.keys(o); return k[Math.floor(Math.random() * k.length)]; };
+            return validLo({ cls: any(CLASSES), w: any(WEAPONS), g: any(GEARS) });
+        },
+        /** Nearest landed crate the bot can see (or a fresh drop marker, which everyone sees on the minimap). */
+        crate(me) {
+            let best = null, bd = 1e9;
+            for (const it of S.items) {
+                const d = dist(me, it);
+                if (d < bd && (d < stOf(me).sight || S.T < it.land + 4000)) { bd = d; best = it; }
+            }
+            return best && bd < 900 ? best : null;
+        },
         level() {
             return GameBot.pick({
                 easy: { react: 750, err: 0.2, fire: 0.25, keep: 260, gadget: 0.003, camp: 0 },
@@ -321,7 +489,7 @@
         },
         think(T) {
             const me = S.tanks[1], foe = S.tanks[0], lv = this.level();
-            const out = { mx: 0, my: 0, ax: null, f: false, q: this.q, e: this.e };
+            const out = { mx: 0, my: 0, ax: null, f: false, q: this.q, e: this.e, m: this.m };
             if (this.frozen || !me.alive || S.ph !== 'play') return out;
             const sees = visibleTo(S, 1, foe);
             const satLive = T >= me.satFrom && T < me.satTo;
@@ -341,11 +509,14 @@
                     out.mx = s.mx; out.my = s.my;
                 }
                 out.f = losClear(me, foe) && Math.abs(angDiff(me.ta, out.ax)) < 0.22 && Math.random() < lv.fire;
+                if (me.mines > 0 && d < 260 && T > this.mineT && Math.random() < lv.gadget * 3) { out.m = ++this.m; this.mineT = T + 2500; }
                 return out;
             }
             // no contact: chase last intel, otherwise roam/lurk
             let goal = this.seen && T - this.seenT < 6000 ? this.seen : null;
-            if (!goal) {
+            const crate = S.itemsOn && this.crate(me);
+            if (crate && (!goal || dist(me, crate) < 300) && !(this.camp > T && dist(me, crate) > 350)) { goal = crate; this.camp = 0; }
+            else if (!goal) {
                 if (!this.wp || dist(me, this.wp) < 50) {
                     if (this.wp && this.wp.forest && Math.random() < lv.camp) this.camp = T + 3000 + Math.random() * 4000;
                     this.wp = this.pickWaypoint(me);
@@ -370,6 +541,8 @@
                 if (Math.abs(angDiff(me.ta, out.ax)) < 0.3) out.q = ++this.q;
             }
             if (T >= me.satAt && T - this.seenT > 9000 && Math.random() < lv.gadget * 0.6) out.e = ++this.e;
+            // seed a mine on the way into a forest or where the enemy was last seen
+            if (me.mines > 0 && T > this.mineT && Math.random() < lv.gadget && (inForest(me.x, me.y) || (this.seen && dist(me, this.seen) < 200))) { out.m = ++this.m; this.mineT = T + 6000; }
             return out;
         }
     };
@@ -377,18 +550,27 @@
 
     // ---------------------------------------------------------------- input
     const keys = {};
-    let mouseAim = null, mouseDown = false, touchFire = false, stickVec = { x: 0, y: 0 }, qSeq = 0, eSeq = 0;
+    let mouseAim = null, mouseDown = false, touchFire = false, stickVec = { x: 0, y: 0 }, qSeq = 0, eSeq = 0, mSeq = 0;
+    /** Player prefs: touch aim mode ('auto' tracks visible enemies, 'manual' = only where you drag) and auto-fire. */
+    const prefs = { aim: localStorage.getItem('recon-aim') === 'manual' ? 'manual' : 'auto', autoFire: localStorage.getItem('recon-autofire') === '1' };
+    function setAutoFire(on, announce) {
+        prefs.autoFire = on; localStorage.setItem('recon-autofire', on ? '1' : '0');
+        if (announce) banner((on ? '🎯 ' : '✋ ') + L(on ? 'af_on' : 'af_off'), '#ffe066', 1200);
+        renderOptions();
+    }
     addEventListener('keydown', e => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
         if (!keys[e.code]) {
             if (e.code === 'KeyQ') qSeq++;
             if (e.code === 'KeyE') eSeq++;
+            if (e.code === 'KeyF') mSeq++;
+            if (e.code === 'KeyV') setAutoFire(!prefs.autoFire, true);
         }
         keys[e.code] = true;
         if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
     });
     addEventListener('keyup', e => { keys[e.code] = false; });
-    addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseDown = false; touchFire = false; });
+    addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseDown = false; touchFire = false; dragAim = null; });
     canvas.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') { const r = canvas.getBoundingClientRect(); mouseAim = { x: e.clientX - r.left, y: e.clientY - r.top }; } });
     canvas.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button === 0) { mouseDown = true; Sfx.init(); } });
     addEventListener('pointerup', e => { if (e.pointerType === 'mouse') mouseDown = false; });
@@ -412,19 +594,41 @@
         el.addEventListener('pointerdown', e => { e.preventDefault(); Sfx.init(); on(); });
         for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(ev, () => off && off());
     }
-    holdBtn($('fire-btn'), () => { touchFire = true; }, () => { touchFire = false; });
+    // Fire button doubles as an aim stick: tap/hold = fire (auto-aim), drag = aim the gun, release = fire there.
+    const fireBtn = $('fire-btn');
+    let fireId = null, fireStart = null, dragAim = null, release = null;
+    fireBtn.addEventListener('pointerdown', e => {
+        e.preventDefault(); Sfx.init();
+        fireId = e.pointerId; fireBtn.setPointerCapture(e.pointerId);
+        fireStart = { x: e.clientX, y: e.clientY }; dragAim = null; release = null; touchFire = true;
+    });
+    fireBtn.addEventListener('pointermove', e => {
+        if (e.pointerId !== fireId) return;
+        const dx = e.clientX - fireStart.x, dy = e.clientY - fireStart.y;
+        if (Math.hypot(dx, dy) > 18) { dragAim = Math.atan2(dy, dx); touchFire = false; }
+    });
+    for (const ev of ['pointerup', 'pointercancel']) fireBtn.addEventListener(ev, e => {
+        if (e.pointerId !== fireId) return;
+        if (dragAim !== null && ev === 'pointerup') release = { ang: dragAim, until: performance.now() + 650 + ((D() && D().tanks[myIdx].cd) || 0) };
+        fireId = null; dragAim = null; touchFire = false;
+    });
     holdBtn($('drone-btn'), () => { qSeq++; });
     holdBtn($('sat-btn'), () => { eSeq++; });
+    holdBtn($('mine-btn'), () => { mSeq++; });
 
     let view = { ox: 0, oy: 0, s: 1, w: 0, h: 0 };
     function localInput() {
         let mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
         let my = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
         if (!mx && !my) { mx = stickVec.x; my = stickVec.y; }
-        let ax = null;
+        let ax = null, f = !!(keys.Space || mouseDown || touchFire), fw = false;
         const me = D()?.tanks[myIdx];
-        if (mouseAim && me) ax = Math.atan2(mouseAim.y / view.s + view.oy - me.y, mouseAim.x / view.s + view.ox - me.x);
-        return { mx: Math.round(mx * 100) / 100, my: Math.round(my * 100) / 100, ax: ax === null ? null : Math.round(ax * 100) / 100, f: !!(keys.Space || mouseDown || touchFire), q: qSeq, e: eSeq };
+        if (dragAim !== null) ax = dragAim;
+        else if (release && performance.now() < release.until) { ax = release.ang; f = true; fw = true; }
+        else if (mouseAim && me) ax = Math.atan2(mouseAim.y / view.s + view.oy - me.y, mouseAim.x / view.s + view.ox - me.x);
+        if (release && performance.now() >= release.until) release = null;
+        return { mx: Math.round(mx * 100) / 100, my: Math.round(my * 100) / 100, ax: ax === null ? null : Math.round(ax * 100) / 100,
+            f, fw, aa: !isTouch || prefs.aim === 'auto', af: prefs.autoFire, q: qSeq, e: eSeq, m: mSeq };
     }
 
     // ---------------------------------------------------------------- network
@@ -466,7 +670,8 @@
         if (!m || typeof m !== 'object') return;
         if (m.type === 'input' && myRole === 'host') {
             const n = v => (typeof v === 'number' && isFinite(v) ? v : 0);
-            inputs[1] = { mx: n(m.mx), my: n(m.my), ax: typeof m.ax === 'number' && isFinite(m.ax) ? m.ax : null, f: !!m.f, q: n(m.q), e: n(m.e) };
+            inputs[1] = { mx: n(m.mx), my: n(m.my), ax: typeof m.ax === 'number' && isFinite(m.ax) ? m.ax : null, f: !!m.f, fw: !!m.fw, aa: m.aa !== false, af: !!m.af, q: n(m.q), e: n(m.e), m: n(m.m) };
+            if (m.lo) loadouts[1] = validLo(m.lo);
         } else if (m.type === 'restart' && myRole === 'host') {
             if (!S || S.ph === 'over') startMatch();
         } else if (m.type === 'state' && myRole === 'client') {
@@ -478,7 +683,7 @@
     }
     setInterval(() => {
         if (!channelOpen || myRole !== 'client') return;
-        session.send({ type: 'input', ...localInput() });
+        session.send({ type: 'input', ...localInput(), lo: myLoadout });
         if (wantRestart) session.send({ type: 'restart' });
     }, 1000 / 30);
     setInterval(() => { if (myRole === 'host' && S) broadcast(); }, NET_MS);
@@ -488,7 +693,48 @@
         overlay.classList.toggle('hidden', !id);
         for (const s of screens) s.classList.toggle('hidden', s.id !== id);
     }
+    // ---------------------------------------------------------------- loadout picker (ready screen)
+    function chipRow(id, table, key, prefix) {
+        const box = $(id);
+        box.textContent = '';
+        for (const k of Object.keys(table)) {
+            const b = document.createElement('button');
+            b.type = 'button'; b.dataset.k = k;
+            b.textContent = table[k].icon + ' ' + L(prefix + k);
+            b.classList.toggle('on', myLoadout[key] === k);
+            b.onclick = () => {
+                myLoadout = validLo({ ...myLoadout, [key]: k });
+                localStorage.setItem('recon-loadout', JSON.stringify(myLoadout));
+                renderOptions();
+            };
+            box.appendChild(b);
+        }
+    }
+    function renderOptions() {
+        chipRow('cls-chips', CLASSES, 'cls', 'cls_');
+        chipRow('w-chips', WEAPONS, 'w', 'w_');
+        chipRow('g-chips', GEARS, 'g', 'g_');
+        $('cls-desc').textContent = L('d_' + myLoadout.cls);
+        $('w-desc').textContent = L('dw_' + myLoadout.w);
+        $('g-desc').textContent = L('dg_' + myLoadout.g);
+        const st = statsOf(myLoadout);
+        $('lo-stats').textContent = `${L('st_hp')} ${st.hp} · ${L('st_spd')} ${Math.round(st.speed * 1000)} · ${L('st_sight')} ${st.sight} · ` +
+            `${L('st_dmg')} ${Math.round(st.dmg)}${st.splash ? '💥' : ''} · ${(1000 / st.cd).toFixed(1)}${L('st_rof')} · ${L('st_range')} ${Math.round(st.shot * st.life)} · 💣${st.mines}`;
+        const canItems = myRole !== 'client';
+        $('items-btn').textContent = canItems ? L(itemsOn ? 'items_on' : 'items_off') : L('items_host');
+        $('items-btn').disabled = !canItems;
+        $('items-btn').classList.toggle('off', !itemsOn);
+        $('aim-btn').textContent = L(prefs.aim === 'auto' ? 'aim_auto' : 'aim_manual');
+        $('aim-btn').classList.toggle('hidden', !isTouch);
+        $('af-btn').textContent = L(prefs.autoFire ? 'af_on' : 'af_off');
+        $('af-btn').classList.toggle('off', !prefs.autoFire);
+    }
+    $('items-btn').onclick = () => { itemsOn = !itemsOn; localStorage.setItem('recon-items', itemsOn ? '1' : '0'); renderOptions(); };
+    $('aim-btn').onclick = () => { prefs.aim = prefs.aim === 'auto' ? 'manual' : 'auto'; localStorage.setItem('recon-aim', prefs.aim); renderOptions(); };
+    $('af-btn').onclick = () => setAutoFire(!prefs.autoFire, false);
+
     function refreshTexts() {
+        renderOptions();
         $('role-text').textContent = GameBot.enabled ? GameBot.t('ready', { lv: GameBot.t(GameBot.level).replace(/^\S+\s/, '') })
             : L(myRole === 'client' ? 'role_client' : 'role_host');
         $('start-btn').textContent = myRole === 'client' ? L(wantRestart ? 'wait_host' : 'start') : L('start');
@@ -533,6 +779,7 @@
             hit() { tone(90, 0.2, 'square', 0.07, -50); },
             boom() { tone(70, 0.5, 'sawtooth', 0.09, -40); },
             gadget() { tone(660, 0.12, 'sine', 0.05, 400); },
+            click() { tone(320, 0.06, 'square', 0.04, -100); },
             ping() { tone(1200, 0.25, 'sine', 0.04, -300); },
             win() { [523, 659, 784].forEach((f, i) => setTimeout(() => tone(f, 0.2, 'triangle', 0.06), i * 140)); },
             lose() { [392, 330, 262].forEach((f, i) => setTimeout(() => tone(f, 0.25, 'triangle', 0.06), i * 160)); }
@@ -550,12 +797,24 @@
             const mine = e.i === myIdx, now = performance.now();
             switch (e.k) {
                 case 'start': explored = new Uint8Array(EC * ER); banner(L('start_msg'), '#8ef4ff', 2400); break;
-                case 'fire': if (mine || canSeePoint(D, e)) { fx.push({ k: 'flash', x: e.x, y: e.y, t: now }); Sfx.fire(); } break;
-                case 'spark': fx.push({ k: 'spark', x: e.x, y: e.y, t: now }); break;
+                case 'fire': if (mine) release = null; if (mine || canSeePoint(D, e)) { fx.push({ k: 'flash', x: e.x, y: e.y, t: now }); Sfx.fire(); } break;
+                case 'spark':
+                    if (e.sp) { fx.push({ k: 'blast', x: e.x, y: e.y, t: now, r: e.sp }); Sfx.hit(); }
+                    else fx.push({ k: 'spark', x: e.x, y: e.y, t: now });
+                    break;
+                case 'boom_mine': fx.push({ k: 'blast', x: e.x, y: e.y, t: now, r: MINE_R + 30 }); fx.push({ k: 'boom', x: e.x, y: e.y, t: now }); Sfx.boom(); break;
+                case 'mine_set': if (mine) Sfx.click(); break;
+                case 'drop': banner(L('drop'), '#ffd36a', 1800); Sfx.ping(); break;
+                case 'pick':
+                    fx.push({ k: 'pick', x: e.x, y: e.y, t: now, c: ITEMS[e.it].color, icon: ITEMS[e.it].icon });
+                    if (mine) { banner(ITEMS[e.it].icon + ' ' + L('it_' + e.it), ITEMS[e.it].color, 1400); Sfx.gadget(); }
+                    else if (canSeePoint(D, e)) banner(L('pick_enemy'), '#ff9a9a', 1100);
+                    break;
                 case 'hit':
                     fx.push({ k: 'hit', x: e.x, y: e.y, t: now, dmg: e.dmg });
                     Sfx.hit();
                     if (e.amb) banner(L('ambush') + ' -' + e.dmg, mine ? '#ff7a7a' : '#ffd36a');
+                    else if (e.src === 'mine') banner('💣 ' + L('mine_hit') + ' -' + e.dmg, mine ? '#ff7a7a' : '#ffd36a');
                     if (mine) shake = 10;
                     break;
                 case 'kill':
@@ -570,7 +829,7 @@
         }
         if (D.ph === 'over') showGameOver(D);
     }
-    function canSeePoint(D, p) { const me = D.tanks[myIdx]; return me.alive && Math.hypot(me.x - p.x, me.y - p.y) < SIGHT; }
+    function canSeePoint(D, p) { const me = D.tanks[myIdx]; return me.alive && Math.hypot(me.x - p.x, me.y - p.y) < stOf(me).sight; }
 
     // ---------------------------------------------------------------- exploration (local per player)
     let explored = new Uint8Array(EC * ER);
@@ -614,35 +873,88 @@
         return { cw: r.width, ch: r.height, dpr };
     }
 
-    function drawTank(t, i, alpha) {
-        const c = COLORS[i];
+    function drawTank(t, i, alpha, T) {
+        const c = COLORS[i], st = stOf(t), k = st.size, cls = t.cls, w = t.w;
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.translate(t.x, t.y);
+        if (T < t.speedTo) {                                   // boost trail
+            ctx.fillStyle = 'rgba(255,160,90,.25)';
+            ctx.beginPath(); ctx.ellipse(-Math.cos(t.a) * 26, -Math.sin(t.a) * 26, 22, 14, t.a, 0, 7); ctx.fill();
+        }
         ctx.fillStyle = 'rgba(0,0,0,.35)';
-        ctx.beginPath(); ctx.ellipse(4, 8, 27, 20, 0, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(4, 8, 27 * k, 20 * k, 0, 0, 7); ctx.fill();
         ctx.save();
-        ctx.rotate(t.a);
+        ctx.rotate(t.a); ctx.scale(k, k);
         ctx.fillStyle = '#1b1f1d';
         ctx.fillRect(-25, -22, 50, 10); ctx.fillRect(-25, 12, 50, 10);
         ctx.fillStyle = '#3a403b';
-        for (let k = -22; k < 25; k += 7) { ctx.fillRect(k, -22, 3, 10); ctx.fillRect(k, 12, 3, 10); }
+        for (let q = -22; q < 25; q += 7) { ctx.fillRect(q, -22, 3, 10); ctx.fillRect(q, 12, 3, 10); }
         ctx.fillStyle = c.dark; ctx.fillRect(-22, -15, 44, 30);
-        ctx.fillStyle = c.body; ctx.fillRect(-20, -13, 40, 24);
+        ctx.fillStyle = c.body;
+        if (cls === 'scout') { ctx.beginPath(); ctx.moveTo(-20, -12); ctx.lineTo(16, -12); ctx.lineTo(24, 0); ctx.lineTo(16, 12); ctx.lineTo(-20, 12); ctx.fill(); }
+        else ctx.fillRect(-20, -13, 40, 24);
+        if (cls === 'heavy' || t.g === 'plate') { ctx.fillStyle = c.dark; ctx.fillRect(-18, -17, 36, 4); ctx.fillRect(-18, 13, 36, 4); ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(-16, -16, 32, 2); }
+        if (t.g === 'camo') { ctx.fillStyle = 'rgba(40,90,40,.65)'; for (const [x, y] of [[-12, -6], [2, 4], [-4, -10], [10, -3]]) { ctx.beginPath(); ctx.arc(x, y, 5, 0, 7); ctx.fill(); } }
+        if (t.g === 'mines') { ctx.fillStyle = '#2a2a2a'; for (const y of [-7, 0, 7]) { ctx.beginPath(); ctx.arc(-21, y, 3, 0, 7); ctx.fill(); } }
+        if (t.g === 'turbo') { ctx.fillStyle = '#ff9f5a'; ctx.fillRect(-25, -6, 4, 4); ctx.fillRect(-25, 2, 4, 4); }
         ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(12, -10, 6, 20);
         ctx.restore();
-        ctx.rotate(t.ta);
-        ctx.fillStyle = '#20282b'; ctx.fillRect(4, -4, 30, 8);
+        ctx.save();
+        ctx.rotate(t.ta); ctx.scale(k, k);
+        const len = cls === 'sniper' ? 46 : cls === 'heavy' ? 34 : 30, bw = w === 'he' ? 11 : cls === 'heavy' ? 10 : w === 'ap' || cls === 'sniper' ? 6 : 8;
+        ctx.fillStyle = '#20282b';
+        if (w === 'rapid') { ctx.fillRect(4, -7, len - 4, 5); ctx.fillRect(4, 2, len - 4, 5); }
+        else ctx.fillRect(4, -bw / 2, len, bw);
+        if (cls === 'sniper') { ctx.fillStyle = '#20282b'; ctx.fillRect(len, -bw / 2 - 2, 6, bw + 4); }
+        if (w === 'he') { ctx.fillStyle = '#5a2a14'; ctx.fillRect(len - 2, -bw / 2 - 1, 6, bw + 2); }
         ctx.fillStyle = c.turret;
-        ctx.beginPath(); ctx.arc(0, 0, 11, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.arc(0, 0, cls === 'heavy' ? 13 : 11, 0, 7); ctx.fill();
         ctx.strokeStyle = c.dark; ctx.lineWidth = 2; ctx.stroke();
+        if (cls === 'scout' || t.g === 'radar') { ctx.strokeStyle = '#d9f6ff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-6, -4); ctx.lineTo(-16, -14); ctx.stroke(); ctx.fillStyle = '#5ef0ff'; ctx.beginPath(); ctx.arc(-16, -14, 2.5, 0, 7); ctx.fill(); }
         ctx.restore();
-        // hp bar
+        if (t.shield > 0 && T < t.shieldTo) {                  // shield bubble
+            ctx.strokeStyle = `rgba(143,211,255,${0.45 + 0.25 * Math.sin(T / 120)})`; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(0, 0, 34 * k, 0, 7); ctx.stroke();
+            ctx.fillStyle = 'rgba(143,211,255,.12)'; ctx.fill();
+        }
+        if (T < t.rapidTo) { ctx.strokeStyle = 'rgba(255,224,102,.7)'; ctx.lineWidth = 2; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.arc(0, 0, 28 * k, T / 300, T / 300 + 5); ctx.stroke(); ctx.setLineDash([]); }
+        ctx.restore();
+        // hp (+ shield) bar and class tag
         ctx.globalAlpha = alpha;
-        ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(t.x - 24, t.y - 36, 48, 6);
-        ctx.fillStyle = t.hp > 50 ? '#70ff91' : t.hp > 25 ? '#ffd36a' : '#ff6060';
-        ctx.fillRect(t.x - 23, t.y - 35, 46 * t.hp / 100, 4);
+        const bw2 = 52, hpw = (bw2 - 2) * t.hp / (t.maxHp || 100);
+        ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(t.x - bw2 / 2, t.y - 38 * k, bw2, 7);
+        ctx.fillStyle = t.hp > t.maxHp / 2 ? '#70ff91' : t.hp > t.maxHp / 4 ? '#ffd36a' : '#ff6060';
+        ctx.fillRect(t.x - bw2 / 2 + 1, t.y - 38 * k + 1, hpw, 5);
+        if (t.shield > 0 && T < t.shieldTo) { ctx.fillStyle = '#8fd3ff'; ctx.fillRect(t.x - bw2 / 2 + 1, t.y - 38 * k + 1, (bw2 - 2) * Math.min(1, t.shield / (t.maxHp || 100)), 2); }
+        ctx.font = '11px system-ui'; ctx.textAlign = 'right'; ctx.fillText(CLASSES[cls]?.icon || '', t.x - bw2 / 2 - 2, t.y - 30 * k);
         ctx.globalAlpha = 1;
+    }
+    function drawMine(m, mine, T) {
+        const armed = T >= m.arm;
+        ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.arc(m.x + 2, m.y + 3, 10, 0, 7); ctx.fill();
+        ctx.fillStyle = '#3b3a33'; ctx.beginPath(); ctx.arc(m.x, m.y, 9, 0, 7); ctx.fill();
+        ctx.strokeStyle = mine ? '#8fd3ff' : '#ff536a'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = armed ? (Math.floor(T / 400) % 2 ? '#ff3a3a' : '#661010') : '#888';
+        ctx.beginPath(); ctx.arc(m.x, m.y, 3, 0, 7); ctx.fill();
+        if (!mine) { ctx.strokeStyle = 'rgba(255,83,106,.5)'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(m.x, m.y, MINE_R, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+    }
+    function drawCrate(it, T, now) {
+        const fall = clamp((it.land - T) / ITEM_FALL, 0, 1), h = fall * 160, info = ITEMS[it.k];
+        ctx.fillStyle = `rgba(0,0,0,${0.15 + 0.25 * (1 - fall)})`;
+        ctx.beginPath(); ctx.ellipse(it.x + 3, it.y + 6, 18 * (1 - fall * 0.5), 10 * (1 - fall * 0.5), 0, 0, 7); ctx.fill();
+        const y = it.y - h - (fall ? 0 : 4 + 3 * Math.sin(now / 260 + it.id));
+        if (fall > 0) {                                        // parachute
+            ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(it.x - 12, y - 10); ctx.lineTo(it.x - 22, y - 44); ctx.moveTo(it.x + 12, y - 10); ctx.lineTo(it.x + 22, y - 44); ctx.stroke();
+            ctx.fillStyle = '#e8e2cf'; ctx.beginPath(); ctx.arc(it.x, y - 44, 26, Math.PI, 0); ctx.fill();
+        } else {
+            ctx.strokeStyle = info.color; ctx.globalAlpha = 0.4 + 0.3 * Math.sin(now / 200); ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(it.x, it.y, ITEM_R, 0, 7); ctx.stroke(); ctx.globalAlpha = 1;
+        }
+        ctx.fillStyle = '#7a5a2e'; ctx.fillRect(it.x - 14, y - 12, 28, 22);
+        ctx.strokeStyle = '#c99a52'; ctx.lineWidth = 2; ctx.strokeRect(it.x - 14, y - 12, 28, 22);
+        ctx.font = '15px system-ui'; ctx.textAlign = 'center'; ctx.fillText(info.icon, it.x, y + 4);
     }
     function drawRuin(o) {
         const hgt = 22;
@@ -701,7 +1013,7 @@
         if (Dn) {
             tanks = Dn.tanks.map((t, i) => {
                 if (myRole === 'host' || !disp[i] || !t.alive || dist(disp[i], t) > 150) disp[i] = { ...t };
-                else { const d = disp[i]; d.x += (t.x - d.x) * 0.35; d.y += (t.y - d.y) * 0.35; d.a = t.a; d.ta = t.ta; Object.assign(d, { hp: t.hp, alive: t.alive, reveal: t.reveal, respawnAt: t.respawnAt }); }
+                else { const d = disp[i], px = d.x, py = d.y; Object.assign(d, t); d.x = px + (t.x - px) * 0.35; d.y = py + (t.y - py) * 0.35; }
                 return disp[i];
             });
         }
@@ -710,7 +1022,8 @@
         const ox = clamp(me.x - vw / 2, -40, W - vw + 40), oy = clamp(me.y - vh / 2, -40, H - vh + 40);
         view = { ox, oy, s: scale, w: vw, h: vh };
 
-        if (Dn && me.alive) markExplored(me.x, me.y, SIGHT);
+        const inView = (x, y, m) => x > ox - m && x < ox + vw + m && y > oy - m && y < oy + vh + m;
+        if (Dn && me.alive) markExplored(me.x, me.y, stOf(me).sight);
         const myDrone = Dn && Dn.drones[myIdx];
         if (myDrone && myDrone.hover) markExplored(myDrone.x, myDrone.y, DRONE_R);
 
@@ -722,17 +1035,27 @@
         if (!groundCache) groundCache = buildGround();
         ctx.drawImage(groundCache, 0, 0, W, H);
 
+        if (Dn) for (const m of Dn.mines || []) if (inView(m.x, m.y, 40) && mineVisible(shown, myIdx, m)) drawMine(m, m.o === myIdx, T);
+        // aim guide: dashed line along the gun to its range (brighter while dragging the touch fire button)
+        if (Dn && me.alive) {
+            const st = stOf(me), ang = dragAim !== null ? dragAim : release ? release.ang : me.ta, rng2 = st.shot * st.life;
+            ctx.strokeStyle = dragAim !== null || release ? 'rgba(255,230,120,.75)' : prefs.autoFire ? 'rgba(255,224,102,.28)' : 'rgba(255,255,255,.16)';
+            ctx.lineWidth = dragAim !== null ? 3 : 2; ctx.setLineDash([12, 10]);
+            ctx.beginPath(); ctx.moveTo(me.x + Math.cos(ang) * 34, me.y + Math.sin(ang) * 34); ctx.lineTo(me.x + Math.cos(ang) * rng2, me.y + Math.sin(ang) * rng2); ctx.stroke();
+            ctx.setLineDash([]);
+            if (dragAim !== null) { ctx.fillStyle = 'rgba(255,230,120,.8)'; ctx.beginPath(); ctx.arc(me.x + Math.cos(ang) * rng2, me.y + Math.sin(ang) * rng2, 6, 0, 7); ctx.fill(); }
+        }
         // painter's order: ruins/rocks/tanks sorted by their bottom edge
         const items = [];
-        const inView = (x, y, m) => x > ox - m && x < ox + vw + m && y > oy - m && y < oy + vh + m;
         for (const o of map.ruins) if (inView(o.x + o.w / 2, o.y + o.h / 2, 260)) items.push({ y: o.y + o.h, draw: () => drawRuin(o) });
         for (const o of map.rocks) if (inView(o.x, o.y, 80)) items.push({ y: o.y + o.r, draw: () => drawRock(o) });
+        if (Dn) for (const it of Dn.items || []) if (inView(it.x, it.y, 200)) items.push({ y: it.y + 8, draw: () => drawCrate(it, T, now) });
         const enemyVisible = Dn ? visibleTo(shown, myIdx, tanks[1 - myIdx]) : false;
         if (Dn) {
             tanks.forEach((t, i) => {
                 if (!t.alive) return;
-                if (i === myIdx) items.push({ y: t.y + TANK_R, draw: () => drawTank(t, i, inForest(t.x, t.y) ? 0.85 : 1) });
-                else if (enemyVisible) items.push({ y: t.y + TANK_R, draw: () => drawTank(t, i, 1) });
+                if (i === myIdx) items.push({ y: t.y + TANK_R, draw: () => drawTank(t, i, inForest(t.x, t.y) || (stOf(t).camo && T - t.still > CAMO_T) ? 0.8 : 1, T) });
+                else if (enemyVisible) items.push({ y: t.y + TANK_R, draw: () => drawTank(t, i, 1, T) });
             });
         }
         items.sort((a, b) => a.y - b.y).forEach(it => it.draw());
@@ -741,14 +1064,14 @@
         for (const f of map.forests) if (inView(f.x, f.y, f.r + 40)) drawForest(f, Dn && me.alive && Math.hypot(me.x - f.x, me.y - f.y) < f.r + 10);
         // tank inside a forest stays readable under the canopy
         if (Dn && me.alive && inForest(me.x, me.y)) { ctx.strokeStyle = 'rgba(140,255,170,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(me.x, me.y, 30, 0, 7); ctx.stroke(); }
-        if (Dn && enemyVisible && inForest(tanks[1 - myIdx].x, tanks[1 - myIdx].y)) drawTank(tanks[1 - myIdx], 1 - myIdx, 0.75);
+        if (Dn && enemyVisible && inForest(tanks[1 - myIdx].x, tanks[1 - myIdx].y)) drawTank(tanks[1 - myIdx], 1 - myIdx, 0.75, T);
 
         // shells (only near what I can see) + effects
         if (Dn) {
             const ext = myRole === 'host' ? 0 : Math.min(80, performance.now() - netAt);
             for (const b of Dn.shots) {
                 const x = b.x + b.vx * ext, y = b.y + b.vy * ext;
-                if (b.o !== myIdx && Math.hypot(x - me.x, y - me.y) > SIGHT + 40 && !(myDrone && myDrone.hover && Math.hypot(x - myDrone.x, y - myDrone.y) < DRONE_R)) continue;
+                if (b.o !== myIdx && Math.hypot(x - me.x, y - me.y) > stOf(me).sight + 40 && !(myDrone && myDrone.hover && Math.hypot(x - myDrone.x, y - myDrone.y) < DRONE_R)) continue;
                 ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.arc(x + 4, y + 8, 4, 0, 7); ctx.fill();
                 ctx.strokeStyle = 'rgba(255,200,90,.45)'; ctx.lineWidth = 4;
                 ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - b.vx * 40, y - b.vy * 40); ctx.stroke();
@@ -758,20 +1081,28 @@
         }
         for (let k = fx.length - 1; k >= 0; k--) {
             const f = fx[k], age = now - f.t;
-            const life = { flash: 120, spark: 260, hit: 700, boom: 900 }[f.k];
+            const life = { flash: 120, spark: 260, hit: 700, boom: 900, blast: 450, pick: 800 }[f.k];
             if (age > life) { fx.splice(k, 1); continue; }
-            const p = age / life;
+            const p = Math.max(0, age / life);          // rAF time can trail performance.now()
             if (f.k === 'flash') { ctx.fillStyle = `rgba(255,220,120,${1 - p})`; ctx.beginPath(); ctx.arc(f.x, f.y, 34 * (1 - p) + 10, 0, 7); ctx.fill(); }
             if (f.k === 'spark') { ctx.strokeStyle = `rgba(255,210,120,${1 - p})`; ctx.lineWidth = 2; for (let a = 0; a < 6; a++) { ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x + Math.cos(a) * 18 * p + 2, f.y + Math.sin(a) * 18 * p + 2); ctx.stroke(); } }
             if (f.k === 'hit') {
                 ctx.fillStyle = `rgba(255,120,60,${0.8 * (1 - p)})`; ctx.beginPath(); ctx.arc(f.x, f.y, 14 + 26 * p, 0, 7); ctx.fill();
                 ctx.fillStyle = `rgba(255,255,255,${1 - p})`; ctx.font = 'bold 18px system-ui'; ctx.textAlign = 'center'; ctx.fillText('-' + f.dmg, f.x, f.y - 40 - 30 * p);
             }
+            if (f.k === 'blast') {
+                ctx.fillStyle = `rgba(255,150,60,${0.45 * (1 - p)})`; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (0.4 + 0.6 * p), 0, 7); ctx.fill();
+                ctx.strokeStyle = `rgba(255,230,160,${1 - p})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * p, 0, 7); ctx.stroke();
+            }
+            if (f.k === 'pick') {
+                ctx.strokeStyle = f.c; ctx.globalAlpha = 1 - p; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x, f.y, 20 + 40 * p, 0, 7); ctx.stroke();
+                ctx.font = '22px system-ui'; ctx.textAlign = 'center'; ctx.fillText(f.icon, f.x, f.y - 20 - 30 * p); ctx.globalAlpha = 1;
+            }
             if (f.k === 'boom') {
                 for (let r = 0; r < 3; r++) { ctx.fillStyle = `rgba(${255 - r * 40},${150 - r * 50},40,${(1 - p) * 0.7})`; ctx.beginPath(); ctx.arc(f.x + (r - 1) * 12 * p, f.y - r * 8 * p, (20 + 60 * p) * (1 - r * 0.2), 0, 7); ctx.fill(); }
             }
         }
-        if (Dn) Dn.drones.forEach((d, i) => { if (d && (i === myIdx || (me.alive && Math.hypot(d.x - me.x, d.y - me.y) < SIGHT + 120))) drawDrone(d, i === myIdx, now); });
+        if (Dn) Dn.drones.forEach((d, i) => { if (d && (i === myIdx || (me.alive && Math.hypot(d.x - me.x, d.y - me.y) < stOf(me).sight + 120))) drawDrone(d, i === myIdx, now); });
 
         // ---- fog (offscreen, then composited) ----
         if (Dn) {
@@ -791,7 +1122,7 @@
                 g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
                 fctx.fillStyle = g; fctx.beginPath(); fctx.arc(x, y, r, 0, 7); fctx.fill();
             };
-            if (me.alive) hole(me.x, me.y, SIGHT);
+            if (me.alive) hole(me.x, me.y, stOf(me).sight);
             if (myDrone && myDrone.hover) hole(myDrone.x, myDrone.y, DRONE_R);
             fctx.globalCompositeOperation = 'source-over';
             ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(fog, 0, 0, canvas.width, canvas.height); ctx.restore();
@@ -846,6 +1177,11 @@
         if ((enemyVisible || satLive) && foe.alive) {
             ctx.fillStyle = '#ff536a'; ctx.beginPath(); ctx.arc(mx + foe.x * k, my + foe.y * k, 3.5 + (satLive ? 2 * Math.sin(now / 90) : 0), 0, 7); ctx.fill();
         }
+        for (const it of Dn.items || []) {                 // crates are announced to everyone
+            ctx.fillStyle = ITEMS[it.k].color; ctx.globalAlpha = T < it.land ? 0.5 + 0.5 * Math.sin(now / 80) : 0.9;
+            ctx.fillRect(mx + it.x * k - 3, my + it.y * k - 3, 6, 6); ctx.globalAlpha = 1;
+        }
+        for (const m of Dn.mines || []) if (mineVisible({ ...Dn, tanks }, myIdx, m)) { ctx.fillStyle = m.o === myIdx ? '#8fd3ff' : '#ff536a'; ctx.fillRect(mx + m.x * k - 1.5, my + m.y * k - 1.5, 3, 3); }
         ctx.strokeStyle = '#2d6170'; ctx.strokeRect(mx - 2, my - 2, mw + 4, mh + 4);
 
         if (satLive && foe.alive) offscreenArrow(foe.x, foe.y, cw, ch, '#ff536a', '🛰️');
@@ -856,8 +1192,15 @@
         let ly = 22;
         const line = (t, c) => { ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillText(t, 13, ly + 1); ctx.fillStyle = c; ctx.fillText(t, 12, ly); ly += small ? 17 : 20; };
         if (me.alive) {
-            line(`${meT.hp} HP`, meT.hp > 50 ? '#7dff9a' : meT.hp > 25 ? '#ffd36a' : '#ff7070');
-            if (inForest(me.x, me.y)) line(T < meT.reveal ? '⚠ ' + L('spotted') : '🌲 ' + L('hidden'), T < meT.reveal ? '#ffb070' : '#8dffb0');
+            const mh2 = meT.maxHp || 100;
+            line(`${CLASSES[meT.cls]?.icon || ''} ${meT.hp}/${mh2} HP${meT.shield > 0 && T < meT.shieldTo ? ' 🛡️' + meT.shield : ''}`, meT.hp > mh2 / 2 ? '#7dff9a' : meT.hp > mh2 / 4 ? '#ffd36a' : '#ff7070');
+            const camoOn = stOf(meT).camo && T - meT.still > CAMO_T;
+            if (inForest(me.x, me.y) || camoOn) line(T < meT.reveal ? '⚠ ' + L('spotted') : (camoOn && !inForest(me.x, me.y) ? '🍃 ' : '🌲 ') + L('hidden'), T < meT.reveal ? '#ffb070' : '#8dffb0');
+            const buffs = [];
+            if (T < meT.rapidTo) buffs.push('⚡' + Math.ceil((meT.rapidTo - T) / 1000));
+            if (T < meT.speedTo) buffs.push('🚀' + Math.ceil((meT.speedTo - T) / 1000));
+            if (buffs.length) line(buffs.join('  '), '#ffe066');
+            if (prefs.autoFire) line('🎯 AUTO', '#ffe066');
         } else line(L('respawn', { s: Math.max(0, Math.ceil((meT.respawnAt - T) / 1000)) }), '#ff9a9a');
         if (myD && myD.hover) line('🛸 ' + L('drone_on'), '#6ef0ff');
         if (satLive) line('🛰️ ' + L('sat_on'), '#ff9db0');
@@ -866,10 +1209,13 @@
 
         // gadget cooldowns (desktop: bottom-left chips; touch: button fill)
         const cdD = clamp((meT.droneAt - T) / DRONE_CD, 0, 1), cdS = clamp((meT.satAt - T) / SAT_CD, 0, 1);
+        const fireCd = clamp((meT.cd || 0) / stOf(meT).cd, 0, 1);
         if (isTouch) {
-            for (const [id, p] of [['drone-btn', cdD], ['sat-btn', cdS]]) {
-                const b = $(id); b.querySelector('.cd').style.height = (p * 100) + '%'; b.classList.toggle('ready', p === 0);
+            for (const [id, p] of [['drone-btn', cdD], ['sat-btn', cdS], ['fire-btn', fireCd]]) {
+                const b = $(id); b.querySelector('.cd').style.height = (p * 100) + '%'; b.classList.toggle('ready', p === 0 && id !== 'fire-btn');
             }
+            $('mine-n').textContent = meT.mines;
+            $('mine-btn').classList.toggle('empty', !meT.mines);
         } else {
             const chip = (x, icon, key, p) => {
                 ctx.fillStyle = 'rgba(2,10,16,.8)'; ctx.fillRect(x, ch - 52, 118, 40);
@@ -879,6 +1225,10 @@
                 ctx.fillText(`${icon} [${key}] ${p ? Math.ceil(p * (key === 'Q' ? DRONE_CD : SAT_CD) / 1000) + 's' : 'OK'}`, x + 8, ch - 27);
             };
             chip(12, '🛸', 'Q', cdD); chip(138, '🛰️', 'E', cdS);
+            ctx.fillStyle = 'rgba(2,10,16,.8)'; ctx.fillRect(264, ch - 52, 90, 40);
+            ctx.strokeStyle = meT.mines ? '#ff7a7a' : '#355'; ctx.strokeRect(264, ch - 52, 90, 40);
+            ctx.fillStyle = meT.mines ? '#ffe0e0' : '#789'; ctx.fillText(`💣 [F] ×${meT.mines}`, 272, ch - 27);
+            ctx.fillStyle = 'rgba(255,170,80,.7)'; ctx.fillRect(12, ch - 58, 342 * (1 - fireCd), 3);
         }
         // banners
         ctx.textAlign = 'center';
@@ -920,6 +1270,29 @@
         visible: team => (S ? visibleTo(S, team, S.tanks[1 - team]) : false),
         place(i, x, y) { const t = S.tanks[i]; t.x = x; t.y = y; if (i === myIdx) disp[i] = null; },
         freezeBot(on) { bot.frozen = !!on; },
+        loadout(i, lo) {                               // swap a tank's loadout mid-match (tests)
+            loadouts[i] = validLo(lo);
+            if (i === myIdx) myLoadout = loadouts[i];
+            const t = S.tanks[i], keep = { x: t.x, y: t.y, a: t.a, ta: t.ta, qs: t.qs, es: t.es, ms: t.ms };
+            Object.assign(t, newTank(i, 0, loadouts[i]), keep);
+        },
+        items(on) { S.itemsOn = !!on; if (!on) S.items.length = 0; },
+        spawnItem(k, x, y) { S.items.push({ id: ++S.itemN, k, x, y, land: S.T }); },
+        mineVisible: (team, j) => mineVisible(S, team, S.mines[j]),
+        stats: i => stOf(S.tanks[i]),
+        los: (a, b) => losClear(a, b),
+        clearPair(x, y, d) {                           // two open spots `d` apart (east-west) with a clear line (tests)
+            for (let k = 0; k < 400; k++) {
+                const a = this.free(x + (k % 20) * 60 - 600, y + Math.floor(k / 20) * 60 - 600);
+                if (!a) continue;
+                const b = { x: a.x + d, y: a.y };
+                if (!blockedTank(b.x, b.y) && !inForest(b.x, b.y) && losClear(a, b)) return [a, b];
+            }
+            return null;
+        },
+        touchDrag(ang) { dragAim = ang; },
+        touchRelease() { if (dragAim !== null) release = { ang: dragAim, until: performance.now() + 650 + (S ? S.tanks[myIdx].cd : 0) }; dragAim = null; },
+        prefs,
         setInput(i, v) { overrides[i] = v; },
         explored: () => explored.reduce((a, b) => a + b, 0),
         free(x0, y0) {                                 // nearest open, forest-free spot (for tests)
