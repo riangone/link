@@ -116,7 +116,7 @@ test('disconnect while waiting leaves the queue; bad game rejected; names saniti
 
 test('all games listed in client/play/index.html are registered in Matchmaker.GAMES', async () => {
     const html = fs.readFileSync(path.join(__dirname, '../../client/play/index.html'), 'utf8');
-    const ids = [...html.matchAll(/\{\s*id:\s*'([a-z0-9]+)'/g)].map(m => m[1]);
+    const ids = [...html.matchAll(/\{\s*id:\s*'([a-z0-9_-]+)'/g)].map(m => m[1]);
     assert.ok(ids.length >= 20);
     for (const id of ids) {
         assert.ok(GAMES.includes(id), `Game "${id}" in client/play/index.html is missing from server/matchmaker.js GAMES`);

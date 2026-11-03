@@ -54,7 +54,7 @@
     }
 
     function gameFolder() {
-        var m = location.pathname.match(/\/([a-z]+)\/(?:index\.html)?$/);
+        var m = location.pathname.match(/\/([a-z0-9_-]+)\/(?:index\.html)?$/i);
         return m ? m[1] : '';
     }
     function randRoom() { return Math.random().toString(36).slice(2, 9); }

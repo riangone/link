@@ -1,0 +1,53 @@
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: #060d14; color: #e9f6ff; font: 15px system-ui, sans-serif; overflow: hidden; overscroll-behavior: none; }
+main {
+    height: 100dvh; max-width: 1280px; margin: auto; display: flex; flex-direction: column; gap: 6px;
+    padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+}
+header { flex: none; height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.logo { color: #70e8ff; letter-spacing: 2px; white-space: nowrap; }
+.logo span { color: #3c8796; }
+.score { font: 800 20px/1 ui-monospace, monospace; color: #fff; letter-spacing: 3px; }
+select { background: #102d38; color: #dff; border: 1px solid #3ac6d8; border-radius: 8px; padding: 5px; }
+
+.field { position: relative; flex: 1; min-height: 0; border: 1px solid #1d5260; border-radius: 12px; overflow: hidden; background: #0b1512; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+
+.overlay { position: absolute; inset: 0; background: rgba(4, 12, 20, .86); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; text-align: center; z-index: 5; }
+.overlay.hidden, .hidden { display: none !important; }
+.card { max-width: 460px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+h1 { margin: 0; color: #8ef4ff; text-shadow: 0 0 24px #17b9d4; font-size: clamp(24px, 6vw, 36px); }
+h2 { margin: 0; font-size: 18px; color: #cdf; }
+p { margin: 0; }
+.muted { color: #86aab3; font-size: 13px; }
+button { border: 1px solid #3ac6d8; background: #102d38; color: #e8fcff; border-radius: 12px; padding: 10px 16px; font-weight: 700; font-size: 15px; cursor: pointer; }
+button.primary { background: linear-gradient(#1aa6c0, #0d6577); font-size: 18px; padding: 12px 34px; box-shadow: 0 0 20px #17b9d455; }
+button:disabled { opacity: .55; }
+.invite { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #86aab3; width: 100%; }
+.invite .row { display: flex; gap: 6px; }
+.invite input { flex: 1; min-width: 0; background: #0a1c24; color: #cfe; border: 1px solid #245; border-radius: 8px; padding: 8px; }
+.back { color: #8ef4ff; font-size: 13px; }
+
+/* touch controls overlay the bottom of the field */
+.touch { position: absolute; left: 0; right: 0; bottom: 0; height: 170px; display: none; pointer-events: none; z-index: 3; }
+body.is-touch .touch { display: block; }
+.stick { position: absolute; left: 14px; bottom: 14px; width: 140px; height: 140px; border-radius: 50%; border: 2px solid #3ac6d855; background: #0a243055; pointer-events: auto; touch-action: none; }
+.stick span { position: absolute; left: 0; right: 0; top: -18px; text-align: center; font-size: 11px; color: #7ab; }
+.knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: #3ac6d8aa; box-shadow: 0 0 14px #3ac6d8; }
+.acts { position: absolute; right: 12px; bottom: 12px; display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; gap: 8px; pointer-events: auto; }
+.act { position: relative; width: 70px; height: 70px; border-radius: 50%; padding: 0; font-size: 24px; line-height: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0f2c37cc; touch-action: none; overflow: hidden; }
+.act small { font-size: 10px; font-weight: 600; margin-top: 2px; }
+.act.fire { grid-column: 2; grid-row: 1 / span 2; width: 88px; height: 88px; align-self: end; background: #5a1f14cc; border-color: #ff9a52; font-size: 30px; }
+.act .cd { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: #000a; pointer-events: none; }
+.act.ready { box-shadow: 0 0 14px #5ef0ff; }
+
+.help { flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 14px; color: #86aab3; font-size: 12px; }
+.status { flex: none; text-align: center; color: #4f7480; font-size: 11px; }
+body.is-touch .help, body.is-touch .status { display: none; }
+@media (max-width: 640px) {
+    header { height: 30px; }
+    .score { font-size: 17px; }
+    .logo span { display: none; }
+    .field { border-radius: 8px; }
+}
