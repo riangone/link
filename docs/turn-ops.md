@@ -27,7 +27,16 @@
 
 **这些限制才是主要防线，换密钥不是。** 任何连上信令的人都会拿到有效期 24 小时的 TURN 凭证，所以要假设陌生人总能用上 TURN。
 
-**已知遗留问题：** coturn 总是放行自己的中继地址，`denied-peer-ip` 对 `10.0.0.202` 无效，UDP 中继仍能访问本机监听在这个地址上的 UDP 服务（目前是 rpcbind、avahi 和 coturn 自身）。TCP 已由 `no-tcp-relay` 挡住。彻底修复要加防火墙规则：
-`iptables -I OUTPUT -m owner --uid-owner turnserver -d 10.0.0.202 -j REJECT`
+**本机 UDP 服务：** coturn 总是放行自己的中继地址，`denied-peer-ip` 对 `10.0.0.202` 无效，所以用防火墙挡住（已写入 `/etc/iptables/rules.v4`）：
+
+```
+iptables -I OUTPUT -p udp -m owner --uid-owner turnserver -d 10.0.0.202 ! --dport 49152:65535 -j REJECT
+```
+
+**不要去掉 `! --dport` 这部分。** coturn 把发往自己公网地址的流量转给 `10.0.0.202`，两端都走中继时要经过这里。挡住全部端口后，这种连接会断（2026-11-06 实测）。
+
+- **遗留问题：** 放行范围内的本机 UDP 服务仍可被访问，目前是 avahi 的随机高位端口。
+- **保存规则：** 不要用 `netfilter-persistent save`，它会把 fail2ban 和 Docker 的动态规则也写进文件。要改就手动编辑这一行。
+- **本机测试：** 从本机连 TURN 时，不要用 `10.0.0.202` 或 `127.0.0.1` 作源地址。前者的回包会被这条规则挡住，后者的中继会落在环回地址上，测试结果不可信。可以绑定 `172.17.0.1` 连接 `10.0.0.202:3478`。
 
 会话日志在 `/var/log/turnserver/turnserver.log`，含客户端 IP 和 TURN 用户名，由 `/etc/logrotate.d/coturn` 轮转，保留 7 天。
