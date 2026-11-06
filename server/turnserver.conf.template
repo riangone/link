@@ -2,10 +2,24 @@
 listening-port=3478
 fingerprint
 use-auth-secret
-static-auth-secret=snapdrop-static-auth-secret-12345
+static-auth-secret=CHANGE_ME  # openssl rand -hex 32; same value in /etc/link/turn-secret
 realm=link.0101.click
-total-quota=0
-bps-capacity=0
+# Limits. max-bps and bps-capacity are in BYTES per second.
+total-quota=200
+max-bps=250000
+bps-capacity=12500000
+# A TURN relay must never reach the host's own network or cloud metadata.
+no-multicast-peers
+# Browsers only use UDP relays; a TCP relay would reach TCP services on this host.
+no-tcp-relay
+denied-peer-ip=0.0.0.0-0.255.255.255
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=100.64.0.0-100.127.255.255
+denied-peer-ip=169.254.0.0-169.254.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
 stale-nonce=600
 log-file=/var/log/turnserver/turnserver.log
 simple-log
+# Session logs contain client IPs: rotate them and keep them short.
+verbose

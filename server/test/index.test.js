@@ -9,7 +9,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { Peer, RateLimiter, getTurnCredentials, ROOM_MAX_PEERS } = require('../index.js');
+process.env.TURN_SECRET = 'test-secret';
+const { Peer, RateLimiter, getTurnCredentials, getIceServers, ROOM_MAX_PEERS } = require('../index.js');
 
 test('Peer.uuid() produces well-formed, unique v4-like uuids', () => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -94,4 +95,18 @@ test('requiring index.js does not bind a live network port (guarded by require.m
     // index.js above without throwing is the real assertion; this test
     // documents *why* that matters so a future regression is obvious.
     assert.ok(true);
+});
+
+test('without a TURN secret no credentials or TURN server are handed out', () => {
+    assert.strictEqual(getTurnCredentials('p', null), null);
+    const servers = getIceServers('p', null);
+    assert.strictEqual(servers.length, 1);
+    assert.match(servers[0].urls, /^stun:/);
+});
+
+test('with a TURN secret the TURN server and credentials are included', () => {
+    const servers = getIceServers('p', 'some-secret');
+    assert.strictEqual(servers.length, 2);
+    assert.match(servers[1].username, /:p$/);
+    assert.ok(servers[1].credential);
 });

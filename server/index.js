@@ -22,6 +22,7 @@ const crypto = require('crypto');
 const { Matchmaker } = require('./matchmaker');
 const { Leaderboard } = require('./leaderboard');
 const path = require('path');
+const fs = require('fs');
 
 // Leaderboard storage. LEADERBOARD_FILE='' forces memory-only. When this
 // file is require()d (unit / e2e tests) and nothing is configured, the board
@@ -30,7 +31,26 @@ const LEADERBOARD_FILE = process.env.LEADERBOARD_FILE !== undefined
     ? (process.env.LEADERBOARD_FILE || null)
     : (require.main === module ? path.join(__dirname, 'data', 'leaderboard.json') : null);
 
-const TURN_SECRET = process.env.TURN_SECRET || 'snapdrop-static-auth-secret-12345';
+// Kept out of the repo and out of the PM2 dump: anyone holding this secret can
+// mint TURN credentials. Without one we hand out no TURN server at all, and
+// peers fall back to STUN + the WebSocket relay. Tests don't touch the real file.
+const TURN_SECRET_FILE = process.env.TURN_SECRET_FILE
+    || (require.main === module ? '/etc/link/turn-secret' : null);
+
+function loadTurnSecret() {
+    if (process.env.TURN_SECRET) return process.env.TURN_SECRET;
+    if (!TURN_SECRET_FILE) return null;
+    try {
+        return fs.readFileSync(TURN_SECRET_FILE, 'utf8').trim() || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+const TURN_SECRET = loadTurnSecret();
+if (!TURN_SECRET && require.main === module) {
+    console.warn(`TURN disabled: set TURN_SECRET or create ${TURN_SECRET_FILE}. Peers will use STUN + WebSocket relay only.`);
+}
 const TURN_URLS = [
     'turn:link.0101.click:3478?transport=udp',
     'turn:link.0101.click:3478?transport=tcp'
@@ -70,18 +90,32 @@ const PUBLIC_DEVICES_MAX = parseInt(process.env.PUBLIC_DEVICES_MAX || '200', 10)
  * coturn `use-auth-secret` HMAC scheme, so credentials cannot be
  * replayed indefinitely if leaked.
  * @param {string} username - stable identifier to embed in the TURN username (e.g. peer id)
- * @returns {{username: string, password: string}} ephemeral TURN credential pair
+ * @param {string|null} [secret] - coturn static-auth-secret
+ * @returns {{username: string, password: string}|null} ephemeral TURN credential pair, null without a secret
  */
-function getTurnCredentials(username) {
+function getTurnCredentials(username, secret = TURN_SECRET) {
+    if (!secret) return null;
     const unixTimestamp = parseInt(Date.now() / 1000) + 24 * 3600; // 24 hours validity
     const turnUsername = [unixTimestamp, username].join(':');
-    const hmac = crypto.createHmac('sha1', TURN_SECRET);
+    const hmac = crypto.createHmac('sha1', secret);
     hmac.update(turnUsername);
     const password = hmac.digest('base64');
     return {
         username: turnUsername,
         password: password
     };
+}
+
+/**
+ * @param {string} peerId
+ * @param {string|null} [secret] - coturn static-auth-secret
+ * @returns {object[]} RTCPeerConnection iceServers, STUN only without a secret
+ */
+function getIceServers(peerId, secret = TURN_SECRET) {
+    const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
+    const creds = getTurnCredentials(peerId, secret);
+    if (creds) iceServers.push({ urls: TURN_URLS, username: creds.username, credential: creds.password });
+    return iceServers;
 }
 
 /**
@@ -204,18 +238,7 @@ class SnapdropServer {
         });
 
         // send turn-config with dynamically generated credentials
-        const creds = getTurnCredentials(peer.id);
-        this._send(peer, {
-            type: 'turn-config',
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                {
-                    urls: TURN_URLS,
-                    username: creds.username,
-                    credential: creds.password
-                }
-            ]
-        });
+        this._send(peer, { type: 'turn-config', iceServers: getIceServers(peer.id) });
     }
 
     _onHeaders(headers, response) {
@@ -676,4 +699,4 @@ if (require.main === module) {
     new SnapdropServer(process.env.PORT || 3000);
 }
 
-module.exports = { SnapdropServer, Peer, RateLimiter, getTurnCredentials, ROOM_MAX_PEERS, RATE_LIMIT_MAX_MESSAGES, RATE_LIMIT_WINDOW_MS, PUBLIC_DEVICES_MAX };
+module.exports = { SnapdropServer, Peer, RateLimiter, getTurnCredentials, getIceServers, ROOM_MAX_PEERS, RATE_LIMIT_MAX_MESSAGES, RATE_LIMIT_WINDOW_MS, PUBLIC_DEVICES_MAX };
