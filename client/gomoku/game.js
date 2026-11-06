@@ -196,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateHud();
 
             if (gameState.status === 'playing') {
+                session.roundStart();
                 overlay.classList.add('hidden');
                 restartBtn.textContent = 'NEXT ROUND';
                 restartBtn.disabled = false;
@@ -335,6 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const starter = (totalGames % 2 === 0) ? 1 : 2;
         gameState = createInitialState(gameState.score, starter);
         gameState.status = 'playing';
+        session.roundStart();
         overlay.classList.add('hidden');
         restartBtn.textContent = 'NEXT ROUND';
         restartBtn.disabled = false;
@@ -382,6 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showGameOver() {
+        session.roundEnd();
         clearInterval(clockInterval);
         setTimeout(() => {
             if (gameState.status !== 'gameover') return;
@@ -529,6 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     restartBtn.addEventListener('click', () => {
+        session.rematch();
         if (myRole === 'host') {
             startNewMatch();
         } else {

@@ -28,9 +28,13 @@ const NAME_MAX = 16;
 const CODE_TTL_MS = 30 * 60 * 1000;
 
 class Matchmaker {
-    /** @param {(peer, msg) => void} send */
-    constructor(send) {
+    /**
+     * @param {(peer, msg) => void} send
+     * @param {import('./metrics').Metrics} [metrics]
+     */
+    constructor(send, metrics = null) {
         this._send = send;
+        this._metrics = metrics;
         this._quick = new Map();   // game -> peer waiting for a random opponent
         this._codes = new Map();   // code -> { peer, game, ts }
         this._waitingOf = new Map(); // peer -> { quick?: game, code?: string }
@@ -44,11 +48,12 @@ class Matchmaker {
         switch (msg && msg.type) {
             case 'lobby-subscribe':
                 this._subscribers.add(peer);
+                if (this._metrics) this._metrics.lobbyOpen();
                 this._broadcast();
                 return true;
             case 'match-join':
                 peer.lobbyName = Matchmaker._cleanName(msg.name) || (peer.name && peer.name.displayName) || '?';
-                if (typeof msg.code === 'string') this._joinCode(peer, msg.code);
+                if (typeof msg.code === 'string') this._joinCode(peer, msg.code, msg.via);
                 else this._joinQuick(peer, msg.game);
                 return true;
             case 'match-create':
@@ -56,6 +61,7 @@ class Matchmaker {
                 this._create(peer, msg.game);
                 return true;
             case 'match-leave':
+                this._trackLeave(peer, msg.reason === 'bot' ? 'bot' : 'cancel');
                 this._unqueue(peer);
                 this._broadcast();
                 return true;
@@ -67,6 +73,7 @@ class Matchmaker {
     /** Called when a peer disconnects. */
     remove(peer) {
         const wasSub = this._subscribers.delete(peer);
+        this._trackLeave(peer, 'disconnect');
         if (this._unqueue(peer) || wasSub) this._broadcast();
     }
 
@@ -75,15 +82,18 @@ class Matchmaker {
         this._unqueue(peer);
         const other = this._quick.get(game);
         if (other && other !== peer) {
+            const since = this._waitingOf.get(other).ts;
             this._unqueue(other);
-            this._pair(other, peer, game);
+            this._pair(other, peer, game, { source: 'quick', since });
         } else {
             // public queue + a private code at the same time: whichever
             // comes first (a stranger or the friend you sent the code to) wins
             const code = this._newCode();
+            const ts = Date.now();
             this._quick.set(game, peer);
-            if (code) this._codes.set(code, { peer, game, ts: Date.now() });
-            this._waitingOf.set(peer, { quick: game, code });
+            if (code) this._codes.set(code, { peer, game, ts });
+            this._waitingOf.set(peer, { quick: game, code, game, ts });
+            if (this._metrics) this._metrics.queueJoin(game, 'quick');
             this._send(peer, { type: 'match-waiting', game, code, public: true });
         }
         this._broadcast();
@@ -95,8 +105,10 @@ class Matchmaker {
         this._unqueue(peer);
         const code = this._newCode();
         if (!code) return this._send(peer, { type: 'match-error', reason: 'busy' });
-        this._codes.set(code, { peer, game, ts: Date.now() });
-        this._waitingOf.set(peer, { code });
+        const ts = Date.now();
+        this._codes.set(code, { peer, game, ts });
+        this._waitingOf.set(peer, { code, game, ts });
+        if (this._metrics) this._metrics.queueJoin(game, 'private');
         this._send(peer, { type: 'match-waiting', game, code, public: false });
         this._broadcast();
     }
@@ -110,20 +122,34 @@ class Matchmaker {
         return null;
     }
 
-    _joinCode(peer, code) {
+    _joinCode(peer, code, via) {
         this._expireCodes();
         const entry = CODE_RE.test(code) && this._codes.get(code);
-        if (!entry || entry.peer === peer) return this._send(peer, { type: 'match-error', reason: 'no-code' });
+        if (!entry || entry.peer === peer) {
+            if (this._metrics) this._metrics.codeJoin(via, 'no_code');
+            return this._send(peer, { type: 'match-error', reason: 'no-code' });
+        }
+        if (this._metrics) this._metrics.codeJoin(via, 'ok');
         this._unqueue(peer);
         this._unqueue(entry.peer);
-        this._pair(entry.peer, peer, entry.game);
+        this._pair(entry.peer, peer, entry.game, { source: 'code', via, since: entry.ts });
         this._broadcast();
     }
 
-    _pair(a, b, game) {
+    _pair(a, b, game, { source, via, since }) {
         const roomId = crypto.randomBytes(6).toString('hex');
+        if (this._metrics) this._metrics.matchFound(roomId, { game, source, via, waitMs: Date.now() - since });
         this._send(a, { type: 'match-found', game, roomId, opponent: b.lobbyName });
         this._send(b, { type: 'match-found', game, roomId, opponent: a.lobbyName });
+    }
+
+    /**
+     * Only for peers really giving up. Not part of _unqueue, which also runs
+     * when a peer gets paired or switches queue.
+     */
+    _trackLeave(peer, reason) {
+        const w = this._waitingOf.get(peer);
+        if (w && this._metrics) this._metrics.queueLeave(w.game, reason, Date.now() - w.ts);
     }
 
     _unqueue(peer) {
@@ -139,6 +165,7 @@ class Matchmaker {
         const now = Date.now();
         for (const [code, e] of this._codes) {
             if (now - e.ts > CODE_TTL_MS) {
+                this._trackLeave(e.peer, 'expired');
                 this._unqueue(e.peer);
                 this._send(e.peer, { type: 'match-error', reason: 'expired' });
             }

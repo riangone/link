@@ -445,6 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
             buf: [1, FLOOR ? FLOOR.buff : 1]
         };
         resetMatchStats();
+        session.roundStart();
         if (MODE === 'tutorial') Tut.start();
         if (GameBot.enabled) bot.lockTarget = null;
         startRound();
@@ -1162,6 +1163,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateScoreDom(msg.sc);
             if (msg.ph === 'gameover') { if (!gameoverShown) showGameOver(msg.sc); }
             else {
+                session.roundStart();
                 gameoverShown = false;
                 awaitingRestart = false;
                 if (!overlay.classList.contains('hidden')) hideOverlay();
@@ -1192,6 +1194,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateScoreDom(sc) { p1ScoreVal.textContent = sc[0]; p2ScoreVal.textContent = sc[1]; }
 
     function showGameOver(sc) {
+        session.roundEnd();
         gameoverShown = true;
         if (myRole === 'host') clearInterval(hostLoop);
         showScreen(gameoverScreen);
@@ -1223,6 +1226,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (myRole === 'host' && (!S || S.ph === 'gameover')) { picks[0] = myCfg(); startMatch(); }
     });
     restartBtn.addEventListener('click', () => {
+        session.rematch();
         Sfx.init();
         if (myRole === 'host') { picks[0] = myCfg(); startMatch(); }
         else {

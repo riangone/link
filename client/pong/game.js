@@ -279,6 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 p2ScoreVal.textContent = gameState.score.p2;
 
                 if (gameState.status === 'playing') {
+                    session.roundStart();
                     overlay.classList.add('hidden');
                 } else if (gameState.status === 'gameover') {
                     showGameOver();
@@ -318,6 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 重新开始游戏 (Host 触发或 Client 发送重试请求)
     restartBtn.addEventListener('click', () => {
+        session.rematch();
         if (myRole === 'host') {
             initGame();
             sendGameData({ type: 'start' });
@@ -335,6 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.score.p2 = 0;
         gameState.status = 'playing';
         gameState.winner = 0;
+        session.roundStart();
 
         p1ScoreVal.textContent = '0';
         p2ScoreVal.textContent = '0';
@@ -615,6 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 展示对局结束画面
     function showGameOver() {
+        session.roundEnd();
         clearInterval(gameLoopInterval);
         clearInterval(netSendInterval);
 

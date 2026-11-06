@@ -84,6 +84,8 @@ class GameSession {
         this._relayStalled = false;
         this._connectTimeoutTimer = null;
         this._destroyed = false;
+        this._netReported = false;
+        this._roundAt = 0;
 
         this._connectSignaling();
     }
@@ -103,7 +105,10 @@ class GameSession {
         const ws = new WebSocket(wsUrl);
         this.ws = ws;
 
-        ws.onopen = () => this.onSignalingStatus('open');
+        ws.onopen = () => {
+            this._sendVisit();
+            this.onSignalingStatus('open');
+        };
         ws.onclose = () => {
             this.onSignalingStatus('closed');
             if (!this._destroyed) setTimeout(() => this._connectSignaling(), 3000);
@@ -181,6 +186,7 @@ class GameSession {
                     if (!this._fallbackConfirmed) {
                         // first proof the opponent is really there
                         this._fallbackConfirmed = true;
+                        this._reportNet('ws');
                         this.onChannelOpen();
                         this.onPeerConnected();
                     } else if (this._relayStalled) {
@@ -306,6 +312,7 @@ class GameSession {
                     clearTimeout(this.reconnectGraceTimer);
                     this.reconnectGraceTimer = null;
                 }
+                this._reportDirectOrTurn(pc);
                 this.onPeerConnected();
                 this._startLatencyCheck();
             } else if (pc.connectionState === 'failed') {
@@ -470,6 +477,92 @@ class GameSession {
         } else if (this.usingWsFallback && this.opponentId) {
             this._sendSignaling({ type: 'game-relay', to: this.opponentId, payload: obj });
         }
+    }
+
+    // --- Anonymous aggregate metrics (docs/analytics-events.md) ---------------
+
+    /**
+     * Call when a round starts. Harmless to repeat while it's running, so a
+     * client can call it for every 'playing' state it receives.
+     */
+    roundStart() {
+        if (!this._roundAt) this._roundAt = Date.now();
+    }
+
+    /** Call when a round's result shows. Reports once per roundStart(). */
+    roundEnd() {
+        if (!this._roundAt) return;
+        const sec = Math.round((Date.now() - this._roundAt) / 1000);
+        this._roundAt = 0;
+        this._metric('match_end', { sec });
+    }
+
+    /** Call when the player asks for another round. */
+    rematch() {
+        this._metric('rematch');
+    }
+
+    _metric(ev, dims) {
+        this._sendSignaling(Object.assign({ type: 'metric', ev, game: this.gameFolder }, dims));
+    }
+
+    _sendVisit() {
+        const msg = GameSession.visitMetric();
+        if (msg) this._sendSignaling(msg);
+    }
+
+    _reportNet(kind) {
+        if (this._netReported) return;
+        this._netReported = true;
+        this._metric('net_result', { kind });
+    }
+
+    _reportDirectOrTurn(pc) {
+        if (this._netReported) return;
+        pc.getStats().then((stats) => {
+            this._reportNet(GameSession._connectionKind(stats));
+        }).catch(() => this._reportNet('unknown'));
+    }
+
+    /** @param {RTCStatsReport} stats  @returns {'direct'|'turn'|'unknown'} */
+    static _connectionKind(stats) {
+        let pair = null;
+        stats.forEach((r) => {
+            if (r.type === 'transport' && r.selectedCandidatePairId) pair = stats.get(r.selectedCandidatePairId);
+        });
+        // Firefox has no transport.selectedCandidatePairId
+        if (!pair) stats.forEach((r) => { if (r.type === 'candidate-pair' && r.selected) pair = r; });
+        const local = pair && stats.get(pair.localCandidateId);
+        const remote = pair && stats.get(pair.remoteCandidateId);
+        if (!local || !remote) return 'unknown';
+        return local.candidateType === 'relay' || remote.candidateType === 'relay' ? 'turn' : 'direct';
+    }
+
+    /**
+     * The weekly retention ping: `{cohort, week}` the first time per calendar
+     * week, otherwise null. Needs no user id: the browser remembers its own
+     * first-visit week and the server only adds up cohort x week counts.
+     */
+    static visitMetric() {
+        try {
+            const week = Math.floor((Date.now() + 3 * 86400000) / (7 * 86400000)); // Monday-based week index
+            const key = 'link-metric-visit';
+            const seen = JSON.parse(localStorage.getItem(key) || 'null') || { first: week, last: -1 };
+            if (seen.last === week) return null;
+            localStorage.setItem(key, JSON.stringify({ first: seen.first, last: week }));
+            return { type: 'metric', ev: 'visit', cohort: GameSession._isoWeek(seen.first), week: week - seen.first };
+        } catch (e) {
+            return null; // storage blocked: skip rather than count a new user every time
+        }
+    }
+
+    /** @param {number} week - Monday-based week index  @returns {string} e.g. '2026-W45' */
+    static _isoWeek(week) {
+        // day 0 (1970-01-01) is a Thursday, so index * 7 days is that week's Thursday
+        const thursday = new Date(week * 7 * 86400000);
+        const year = thursday.getUTCFullYear();
+        const dayOfYear = Math.floor((thursday - Date.UTC(year, 0, 1)) / 86400000);
+        return `${year}-W${String(Math.floor(dayOfYear / 7) + 1).padStart(2, '0')}`;
     }
 
     /** Is the current opponent connection actually carrying traffic? */

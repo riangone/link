@@ -94,6 +94,10 @@
     }
     LocalSession.prototype.send = function () {};
     LocalSession.prototype.destroy = function () {};
+    // bot games are not matches: same no-op surface as GameSession's metrics
+    LocalSession.prototype.roundStart = function () {};
+    LocalSession.prototype.roundEnd = function () {};
+    LocalSession.prototype.rematch = function () {};
     Object.defineProperty(LocalSession.prototype, 'isHost', { get: function () { return true; } });
 
     var current = null;

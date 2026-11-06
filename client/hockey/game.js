@@ -275,6 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 p2ScoreVal.textContent = gameState.score.p2;
 
                 if (gameState.status === 'playing') {
+                    session.roundStart();
                     overlay.classList.add('hidden');
                 } else if (gameState.status === 'gameover') {
                     showGameOver();
@@ -319,6 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     restartBtn.addEventListener('click', () => {
+        session.rematch();
         if (myRole === 'host') {
             initGame();
             sendGameData({ type: 'start', score: gameState.score });
@@ -332,6 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function initGame() {
         gameState = createInitialState({ p1: 0, p2: 0 });
         gameState.status = 'playing';
+        session.roundStart();
         puckTrail = [];
 
         p1ScoreVal.textContent = '0';
@@ -776,6 +779,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showGameOver() {
+        session.roundEnd();
         clearInterval(gameLoopInterval);
         clearInterval(netSendInterval);
 

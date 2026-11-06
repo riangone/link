@@ -87,6 +87,7 @@ body.bot .g .bt{display:block}
 <div id="ov"><div class="box" id="box"></div></div>
 <div id="toast"></div>
 
+<script src="../scripts/game-session.js"></script>
 <script>
 (function () {
 'use strict';
@@ -158,7 +159,8 @@ document.querySelectorAll('#lv button').forEach(function (b) {
   b.onclick = function () { botLevel = b.dataset.lv; localStorage.setItem('lobby-bot-level', botLevel); renderMode(); };
 });
 renderMode();
-function playBot(game) {
+function playBot(game, from) {
+  send({ type: 'metric', ev: 'bot_start', game: game, from: from || 'lobby' });
   var url = new URL('../' + game + '/', location.href);
   url.searchParams.set('bot', botLevel);
   url.hash = 'bot-' + Math.random().toString(36).slice(2, 9);
@@ -203,16 +205,17 @@ function showWaiting() {
   var of = document.getElementById('of');
   if (of) of.onclick = function () { send({ type: 'match-create', game: state.game, name: name }); };
   document.getElementById('cx').onclick = cancel;
-  document.getElementById('vb').onclick = function () { var g = state.game; send({ type: 'match-leave' }); state = null; playBot(g); };
+  document.getElementById('vb').onclick = function () { var g = state.game; send({ type: 'match-leave', reason: 'bot' }); state = null; playBot(g, 'waiting'); };
 }
 function share() {
   var url = inviteUrl(state.code), text = t('share_text', { game: t(state.game), code: state.code });
+  send({ type: 'metric', ev: 'share_click', game: state.game, method: navigator.share ? 'native' : 'copy' });
   if (navigator.share) { navigator.share({ title: t('title'), text: text, url: url }).catch(function () {}); return; }
   (navigator.clipboard ? navigator.clipboard.writeText(text + ' ' + url) : Promise.reject()).then(function () { toast(t('copied')); }, function () { prompt('', url); });
 }
 function cancel() { send({ type: 'match-leave' }); state = null; ov.classList.remove('on'); if (/^#\d{4}$/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search); }
 function quick(game) { if (!state) send({ type: 'match-join', game: game, name: name }); }
-function joinCode(code) { send({ type: 'match-join', code: code, name: name }); }
+function joinCode(code, via) { send({ type: 'match-join', code: code, name: name, via: via || 'manual' }); }
 
 document.getElementById('cf').onsubmit = function (e) {
   e.preventDefault();
@@ -230,6 +233,8 @@ function connect() {
   ws.onopen = function () {
     retry = 0;
     ws.send(JSON.stringify({ type: 'lobby-subscribe' }));
+    var visit = window.GameSession && GameSession.visitMetric();
+    if (visit) ws.send(JSON.stringify(visit));
     while (queue.length) ws.send(JSON.stringify(queue.shift()));
   };
   ws.onmessage = function (ev) {
@@ -275,7 +280,7 @@ function found(m) {
 
 // opened from a shared invite link: /play/#1234
 var hc = location.hash.match(/^#(\d{4})$/);
-if (hc) { joinCode(hc[1]); history.replaceState(null, '', location.pathname + location.search); }
+if (hc) { joinCode(hc[1], 'link'); history.replaceState(null, '', location.pathname + location.search); }
 // one-tap entry from 0101.click: /play/?g=gomoku starts quick match right away
 else if (qs.get('g') && GAMES.some(function (g) { return g.id === qs.get('g'); })) {
   quick(qs.get('g'));

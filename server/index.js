@@ -21,6 +21,7 @@ const url = require('url');
 const crypto = require('crypto');
 const { Matchmaker } = require('./matchmaker');
 const { Leaderboard } = require('./leaderboard');
+const { Metrics } = require('./metrics');
 const path = require('path');
 const fs = require('fs');
 
@@ -30,6 +31,11 @@ const fs = require('fs');
 const LEADERBOARD_FILE = process.env.LEADERBOARD_FILE !== undefined
     ? (process.env.LEADERBOARD_FILE || null)
     : (require.main === module ? path.join(__dirname, 'data', 'leaderboard.json') : null);
+
+// Same convention for the aggregate metrics (see metrics.js).
+const METRICS_FILE = process.env.METRICS_FILE !== undefined
+    ? (process.env.METRICS_FILE || null)
+    : (require.main === module ? path.join(__dirname, 'data', 'metrics.json') : null);
 
 // Kept out of the repo and out of the PM2 dump: anyone holding this secret can
 // mint TURN credentials. Without one we hand out no TURN server at all, and
@@ -175,7 +181,9 @@ class SnapdropServer {
             : new WebSocket.Server({ port: port, maxPayload: WS_MAX_PAYLOAD_BYTES });
         this._wss.on('connection', (socket, request) => this._onConnection(new Peer(socket, request)));
         // 对战大厅 matchmaking (see matchmaker.js)
-        this._matchmaker = new Matchmaker((peer, msg) => this._send(peer, msg));
+        this._metrics = new Metrics(Matchmaker.GAMES, METRICS_FILE);
+        onExit.push(() => this._metrics.flush());
+        this._matchmaker = new Matchmaker((peer, msg) => this._send(peer, msg), this._metrics);
         this._wss.on('headers', (headers, response) => this._onHeaders(headers, response));
         // per-game score tables (see leaderboard.js)
         this._leaderboard = new Leaderboard(Matchmaker.GAMES, LEADERBOARD_FILE);
@@ -277,6 +285,8 @@ class SnapdropServer {
 
         if (this._matchmaker.handle(sender, message)) return;
         if (this._leaderboard.handle(sender, message, (p, m) => this._send(p, m))) return;
+        const room = this._rooms[sender.ip];
+        if (this._metrics.handle(sender, message, room ? Object.keys(room).length : 0)) return;
 
         switch (message.type) {
             case 'disconnect':
@@ -448,6 +458,7 @@ class SnapdropServer {
         // add peer to room
         this._rooms[peer.ip][peer.id] = peer;
         this._peersById[peer.id] = peer;
+        this._metrics.peerJoined(peer.ip, Object.keys(this._rooms[peer.ip]).length);
         return true;
     }
 

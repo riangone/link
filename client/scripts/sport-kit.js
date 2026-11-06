@@ -353,7 +353,7 @@
         // a live phase; a reconnecting peer must still be able to start anew.
         let peerLost = false;
         const canStart = () => o.hostOver() || peerLost;
-        const hostStart = () => { peerLost = false; o.startMatch(); };
+        const hostStart = () => { peerLost = false; M.session.roundStart(); o.startMatch(); };
 
         function showScreen(s) {
             el.overlay.classList.remove('hidden');
@@ -363,6 +363,7 @@
         M.overlayUp = () => !el.overlay.classList.contains('hidden');
         M.score = function (sc) { el.p1.textContent = sc[0]; el.p2.textContent = sc[1]; };
         M.gameOver = function (sc) {
+            M.session.roundEnd();
             overShown = true;
             if (M.role === 'host') o.stopHost();
             showScreen(el.over);
@@ -385,6 +386,7 @@
                 if (msg.sc) M.score(msg.sc);
                 if (msg.ph === 'over') { if (!overShown) M.gameOver(msg.sc); }
                 else {
+                    M.session.roundStart();
                     overShown = false; awaitingRestart = false;
                     if (M.overlayUp()) M.hideOverlay();
                 }
@@ -448,6 +450,7 @@
             if (M.role === 'host' && canStart()) hostStart();
         });
         el.restart.addEventListener('click', () => {
+            M.session.rematch();
             o.sfx.init();
             if (M.role === 'host') hostStart();
             else {
