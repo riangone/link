@@ -46,20 +46,27 @@ test('lobby invite link -> pong match reports the funnel metrics', async ({ brow
     await a.waitForURL(/\/pong\//, { timeout: 15000 });
     await b.waitForURL(/\/pong\//, { timeout: 15000 });
 
+    // The connection decides who hosts, and only the host gets a start button.
+    let host = null, guest = null;
+    await expect.poll(async () => {
+        if (await a.locator('#start-btn').isVisible()) [host, guest] = [a, b];
+        else if (await b.locator('#start-btn').isVisible()) [host, guest] = [b, a];
+        return !!host;
+    }, { timeout: 20000 }).toBe(true);
+
     // Nobody moves the paddles, so the host's ball scores until game over.
-    await expect(a.locator('#start-btn')).toBeVisible({ timeout: 20000 });
-    await a.locator('#start-btn').click({ force: true });
+    await host.locator('#start-btn').click({ force: true });
 
-    await expect.poll(() => sent(a, 'net_result').then((r) => r.length), { timeout: 15000 }).toBe(1);
-    expect(['direct', 'turn', 'ws']).toContain((await sent(a, 'net_result'))[0].kind);
+    await expect.poll(() => sent(host, 'net_result').then((r) => r.length), { timeout: 15000 }).toBe(1);
+    expect(['direct', 'turn', 'ws']).toContain((await sent(host, 'net_result'))[0].kind);
 
-    await expect.poll(() => sent(a, 'match_end').then((r) => r.length), { timeout: 150000 }).toBe(1);
-    await expect.poll(() => sent(b, 'match_end').then((r) => r.length), { timeout: 10000 }).toBe(1);
-    expect((await sent(a, 'match_end'))[0]).toMatchObject({ game: 'pong' });
-    expect((await sent(a, 'match_end'))[0].sec).toBeGreaterThan(0);
+    await expect.poll(() => sent(host, 'match_end').then((r) => r.length), { timeout: 150000 }).toBe(1);
+    await expect.poll(() => sent(guest, 'match_end').then((r) => r.length), { timeout: 10000 }).toBe(1);
+    expect((await sent(host, 'match_end'))[0]).toMatchObject({ game: 'pong' });
+    expect((await sent(host, 'match_end'))[0].sec).toBeGreaterThan(0);
 
-    await a.locator('#restart-btn').click();
-    await expect.poll(() => sent(a, 'rematch').then((r) => r.length)).toBe(1);
+    await host.locator('#restart-btn').click();
+    await expect.poll(() => sent(host, 'rematch').then((r) => r.length)).toBe(1);
 
     await ctxA.close();
     await ctxB.close();
