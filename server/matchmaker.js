@@ -22,7 +22,7 @@
  */
 const crypto = require('crypto');
 
-const GAMES = ['gomoku', 'pong', 'hockey', 'tanks', 'brawl', 'tron', 'blaster', 'blocks', 'bombs', 'tag', 'paint', 'kart', 'kart3d', 'spin', 'spin3d', 'armor', 'mech', 'recon', 'volley', 'soccer', 'tennis', 'hoops', 'oni'];
+const GAMES = ['gomoku', 'pong', 'hockey', 'tanks', 'brawl', 'tron', 'blaster', 'blocks', 'bombs', 'tag', 'paint', 'kart', 'kart3d', 'spin', 'armor', 'mech', 'recon', 'frontline', 'oni', 'abyss'];
 const CODE_RE = /^\d{4}$/;
 const NAME_MAX = 16;
 const CODE_TTL_MS = 30 * 60 * 1000;

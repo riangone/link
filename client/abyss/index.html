@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+    <title>深渊升潮</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+    <header>
+        <b class="logo">LINK <span>// ABYSS</span></b>
+        <span class="score" id="score">0 : 0</span>
+        <select id="lang" aria-label="Language">
+            <option value="zh">中文</option><option value="en">EN</option><option value="ja">日本語</option><option value="ko">한국어</option>
+        </select>
+    </header>
+
+    <section class="field" id="field">
+        <canvas id="game"></canvas>
+
+        <div class="hud" id="hud">
+            <div class="hb" data-i="0"><span>AMBER</span><div><i></i></div><b>--</b></div>
+            <div class="hb foe" data-i="1"><span>BLOOM</span><div><i></i></div><b>--</b></div>
+        </div>
+        <p class="hint" id="hint"></p>
+
+        <div class="touch" id="touch">
+            <div class="stick" id="stick"><div class="knob" id="knob"></div><span data-i18n="stick">潜行摇杆</span></div>
+            <div class="acts" id="acts">
+                <button type="button" class="act" id="drone-btn">🔆<small data-i18n="drone">回声</small><i class="cd"></i></button>
+                <button type="button" class="act" id="hunter-btn">🐍<small data-i18n="hunter">鳗群</small><i class="cd"></i></button>
+                <button type="button" class="act" id="scan-btn">📡<small data-i18n="scan">扫描</small><i class="cd"></i></button>
+                <button type="button" class="act" id="flare-btn">💡<small data-i18n="flare">爆闪</small><i class="cd"></i></button>
+                <button type="button" class="act" id="vent-btn">🌫️<small data-i18n="vent">雾障</small><i class="cd"></i></button>
+                <button type="button" class="act" id="mine-btn">💣<small><span data-i18n="mine">水雷</span> <b id="mine-n">3</b></small></button>
+                <button type="button" class="act fire" id="fire-btn">🦈<small data-i18n="fire">开火</small><i class="cd"></i></button>
+            </div>
+        </div>
+
+        <div class="overlay" id="overlay">
+            <div class="card" id="lobby-screen">
+                <h1 data-i18n="title">深渊升潮</h1>
+                <p data-i18n="tagline">深海突袭 · 巨兽巢穴 · 声呐隐匿 · 单手操控</p>
+                <label class="invite"><span data-i18n="invite">邀请链接（发给队友）</span>
+                    <span class="row"><input id="invite-url" readonly><button type="button" id="copy-btn" data-i18n="copy">复制</button></span>
+                </label>
+                <p class="muted" id="conn-text" data-i18n="conn_wait">正在接入深渊…</p>
+            </div>
+
+            <div class="card hidden" id="ready-screen">
+                <h1 data-i18n="title">深渊升潮</h1>
+                <h2 data-i18n="ready_h">潜航简报 & 装备整备</h2>
+                <p id="role-text"></p>
+                <div class="loadout" id="loadout">
+                    <div class="opt"><span class="opt-h" data-i18n="lo_map">海域规模</span><div class="chips" id="map-chips"></div></div>
+                    <p class="desc" id="map-desc"></p>
+
+                    <div class="opt"><span class="opt-h" data-i18n="lo_depth">下潜深度</span><div class="chips" id="depth-chips"></div></div>
+                    <p class="desc" id="depth-desc"></p>
+
+                    <div class="opt"><span class="opt-h" data-i18n="lo_class">压力壳</span><div class="chips" id="cls-chips"></div></div>
+                    <p class="desc" id="cls-desc"></p>
+
+                    <div class="opt"><span class="opt-h" data-i18n="lo_weapon">声呐武器</span><div class="chips" id="w-chips"></div></div>
+                    <p class="desc" id="w-desc"></p>
+
+                    <div class="opt"><span class="opt-h" data-i18n="lo_gear">深渊装备</span><div class="chips" id="g-chips"></div></div>
+                    <p class="desc" id="g-desc"></p>
+
+                    <p class="stats" id="lo-stats"></p>
+                    <div class="toggles">
+                        <button type="button" id="items-btn"></button>
+                        <button type="button" id="aim-btn"></button>
+                        <button type="button" id="af-btn"></button>
+                    </div>
+                </div>
+                <p class="muted" data-i18n="rule" data-n="3"></p>
+                <button type="button" class="primary" id="start-btn" data-i18n="start">下潜突袭</button>
+            </div>
+
+            <div class="card hidden" id="gameover-screen">
+                <h1 id="result-title"></h1>
+                <p id="result-reason" style="margin: 6px 0 10px; font-size: 13px; color: var(--accent);"></p>
+                <p><span data-i18n="final">总比分</span>: <b id="final-score">0 - 0</b></p>
+                <button type="button" class="primary" id="restart-btn" data-i18n="rematch">再战一场</button>
+            </div>
+
+            <div class="card hidden" id="disconnect-screen">
+                <h1 data-i18n="lost_h">队友信号丢失</h1>
+                <p data-i18n="lost_p">对方已离开深渊。</p>
+                <button type="button" class="primary" id="reload-btn" data-i18n="reload">重新部署</button>
+            </div>
+
+            <a class="back" href="../play/" data-i18n="lobby">返回大厅</a>
+        </div>
+    </section>
+
+    <p class="status"><span id="status-text">--</span> · <span id="ping-text">-- ms</span> · <span id="role-status-text">--</span></p>
+</main>
+<script src="../scripts/game-session.js"></script>
+<script src="../scripts/game-bot.js" data-lobby="../play/"></script>
+<script src="i18n.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
