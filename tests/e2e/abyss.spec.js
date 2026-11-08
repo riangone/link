@@ -16,25 +16,43 @@ test.describe('Abyssal Front', () => {
     test.beforeAll(async () => { dev = await startDevServer(); });
     test.afterAll(async () => { await dev.close(); });
 
+    /**
+     * Wait until the vs-computer room hands the page a local session. GameBot
+     * opens the ready card only when its (deferred) LocalSession connects, and
+     * clicking through earlier just gets the start call dropped.
+     */
+    async function waitBotReady(page) {
+        await page.waitForFunction(() => !!window.__bot && typeof window.__bot.state === 'function', null, { timeout: 5_000 });
+        await expect(page.locator('#ready-screen')).toBeVisible({ timeout: 5_000 });
+    }
+
     async function startBot(page, { bot = 'easy', lan = 'zh' } = {}) {
         const errors = [];
         page.on('pageerror', e => errors.push(String(e)));
         await page.goto(`${dev.url}/abyss/?bot=${bot}&lang=${lan}#bot-abyss-${Math.random().toString(36).slice(2, 7)}`);
-        await expect(page.locator('#ready-screen')).toBeVisible({ timeout: 5_000 });
+        await waitBotReady(page);
         await page.locator('#start-btn').click();
         await expect(page.locator('#overlay')).toHaveClass(/hidden/);
         await page.evaluate(() => window.__bot.freezeBot(true));
         return errors;
     }
     const simT = page => page.evaluate(() => window.__bot.state().T);
-    /** Leave a running dive, pick the depth band on the ready screen, dive again. */
+    /**
+     * Leave a running dive and get back to the ready card. The lobby card is
+     * display:none while the overlay is hidden, so it cannot be clicked — the
+     * overlay itself has to be unhidden first (the real UI gets there through
+     * the game-over / disconnect screens).
+     */
     async function redive(page, depthIndex) {
         await page.evaluate(() => {
+            // showScreen() only shows the card it is asked for, so open the ready card
+            // explicitly and close the game-over card left open by the last dive
             const el = id => document.getElementById(id);
             el('overlay').classList.remove('hidden');
-            el('gameover-screen').classList.remove('hidden');
             el('ready-screen').classList.remove('hidden');
+            el('gameover-screen').classList.add('hidden');
         });
+        await waitBotReady(page);
         await page.locator('#depth-chips button').nth(depthIndex).click();
         await expect(page.locator('#depth-chips button').nth(depthIndex)).toHaveClass(/active/);
         await expect(page.locator('#lo-stats')).toContainText('228');   // ram 380 sonar × 0.6 (hadal)
@@ -59,6 +77,8 @@ test.describe('Abyssal Front', () => {
         const x1 = await page.evaluate(() => window.__bot.state().tanks[0].x);
         expect(x1).toBeGreaterThan(S0.x + 40);
 
+        // a fresh dive starts with a short arming delay on the tubes; wait it out, then hold fire
+        await expect.poll(() => page.evaluate(() => window.__bot.state().tanks[0].cd), { timeout: 4_000 }).toBeLessThan(200);
         await page.keyboard.down(' ');
         await expect.poll(() => page.evaluate(() => window.__bot.state().shots.length)).toBeGreaterThan(0);
         await page.keyboard.up(' ');
@@ -85,12 +105,26 @@ test.describe('Abyssal Front', () => {
             const S = window.__bot.state();
             // a captured den is a listening post: keep every den (and its radar) away from this test
             S.dens.length = 0;
-            // open water just outside the rival's endge of the sea: a = our hull, k = the kelp centre 300px east
-            const seaW = window.__bot.state().size === 'large' ? 3600 : 2400;
-            const a = [120, 240, 360, 480, 600, 720, 840, 960].map(y => window.__bot.free(seaW - 900, y))
-                .filter(Boolean).find(p => !!window.__bot.free(p.x + 300, p.y));
-            if (!a) return { fail: 'no open pair' };
-            const k = window.__bot.free(a.x + 300, a.y);
+            // open water near the rival's patch of sea: a = our hull, k = the kelp centre ~300px east.
+            // Scan the whole west edge for a pair that satisfies every rule at once: a clear line of
+            // sound (no basalt), a straight-line distance inside the rival's spot radius (kelp hides
+            // beyond it) yet inside the shooter's own sonar reach (so only the kelp can explain the
+            // silence), and a kelp centre that is itself in open water
+            const seaW = S.size === 'large' ? 3600 : 2400;
+            const reach = window.__bot.stats(0).sight;
+            let a = null, k = null;
+            for (let y = 120; y < 900 && !k; y += 60) {
+                const c = window.__bot.free(seaW - 1000, y);
+                if (!c) continue;
+                for (let dx = 0; dx <= 300 && !k; dx += 30) {
+                    const q = window.__bot.free(c.x + 300 + dx, c.y);
+                    if (!q || window.__bot.inKelp(q.x, q.y)) continue;
+                    const d = Math.hypot(q.x - c.x, q.y - c.y);
+                    if (d <= 125 || d >= reach || !window.__bot.los(c, q)) continue;
+                    a = c; k = q;
+                }
+            }
+            if (!k) return { fail: 'no clear kelp spot' };
             window.__bot.map().forests.push({ x: k.x, y: k.y, r: 150 });
             // zero the clocks before teleporting: a stale `reveal` from before the move must not leak
             const T = S.T;
@@ -100,11 +134,12 @@ test.describe('Abyssal Front', () => {
             window.__bot.place(1, k.x, k.y);
             window.__bot.setInput(1, { mx: 0, my: 0, ax: null, f: false, aa: false });
             S.tanks[1].still = T;
-            return { d: Math.hypot(a.x - k.x, a.y - k.y), inKelp: window.__bot.inKelp(k.x, k.y), los: window.__bot.los(a, k), sight: window.__bot.stats(0).sight, a, k };
+            return { d: Math.hypot(a.x - k.x, a.y - k.y), inKelp: window.__bot.inKelp(k.x, k.y), los: window.__bot.los(a, k), sight: reach, a, k };
         });
         expect(setup.inKelp).toBe(true);
         expect(setup.los).toBe(true);
         expect(setup.d).toBeLessThan(setup.sight);
+        expect(setup.d).toBeGreaterThan(125);                    // plainly beyond the kelp spot radius
 
         // the rival sits in kelp: amber cannot hear it
         await expect.poll(() => page.evaluate(() => window.__bot.visible(0))).toBe(false);
@@ -155,8 +190,8 @@ test.describe('Abyssal Front', () => {
         const hp0 = await page.evaluate(() => window.__bot.stats(0).hp);
         await page.evaluate(() => window.__bot.state().tanks[0].scanAt = 0);
         await page.keyboard.press('e');
-        const scan = await page.evaluate(() => { const t = window.__bot.state().tanks[0]; return { from: t.scanFrom, to: t.scanTo }; });
-        expect(scan.to).toBeGreaterThan(scan.from);
+        // the key is consumed on the next sim tick, which is a frame away: give it until the ping lands
+        await expect.poll(() => page.evaluate(() => { const t = window.__bot.state().tanks[0]; return t.scanTo > t.scanFrom; })).toBe(true);
 
         // the depth band is host-owned: pick it on the ready screen, then dive
         await redive(page, 3);                                   // hadal zone

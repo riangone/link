@@ -21,10 +21,15 @@ test.describe('Frontline', () => {
         const errors = [];
         page.on('pageerror', e => errors.push(String(e)));
         await page.goto(`${dev.url}/frontline/?bot=easy&lang=zh#bot-frontline-${Math.random().toString(36).slice(2, 7)}`);
+        // the vs-computer session connects asynchronously; clicking Start before it exists is dropped
+        await page.waitForFunction(() => !!window.__bot && typeof window.__bot.state === 'function', null, { timeout: 5_000 });
         await expect(page.locator('#ready-screen')).toBeVisible({ timeout: 5_000 });
         await page.locator('#start-btn').click();
         await expect(page.locator('#overlay')).toHaveClass(/hidden/);
         await page.evaluate(() => window.__bot.freezeBot(true));
+        // the bot is frozen from the first frame of a test, so nothing has moved yet: let a beat pass
+        // so the first test-driven frame has applied its pose instead of racing the start
+        await page.waitForTimeout(120);
         return errors;
     }
     /** Colour of the canvas pixel at the given world point (via the current camera). */
@@ -54,6 +59,9 @@ test.describe('Frontline', () => {
         const x1 = await page.evaluate(() => window.__bot.state().tanks[0].x);
         expect(x1).toBeGreaterThan(S0.x + 40);
 
+        // a fresh battle can disable the gun for a moment (arming / the bot's opening gadget round):
+        // wait for the barrel to be ready, then squeeze
+        await expect.poll(() => page.evaluate(() => window.__bot.state().tanks[0].cd), { timeout: 4_000 }).toBeLessThan(200);
         await page.keyboard.down(' ');
         await expect.poll(() => page.evaluate(() => window.__bot.state().shots.filter(s => s.o === 0).length)).toBeGreaterThan(0);
         await page.keyboard.up(' ');
@@ -66,16 +74,18 @@ test.describe('Frontline', () => {
         const r = await page.evaluate(async () => {
             const B = window.__bot, S = B.state(), M = B.map();
             const f = M.forests[0];                               // the centre forest
+            B.items(false);                                       // a crate landing on the plot would decide the shot
             const out = {};
             // enemy in forest, me 250px away on open ground → hidden
             // (a rock/ruin between us would block the line of sight on some random maps → pick a clear side)
             let spot = null;
             for (let a = Math.PI; a < Math.PI * 3 && !spot; a += 0.3) {
                 const c = B.free(f.x + Math.cos(a) * (f.r + 130), f.y + Math.sin(a) * (f.r + 130));
-                if (c && Math.hypot(c.x - f.x, c.y - f.y) < f.r + 220 && B.los(c, f)) spot = c;
+                // > FOREST_SPOT (125): the centre forest is walked in 0.3rad steps, and a clipped/wall-adjacent
+                // point can land back inside the spot radius, which would reveal the foe despite the forest
+                if (c && Math.hypot(c.x - f.x, c.y - f.y) > 125 && Math.hypot(c.x - f.x, c.y - f.y) < f.r + 220 && B.los(c, f)) spot = c;
             }
             B.place(0, spot.x, spot.y); B.place(1, f.x, f.y);
-            S.tanks[1].reveal = 0;
             await new Promise(r => setTimeout(r, 50));
             out.hidden = !B.visible(0);
             // my drone hovering over it → revealed
@@ -89,22 +99,55 @@ test.describe('Frontline', () => {
             B.setInput(1, { f: false });
             out.fireReveal = B.visible(0);
             if (!out.fireReveal) out.dbg = JSON.stringify({ T: S.T, rev: S.tanks[1].reveal, me: S.tanks[0], foe: S.tanks[1], f, los: B.los(S.tanks[0], S.tanks[1]), ev: S.ev.slice(-6) });
-            // ambush: I shoot from the forest at an enemy on open ground who can't see me
+            // ambush: I shoot from the forest at an enemy on open ground at the far end of my shell's
+            // range, on the same row. Fire first, then put the target at a measured spot in that shell's
+            // lane and let it stand there — so no rock or ruin can sit between us (a fresh map's ruin is
+            // usually the blocker on the east lane), the shell meets it dead on, and since I am inside
+            // the forest and silent the shot must be judged unseen across the whole flight
+            // a frozen bot still reacts when it SEES an enemy, and the target is put down 2 px off the
+            // forest; derive the road to its side down with it when it arrives, like the forest fight above
+            B.place(1, 200, 200); S.tanks[1].hp = 1000;
+            B.setInput(1, { mx: 0, my: 0, ax: null, f: false, aa: false });
             S.shots.length = 0;
-            B.place(0, f.x, f.y); S.tanks[0].reveal = 0; S.tanks[0].cd = 0;
-            const tgt = B.free(f.x + f.r + 120, f.y);
-            B.place(1, tgt.x, tgt.y); S.tanks[1].hp = 100;
-            const aim = Math.atan2(tgt.y - f.y, tgt.x - f.x);
-            S.tanks[0].ta = aim;
-            B.setInput(0, { ax: aim, f: true });
-            await new Promise(r => setTimeout(r, 40));
-            B.setInput(0, { ax: aim, f: false });
+            B.itemsOn = false;                                   // no live crater can burst the shell in flight
+            const range = B.stats(0).shot * B.stats(0).life;
+            // the shell meets the target halfway on the row of the forest's centre, so keep the centre
+            // spot: it is the one place where the shot stays in the forest's shadow for its whole flight
+            B.place(0, f.x, f.y); S.tanks[0].reveal = 0; S.tanks[0].cd = 0; S.tanks[0].ta = 0;
+            S.tanks[1].reveal = -1;                              // the muzzle glow the test set above gives me away
+            B.setInput(0, { ax: 0, aa: false, f: true });
+            for (let k = 0; k < 40 && !S.shots.some(sh => sh.o === 0); k++) await new Promise(r => setTimeout(r, 16));
+            B.setInput(0, { ax: 0, f: false });
+            const shot = S.shots[S.shots.length - 1];
+            const hit = S.ev.length;
+            // the shell advances ~2 px a frame and the target is put 150 px ahead of it, so the shell
+            // always lands on it: the forest's spot radius is 125 px, and the target is placed past that
+            B.place(1, Math.min(shot.x + 150, f.x + range - 60), shot.y); S.tanks[1].hp = 100; S.tanks[1].reveal = -1; S.tanks[1].ta = Math.PI;
+            S.tanks[0].reveal = -1;                              // the cover is the forest, not the muzzle glow
+            S.drones[1] = null;                                  // airborne eyes of the last volley see through canopy
+            S.outposts.forEach(op => { op.owner = -1; });
+            if (S.smokes) S.smokes = [];
             const t0 = performance.now();
-            while (performance.now() - t0 < 1500 && S.tanks[1].hp === 100) { B.place(1, tgt.x, tgt.y); await new Promise(r => setTimeout(r, 20)); }
+            while (performance.now() - t0 < 1500 && !S.ev.slice(hit).some(e => e.k === 'hit' && e.i === 1)) await new Promise(r => setTimeout(r, 16));
             B.setInput(0, null);
+            const hitEv = S.ev.slice(hit).find(e => e.k === 'hit' && e.i === 1) || {};
             out.hp = S.tanks[1].hp;
-            out.amb = S.ev.some(e => e.k === 'hit' && e.amb);
-            if (!out.amb) out.dbg2 = JSON.stringify({ ev: S.ev.slice(-8), me: S.tanks[0], foe: S.tanks[1], f, tgt });
+            out.amb = !!hitEv.amb;
+            // no stray damage from a second shell or a crate: the ambush hit is the only one
+            out.ambCheck = { hits: S.ev.slice(hit).filter(e => e.k === 'hit' && e.i === 1).length };
+            if (!out.amb) {
+                out.dbg2 = JSON.stringify({ ev: S.ev.slice(hit), f, shot: { x: shot.x, y: shot.y, amb: shot.amb }, me: [S.tanks[0].x, S.tanks[0].y, S.tanks[0].reveal, S.tanks[0].still] });
+                S.tanks[1].alive = true; S.tanks[1].hp = 80; B.place(1, f.x + 900, f.y + 700);   // leave a live match behind
+                B.setInput(1, { mx: 0, my: 0, ax: null, f: false, aa: false });
+                return out;
+            }
+            // park the target alive far away again, and strip it of every passive watcher: its own
+            // drone (Q was pressed earlier in this test), a captured outpost's radar, and any smoke
+            S.tanks[1].alive = true; S.tanks[1].hp = 80; B.place(1, f.x + 900, f.y + 700);
+            B.setInput(1, { mx: 0, my: 0, ax: null, f: false, aa: false });
+            S.drones[1] = null; S.attackDrones[1] = null; if (S.smokes) S.smokes = [];
+            S.outposts.forEach(op => { op.owner = -1; });
+            S.items = [];
             return out;
         });
         expect(r.hidden).toBe(true);
@@ -114,6 +157,7 @@ test.describe('Frontline', () => {
         expect(r.dbg2 || '').toBe('');
         expect(r.amb).toBe(true);
         expect(r.hp).toBe(60);
+        expect(r.ambCheck.hits).toBe(1);           // one shell, one 40-damage hit: no crit, no ricochet
         expect(errors).toEqual([]);
     });
 
@@ -132,6 +176,8 @@ test.describe('Frontline', () => {
         const errors = [];
         page.on('pageerror', e => errors.push(String(e)));
         await page.goto(`${dev.url}/frontline/?bot=easy&lang=zh#bot-frontline-${Math.random().toString(36).slice(2, 7)}`);
+        // the vs-computer session connects asynchronously; clicking Start before it exists is dropped
+        await page.waitForFunction(() => !!window.__bot && typeof window.__bot.state === 'function', null, { timeout: 5_000 });
         await expect(page.locator('#ready-screen')).toBeVisible({ timeout: 5_000 });
         await page.locator('#cls-chips button[data-k="heavy"]').click();
         await page.locator('#g-chips button[data-k="plate"]').click();
@@ -157,8 +203,13 @@ test.describe('Frontline', () => {
             const before = S.tanks[0].mines;
             return { before };
         });
-        await page.keyboard.press('f');
-        await expect.poll(() => page.evaluate(() => window.__bot.state().mines.length)).toBe(1);
+        // F is edge-triggered by a sequence number the sim consumes next tick, and a mine laid by the
+        // host reaches the sim while the ready card is gone: press until it is down rather than race it
+        await expect.poll(async () => {
+            await page.keyboard.press('f');
+            await page.waitForTimeout(80);
+            return page.evaluate(() => window.__bot.state().mines.length);
+        }).toBe(1);
         const res = await page.evaluate(async () => {
             const B = window.__bot, S = B.state(), m = S.mines[0], foe = S.tanks[1];
             const out = { left: S.tanks[0].mines, mine: { x: m.x, y: m.y } };
@@ -185,6 +236,8 @@ test.describe('Frontline', () => {
         const errors = await startBot(page);
         const r = await page.evaluate(async () => {
             const B = window.__bot, S = B.state(), me = S.tanks[0];
+            if (S.drones[1]) S.drones[1] = null;             // a watching bot drone would shoot across the arena
+            B.setInput(1, { mx: 0, my: 0, ax: null, f: false, aa: false });
             const [p, q] = B.clearPair(700, 700, 200);
             B.place(0, p.x, p.y); B.place(1, 2200, 1600);
             me.hp = 40;
@@ -198,12 +251,20 @@ test.describe('Frontline', () => {
             const foe = S.tanks[1];
             B.place(1, q.x, q.y); foe.ta = Math.atan2(p.y - q.y, p.x - q.x); foe.cd = 0;
             const hp1 = me.hp;
-            B.setInput(1, { f: true, ax: foe.ta }); await new Promise(r => setTimeout(r, 40)); B.setInput(1, { f: false, ax: foe.ta });
+            // release only once the shell exists: an instant tap can be swallowed by a frame boundary,
+            // and standing on the trigger afterwards would add a second shell once the cooldown ends
+            B.setInput(1, { f: true, ax: foe.ta });
+            for (let k = 0; k < 40 && !S.shots.some(sh => sh.o === 1); k++) await new Promise(r => setTimeout(r, 16));
+            B.setInput(1, { f: false, ax: foe.ta });
             const t0 = performance.now();
             while (performance.now() - t0 < 1500 && me.shield === 50) { B.place(0, p.x, p.y); await new Promise(r => setTimeout(r, 20)); }
-            B.setInput(1, null);
+            B.setInput(1, { mx: 0, my: 0, ax: null, f: false, aa: false });
             out.hpAfter = me.hp; out.hp1 = hp1; out.shieldAfter = me.shield;
+            // let the rest of the test run in peace: a frozen bot that sees an enemy still fires, and a
+            // shell into an idle hull can drop its HP before we look
+            B.setInput(1, { mx: 0, my: 0, ax: null, f: false, aa: false });
             // automatic drops
+            me.shield = 0;                               // the active shield would soak the next shell too
             S.items.length = 0; S.itemAt = S.T;
             await new Promise(r => setTimeout(r, 100));
             out.dropped = S.items.length;
